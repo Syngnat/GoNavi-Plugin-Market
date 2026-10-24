@@ -211,8 +211,7 @@ export function PluginDetailPage() {
               <span className="text-muted">当前版本</span>
               <span className="font-mono font-medium">{detail.version}</span>
             </div>
-            <InstallButton pluginId={detail.id} variant="block" label="安装插件" />
-            <p className="text-center text-xs text-muted mt-3">将安装到本机 GoNavi，安装前仍需确认摘要</p>
+            <InstallButton item={detail} variant="block" />
             <dl className="mt-6 space-y-3 text-sm border-t border-hairline pt-5">
               <div className="flex justify-between gap-4">
                 <dt className="text-muted">最低宿主版本</dt>

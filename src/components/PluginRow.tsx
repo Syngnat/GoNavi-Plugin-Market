@@ -35,7 +35,7 @@ export function PluginRow({ item, icon }: { item: PluginItem; icon: string }) {
       </div>
       <div className="flex items-center space-x-4 self-end md:self-center shrink-0">
         <span className="text-xs text-muted font-mono hidden lg:inline">{relativeTime(item.updatedAt)}更新</span>
-        <InstallButton pluginId={item.id} variant="row" />
+        <InstallButton item={item} variant="row" />
       </div>
     </div>
   );

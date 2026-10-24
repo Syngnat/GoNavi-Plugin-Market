@@ -32,6 +32,19 @@ npm run preview
 
 类型镜像见 `src/api/types.ts`，字段与主仓库 `internal/pluginmarket/types.go` 的 JSON tag 一致。
 
+## 安装深链契约
+
+「安装」按钮唤起本机 GoNavi 客户端（客户端在 `internal/deeplink` 注册并解析）：
+
+```
+gonavi://plugin/install?spec=<github:owner/repo 或 npm 包名>&id=<插件ID>&version=<版本>
+```
+
+- `spec` 可选：客户端预填安装面板并自动执行检查；`id` 必填：市场服务接入前客户端仅预填输入框。
+- 链接只负责把用户送到客户端的安装面板；下载、静态检查、SHA-256 摘要确认全部在客户端完成。
+- 2 秒内浏览器未弹出协议处理框（未装客户端）时，按钮回退为复制插件 ID。
+- 市场服务上线后，目录条目携带真实来源时在 `buildInstallDeepLink` 调用处传入 `spec` 即可。
+
 ## 部署
 
 `npm run build` 产出纯静态 `dist/`。SPA 路由需托管层将所有路径回退到 `index.html`（如 Nginx `try_files` / Cloudflare Pages 自动处理）。

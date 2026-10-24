@@ -42,7 +42,7 @@ export function FeaturedCard({ item }: { item: PluginItem }) {
         </div>
       </div>
       <div className="space-y-3 pt-6">
-        <InstallButton pluginId={item.id} variant="block" label="安装插件" />
+        <InstallButton item={item} variant="block" />
         <div className="text-center">
           <Link
             to={`/plugins/${encodeURIComponent(item.id)}`}
