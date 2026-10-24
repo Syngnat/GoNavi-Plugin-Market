@@ -41,6 +41,7 @@ gonavi://plugin/install?spec=<github:owner/repo 或 npm 包名>&id=<插件ID>&ve
 ```
 
 - `spec` 可选：客户端预填安装面板并自动执行检查；`id` 必填：市场服务接入前客户端仅预填输入框。
+- `spec` 的 github 形态支持可选 tag：`github:owner/repo@tag`（tag 允许 `._+-/`，官方 monorepo 约定 `<插件名>-v<semver>`，如 `github:Syngnat/gonavi-plugins@nginx-inspector-v1.0.0`）。不带 tag 时解析仓库 latest release——**monorepo 必须带 tag**，否则 latest 是最后发版的插件；粘贴 `github.com/.../releases/download/...` 直链亦可，宿主跳过 release 解析直接下载。
 - 链接只负责把用户送到客户端的安装面板；下载、静态检查、SHA-256 摘要确认全部在客户端完成。
 - 2 秒内浏览器未弹出协议处理框（未装客户端）时，按钮回退为复制插件 ID。
 - 市场服务上线后，目录条目携带真实来源时在 `buildInstallDeepLink` 调用处传入 `spec` 即可。
