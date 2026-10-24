@@ -88,7 +88,12 @@ export function HomePage() {
             {loading && rows.length === 0 ? (
               <div className="p-10 text-center text-sm text-muted">加载中…</div>
             ) : rows.length === 0 ? (
-              <div className="p-10 text-center text-sm text-muted">没有匹配的插件，换个关键词试试。</div>
+              <div className="p-10 text-center space-y-2">
+                <p className="text-sm text-ink">首批插件正在整理上架。</p>
+                <p className="text-xs text-muted">
+                  上架要求：插件包通过 GoNavi 的静态检查与内容摘要校验，且提供真实可验证的发布源。
+                </p>
+              </div>
             ) : (
               rows.map((item) => (
                 <PluginRow key={item.id} item={item} icon={item.icon ?? 'extension'} />
