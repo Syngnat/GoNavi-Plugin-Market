@@ -1,4 +1,4 @@
-export const CATEGORIES = ['全部', '数据源', 'AI 供应商', '导出器', '技能', '面板', '命令'] as const;
+export const CATEGORIES = ['全部', '数据源', 'AI 供应商', '导出器', '技能', '面板', '命令', '运维'] as const;
 
 export type Category = (typeof CATEGORIES)[number];
 
