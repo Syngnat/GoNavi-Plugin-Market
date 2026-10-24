@@ -10,7 +10,7 @@ export function FeaturedCard({ item }: { item: PluginItem }) {
       <div className="space-y-4">
         <div className="flex justify-between items-start">
           <div className="w-12 h-12 rounded-lg bg-paper border border-hairline flex items-center justify-center text-copper shadow-sm">
-            <span className="material-symbols-outlined text-2xl fill-icon">monitoring</span>
+            <span className="material-symbols-outlined text-2xl fill-icon">{item.icon ?? 'extension'}</span>
           </div>
           <div className="flex items-center space-x-2">
             {item.official && (
@@ -26,16 +26,24 @@ export function FeaturedCard({ item }: { item: PluginItem }) {
         <h2 className="text-2xl font-headline font-bold tracking-tight">{item.name}</h2>
         <p className="text-muted text-sm leading-relaxed">{item.description}</p>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted pt-1">
-          <span className="flex items-center space-x-0.5 text-copper">
-            <span className="material-symbols-outlined text-sm fill-icon">star</span>
-            <span className="font-medium">{item.ratingAverage.toFixed(1)}</span>
-            <span>({item.ratingCount})</span>
-          </span>
-          <span>•</span>
-          <span>
-            下载量 <span className="text-ink font-medium">{formatCount(item.downloadCount)}</span>
-          </span>
-          <span>•</span>
+          {item.ratingAverage !== undefined && (
+            <>
+              <span className="flex items-center space-x-0.5 text-copper">
+                <span className="material-symbols-outlined text-sm fill-icon">star</span>
+                <span className="font-medium">{item.ratingAverage.toFixed(1)}</span>
+                {item.ratingCount !== undefined && <span>({item.ratingCount})</span>}
+              </span>
+              <span>•</span>
+            </>
+          )}
+          {item.downloadCount !== undefined && (
+            <>
+              <span>
+                下载量 <span className="text-ink font-medium">{formatCount(item.downloadCount)}</span>
+              </span>
+              <span>•</span>
+            </>
+          )}
           <span>
             更新于 <span className="text-ink font-medium">{relativeTime(item.updatedAt)}</span>
           </span>

@@ -1,0 +1,79 @@
+{
+  "sourceId": "plugin-market-site",
+  "updatedAt": "2026-10-24T10:49:17Z",
+  "items": [
+    {
+      "id": "com.gonavi.ndjson-exporter",
+      "name": "NDJSON 流式导出器",
+      "description": "把查询结果渲染为逐行 NDJSON（换行分隔 JSON），每个单元格保留 missing、null、string、boolean、number、json、binary 类型标签，供下游程序无损回读。纯渲染插件：不访问数据库、网络或目标文件，按 512 行分块流式输出。",
+      "author": "GoNavi Project",
+      "publisherId": "gonavi",
+      "official": true,
+      "version": "1.0.0",
+      "category": "导出器",
+      "minHostVersion": "1.1.6",
+      "platforms": ["windows", "macos", "linux"],
+      "updatedAt": "2026-10-24T10:48:18Z",
+      "icon": "data_object",
+      "featured": true,
+      "installSpec": "github:Syngnat/gonavi-plugin-ndjson-exporter",
+      "repoUrl": "https://github.com/Syngnat/gonavi-plugin-ndjson-exporter",
+      "contentDigest": "9724147509db9f91b14c286aa1e1a8b23adf93c379d5b13c0a70ad40fb252030",
+      "license": "Apache-2.0",
+      "artifact": {
+        "url": "https://github.com/Syngnat/gonavi-plugin-ndjson-exporter/releases/download/v1.0.0/gonavi-plugin-ndjson-exporter-1.0.0.zip",
+        "sha256": "84e6f79b7de3cda362373179223d46eb9352d9f64294d93ea61855cdfdcc0b8f",
+        "sizeBytes": 4394334,
+        "platform": "all",
+        "version": "1.0.0"
+      },
+      "sourceId": "plugin-market-site",
+      "features": [
+        "在数据导出对话框以「NDJSON（流式 · 无损类型标签）」格式出现，随查询结果分块流式渲染。",
+        "每个单元格携带显式类型标签，时间戳、大整数、二进制等不再被迫退化成字符串猜测。",
+        "插件进程只读处理传入快照：无数据库、无网络、无文件写入，权限清单里逐项可查。"
+      ],
+      "permissions": [
+        { "name": "导出数据", "key": "data.export", "scope": "导出", "granted": true },
+        { "name": "访问数据库", "key": "", "scope": "未授予", "granted": false },
+        { "name": "访问网络", "key": "", "scope": "未授予", "granted": false },
+        { "name": "写入文件", "key": "", "scope": "未授予", "granted": false }
+      ]
+    },
+    {
+      "id": "com.gonavi.sql-triage-skill",
+      "name": "SQL 只读排查技能包",
+      "description": "面向 AI 对话的只读数据库排查参考：排查意外数据、读取失败、慢查询或元数据不一致时，提供一套有界、以证据为准的工作流。技能只提供参考文档，不授予任何工具、凭据或 SQL 权限。",
+      "author": "GoNavi Project",
+      "publisherId": "gonavi",
+      "official": true,
+      "version": "1.0.0",
+      "category": "技能",
+      "minHostVersion": "1.1.5",
+      "platforms": ["windows", "macos", "linux"],
+      "updatedAt": "2026-10-24T10:49:17Z",
+      "icon": "menu_book",
+      "installSpec": "github:Syngnat/gonavi-plugin-sql-triage-skill",
+      "repoUrl": "https://github.com/Syngnat/gonavi-plugin-sql-triage-skill",
+      "contentDigest": "8550fdb832ed21739e0b5ba07fb93c76ca20a206fb49f4b27ae508fb62b2611e",
+      "license": "Apache-2.0",
+      "artifact": {
+        "url": "https://github.com/Syngnat/gonavi-plugin-sql-triage-skill/releases/download/v1.0.0/gonavi-plugin-sql-triage-skill-1.0.0.zip",
+        "sha256": "aaae18b7dd98bc5e6a6aff9e454d97f89b66de8938b6505217401556bbae0902",
+        "sizeBytes": 7913,
+        "platform": "all",
+        "version": "1.0.0"
+      },
+      "sourceId": "plugin-market-site",
+      "features": [
+        "安装后在 AI 设置的「插件技能」里出现，可随时预览 SKILL.md 全文再决定是否使用。",
+        "AI 需要排查思路时以只读工具按需加载参考，不做系统提示注入。",
+        "纯静态文档包：无后端进程、无网络访问，加载时宿主重新校验内容摘要。"
+      ],
+      "permissions": [
+        { "name": "提供 AI 技能", "key": "ai.skills", "scope": "技能", "granted": true },
+        { "name": "调用工具或执行 SQL", "key": "", "scope": "未授予", "granted": false }
+      ]
+    }
+  ]
+}

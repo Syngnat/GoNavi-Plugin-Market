@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { isDemoMode, verifyDeviceCode } from '../api/client';
+import { isMarketServiceConnected, verifyDeviceCode } from '../api/client';
 
 export function DeviceLoginPage() {
   const [code, setCode] = useState('');
@@ -27,7 +27,7 @@ export function DeviceLoginPage() {
             在 GoNavi 客户端的「插件市场 → 登录」弹窗中查看配对码，在此输入完成绑定。
           </p>
         </div>
-        {isDemoMode && (
+        {!isMarketServiceConnected && (
           <div className="text-xs text-muted bg-paper border border-hairline rounded-lg px-3 py-2 text-center">
             演示模式：市场服务尚未接入，输入不会产生真实绑定。
           </div>

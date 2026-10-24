@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CategoryPills, type Category } from '../components/CategoryPills';
 import { FeaturedCard } from '../components/FeaturedCard';
 import { PluginRow } from '../components/PluginRow';
-import { fetchCatalog, FEATURED_ID, seedIcons } from '../api/client';
+import { fetchCatalog } from '../api/client';
 import type { PluginItem } from '../api/types';
 
 export function HomePage() {
@@ -31,7 +31,7 @@ export function HomePage() {
     };
   }, [category, q]);
 
-  const featured = useMemo(() => items.find((entry) => entry.id === FEATURED_ID) ?? null, [items]);
+  const featured = useMemo(() => items.find((entry) => entry.featured) ?? null, [items]);
   const rows = useMemo(
     () => (featured ? items.filter((entry) => entry.id !== featured.id) : items),
     [items, featured],
@@ -91,7 +91,7 @@ export function HomePage() {
               <div className="p-10 text-center text-sm text-muted">没有匹配的插件，换个关键词试试。</div>
             ) : (
               rows.map((item) => (
-                <PluginRow key={item.id} item={item} icon={seedIcons[item.id] ?? 'extension'} />
+                <PluginRow key={item.id} item={item} icon={item.icon ?? 'extension'} />
               ))
             )}
           </div>

@@ -22,13 +22,21 @@ export function PluginRow({ item, icon }: { item: PluginItem; icon: string }) {
           </div>
           <p className="text-muted text-sm line-clamp-1">{item.description}</p>
           <div className="flex items-center space-x-3 text-xs text-muted pt-1">
-            <span className="flex items-center space-x-0.5 text-copper">
-              <span className="material-symbols-outlined text-xs fill-icon">star</span>
-              <span>{item.ratingAverage.toFixed(1)}</span>
-            </span>
-            <span>•</span>
-            <span>下载 {formatCount(item.downloadCount)}</span>
-            <span>•</span>
+            {item.ratingAverage !== undefined && (
+              <>
+                <span className="flex items-center space-x-0.5 text-copper">
+                  <span className="material-symbols-outlined text-xs fill-icon">star</span>
+                  <span>{item.ratingAverage.toFixed(1)}</span>
+                </span>
+                <span>•</span>
+              </>
+            )}
+            {item.downloadCount !== undefined && (
+              <>
+                <span>下载 {formatCount(item.downloadCount)}</span>
+                <span>•</span>
+              </>
+            )}
             <span className="font-mono">{item.version}</span>
           </div>
         </div>

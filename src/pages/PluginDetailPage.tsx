@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { InstallButton } from '../components/InstallButton';
-import { fetchPluginDetail, NotFoundError, seedIcons } from '../api/client';
+import { fetchPluginDetail, NotFoundError } from '../api/client';
 import type { PluginDetail } from '../api/types';
 import { formatBytes, formatCount, relativeTime } from '../lib/format';
 
@@ -62,7 +62,7 @@ export function PluginDetailPage() {
     );
   }
 
-  const icon = seedIcons[detail.id] ?? 'extension';
+  const icon = detail.icon ?? 'extension';
 
   return (
     <main className="flex-grow max-w-7xl w-full mx-auto px-6 py-8">
@@ -100,15 +100,29 @@ export function PluginDetailPage() {
             </div>
             <p className="text-muted text-sm leading-relaxed mt-5">{detail.description}</p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm mt-5">
-              <span className="inline-flex items-center gap-1 text-copper font-medium">
-                <span className="material-symbols-outlined text-base fill-icon">star</span>
-                {detail.ratingAverage.toFixed(1)} <span className="text-muted font-normal">({detail.ratingCount})</span>
-              </span>
-              <span className="text-muted">·</span>
-              <span className="text-muted">
-                下载量 <span className="text-ink font-medium">{formatCount(detail.downloadCount)}</span>
-              </span>
-              <span className="text-muted">·</span>
+              {detail.ratingAverage !== undefined && (
+                <>
+                  <span className="inline-flex items-center gap-1 text-copper font-medium">
+                    <span className="material-symbols-outlined text-base fill-icon">star</span>
+                    {detail.ratingAverage.toFixed(1)}{' '}
+                    {detail.ratingCount !== undefined && (
+                      <span className="text-muted font-normal">({detail.ratingCount})</span>
+                    )}
+                  </span>
+                  <span className="text-muted">·</span>
+                </>
+              )}
+              {detail.downloadCount !== undefined && (
+                <>
+                  <span className="text-muted">
+                    下载量{' '}
+                    <span className="text-ink font-medium">
+                      {formatCount(detail.downloadCount)}
+                    </span>
+                  </span>
+                  <span className="text-muted">·</span>
+                </>
+              )}
               <span className="text-muted">
                 更新于 <span className="text-ink font-medium">{relativeTime(detail.updatedAt)}</span>
               </span>
@@ -116,6 +130,19 @@ export function PluginDetailPage() {
               <span className="text-muted">
                 作者 <span className="text-ink font-medium">{detail.author}</span>
               </span>
+              {detail.repoUrl && (
+                <>
+                  <span className="text-muted">·</span>
+                  <a
+                    href={detail.repoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-copper hover:underline inline-flex items-center gap-1"
+                  >
+                    源码仓库 <span className="material-symbols-outlined text-sm">open_in_new</span>
+                  </a>
+                </>
+              )}
             </div>
           </section>
 
@@ -172,7 +199,7 @@ export function PluginDetailPage() {
                 <h2 className="font-headline font-bold text-lg">评价</h2>
                 <div className="text-right">
                   <div className="text-2xl font-headline font-bold leading-none">
-                    {detail.ratingAverage.toFixed(1)}
+                    {detail.ratingAverage !== undefined ? detail.ratingAverage.toFixed(1) : '—'}
                   </div>
                   <div className="text-xs text-muted mt-1">{detail.ratingCount} 条评价</div>
                 </div>
@@ -232,11 +259,13 @@ export function PluginDetailPage() {
             </dl>
           </section>
 
-          {detail.artifact?.sha256 && (
+          {(detail.contentDigest || detail.artifact?.sha256) && (
             <section className="bg-card rounded-xl border border-hairline shadow-sm p-6">
               <h2 className="font-headline font-bold text-sm mb-3">安装前核对</h2>
-              <p className="text-[11px] uppercase tracking-wider text-muted mb-1">SHA-256</p>
-              <p className="font-mono text-xs leading-relaxed break-all text-ink">{detail.artifact.sha256}</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted mb-1">SHA-256（上架内容摘要）</p>
+              <p className="font-mono text-xs leading-relaxed break-all text-ink">
+                {detail.contentDigest ?? detail.artifact?.sha256}
+              </p>
               <p className="text-xs text-muted mt-3">摘要与市场上架记录不一致时，GoNavi 会拒绝安装。</p>
             </section>
           )}

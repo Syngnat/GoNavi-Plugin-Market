@@ -12,7 +12,7 @@ interface InstallButtonProps {
 /**
  * 安装 = 唤起本机 GoNavi 客户端（gonavi://plugin/install）。
  * 2 秒内窗口没有失焦（浏览器没有弹出协议处理框）就判定未安装客户端，
- * 回退为复制插件 ID，用户在 GoNavi 的安装面板粘贴即可。
+ * 回退为复制安装源 / 插件 ID，用户在 GoNavi 的安装面板粘贴即可。
  */
 export function InstallButton({ item, variant }: InstallButtonProps) {
   const [phase, setPhase] = useState<Phase>('idle');
@@ -39,6 +39,8 @@ export function InstallButton({ item, variant }: InstallButtonProps) {
     };
   }, []);
 
+  const copyValue = item.installSpec?.trim() || item.id;
+
   const launch = () => {
     if (phase === 'launching') return;
     setCopied(false);
@@ -52,7 +54,7 @@ export function InstallButton({ item, variant }: InstallButtonProps) {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(item.id);
+      await navigator.clipboard.writeText(copyValue);
     } catch {
       // 剪贴板不可用（非安全上下文等）时仅提示用户手动复制
     }
@@ -67,7 +69,7 @@ export function InstallButton({ item, variant }: InstallButtonProps) {
   if (variant === 'block') {
     const hint =
       phase === 'fallback'
-        ? '未检测到 GoNavi 客户端，复制插件 ID 后在 GoNavi 的「安装插件」面板粘贴。'
+        ? '未检测到 GoNavi 客户端，复制安装源后在 GoNavi 的「安装插件」面板粘贴。'
         : phase === 'launched'
           ? '已唤起 GoNavi，请在客户端确认安装。'
           : '将安装到本机 GoNavi，安装前仍需确认摘要';
@@ -83,7 +85,7 @@ export function InstallButton({ item, variant }: InstallButtonProps) {
           }
         >
           {phase === 'launching' && <span className="material-symbols-outlined text-lg">rocket_launch</span>}
-          {phase === 'fallback' && (copied ? '已复制插件 ID' : '复制插件 ID')}
+          {phase === 'fallback' && (copied ? '已复制安装源' : '复制安装源')}
           {phase === 'idle' && (
             <>
               <span className="material-symbols-outlined text-lg">download</span>
@@ -105,7 +107,7 @@ export function InstallButton({ item, variant }: InstallButtonProps) {
         : phase === 'fallback'
           ? copied
             ? '已复制'
-            : '复制 ID'
+            : '复制'
           : '安装';
 
   return (

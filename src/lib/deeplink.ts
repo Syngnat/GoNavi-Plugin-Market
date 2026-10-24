@@ -10,9 +10,9 @@ import type { PluginItem } from '../api/types';
  *
  * 链接只把用户送到客户端的安装面板，真正的下载、静态检查与摘要确认都发生在客户端。
  */
-export function buildInstallDeepLink(item: PluginItem, spec?: string): string {
+export function buildInstallDeepLink(item: PluginItem): string {
   const params = new URLSearchParams();
-  if (spec && spec.trim()) params.set('spec', spec.trim());
+  if (item.installSpec && item.installSpec.trim()) params.set('spec', item.installSpec.trim());
   params.set('id', item.id);
   if (item.version) params.set('version', item.version);
   return `gonavi://plugin/install?${params.toString()}`;

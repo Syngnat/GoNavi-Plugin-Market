@@ -1,5 +1,6 @@
-// 与 GoNavi 主仓库 internal/pluginmarket 的 JSON 契约保持同字段兼容；
-// 后端就绪前，展示层扩展字段由种子数据提供。
+// 与 GoNavi 主仓库 internal/pluginmarket 的 JSON 契约保持同字段兼容。
+// 评分/下载量等运营数据由市场服务（/api/v1）提供；静态目录阶段缺省，UI 不渲染。
+// installSpec / contentDigest / features / permissions 是站点目录（catalog.json）的扩展字段。
 export interface Artifact {
   url: string;
   sha256: string;
@@ -19,13 +20,26 @@ export interface PluginItem {
   category?: string;
   minHostVersion?: string;
   platforms: string[];
-  ratingAverage: number;
-  ratingCount: number;
-  downloadCount: number;
+  ratingAverage?: number;
+  ratingCount?: number;
+  downloadCount?: number;
   updatedAt: string;
   artifact?: Artifact | null;
   sourceId: string;
+  /** 站点目录扩展字段 */
+  icon?: string;
+  featured?: boolean;
+  installSpec?: string;
+  repoUrl?: string;
+  contentDigest?: string;
+  license?: string;
+  features?: string[];
+  permissions?: PermissionEntry[];
+  ratingDistribution?: number[];
+  reviews?: PluginReview[];
 }
+
+export type PluginDetail = PluginItem;
 
 export interface CatalogPage {
   items: PluginItem[];
@@ -59,13 +73,4 @@ export interface PluginReview {
   author: string;
   stars: number;
   body: string;
-}
-
-export interface PluginDetail extends PluginItem {
-  license?: string;
-  features?: string[];
-  permissions?: PermissionEntry[];
-  /** 5→1 星的百分比，长度 5 */
-  ratingDistribution?: number[];
-  reviews?: PluginReview[];
 }
