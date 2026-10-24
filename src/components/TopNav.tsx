@@ -28,31 +28,7 @@ export function TopNav() {
           <Link to="/#catalog" className={navLinkClass(catalogActive)}>
             插件分类
           </Link>
-          <a href="#" className={navLinkClass(false)}>
-            开发者社区
-          </a>
-          <a href="#" className={navLinkClass(false)}>
-            文档
-          </a>
         </nav>
-        <div className="flex items-center space-x-4">
-          <button aria-label="通知" className="text-muted hover:text-ink transition-colors">
-            <span className="material-symbols-outlined">notifications</span>
-          </button>
-          <button aria-label="设置" className="text-muted hover:text-ink transition-colors">
-            <span className="material-symbols-outlined">settings</span>
-          </button>
-          <div className="h-5 w-px bg-hairline" />
-          <Link to="/login" className="text-ink font-medium text-sm hover:text-copper transition-colors">
-            登录
-          </Link>
-          <a
-            href="#"
-            className="px-4 py-2 rounded-lg border border-copper text-copper font-medium text-sm hover:bg-copper hover:text-white transition-all duration-200 shadow-sm"
-          >
-            发布插件
-          </a>
-        </div>
       </div>
     </header>
   );
