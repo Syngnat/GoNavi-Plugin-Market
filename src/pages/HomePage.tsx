@@ -83,22 +83,30 @@ export function HomePage() {
           <div className="bg-card rounded-xl border border-hairline shadow-sm p-10 text-center text-sm text-muted">
             加载失败，请稍后重试。
           </div>
+        ) : loading && rows.length === 0 ? (
+          <div className="bg-card rounded-xl border border-hairline shadow-sm p-10 text-center text-sm text-muted">
+            加载中…
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="bg-card rounded-xl border border-hairline shadow-sm p-10 text-center space-y-3">
+            <p className="text-sm text-ink">首批插件正在整理上架。</p>
+            <p className="text-xs text-muted">
+              上架要求：插件包通过 GoNavi 的静态检查与内容摘要校验，且提供真实可验证的发布源。
+            </p>
+            <a
+              href="https://github.com/Syngnat/GoNavi/blob/dev/docs/plugins/development.md"
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-copper hover:underline inline-flex items-center gap-1"
+            >
+              想让自己的插件上架？看开发指南 <span className="material-symbols-outlined text-sm">open_in_new</span>
+            </a>
+          </div>
         ) : (
           <div className="bg-card rounded-xl border border-hairline shadow-sm divide-y divide-hairline">
-            {loading && rows.length === 0 ? (
-              <div className="p-10 text-center text-sm text-muted">加载中…</div>
-            ) : rows.length === 0 ? (
-              <div className="p-10 text-center space-y-2">
-                <p className="text-sm text-ink">首批插件正在整理上架。</p>
-                <p className="text-xs text-muted">
-                  上架要求：插件包通过 GoNavi 的静态检查与内容摘要校验，且提供真实可验证的发布源。
-                </p>
-              </div>
-            ) : (
-              rows.map((item) => (
-                <PluginRow key={item.id} item={item} icon={item.icon ?? 'extension'} />
-              ))
-            )}
+            {rows.map((item) => (
+              <PluginRow key={item.id} item={item} icon={item.icon ?? 'extension'} />
+            ))}
           </div>
         )}
       </section>

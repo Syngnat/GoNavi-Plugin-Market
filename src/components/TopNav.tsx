@@ -1,9 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
 
+const GITHUB_BASE = 'https://github.com/Syngnat/GoNavi';
+const PLUGIN_DOCS_URL = `${GITHUB_BASE}/tree/dev/docs/plugins`;
+const PLUGIN_DEV_GUIDE_URL = `${GITHUB_BASE}/blob/dev/docs/plugins/development.md`;
+const ISSUES_URL = `${GITHUB_BASE}/issues`;
+
 const navLinkClass = (active: boolean) =>
   active
     ? 'text-copper border-b-2 border-copper pb-1 font-bold transition-all duration-200'
     : 'text-muted hover:text-ink transition-colors duration-200 pb-1 border-b-2 border-transparent';
+
+const externalLinkClass = 'text-muted hover:text-ink transition-colors duration-200 pb-1';
 
 export function TopNav() {
   const { pathname } = useLocation();
@@ -28,6 +35,20 @@ export function TopNav() {
           <Link to="/#catalog" className={navLinkClass(catalogActive)}>
             插件分类
           </Link>
+          <a href={PLUGIN_DOCS_URL} target="_blank" rel="noreferrer" className={externalLinkClass}>
+            开发者文档
+          </a>
+          <a href={ISSUES_URL} target="_blank" rel="noreferrer" className={externalLinkClass}>
+            社区
+          </a>
+          <a
+            href={PLUGIN_DEV_GUIDE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="px-4 py-2 rounded-lg border border-copper text-copper font-medium text-sm hover:bg-copper hover:text-white transition-all duration-200 shadow-sm"
+          >
+            发布插件
+          </a>
         </nav>
       </div>
     </header>
