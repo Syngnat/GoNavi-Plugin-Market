@@ -1,13 +1,24 @@
 # GoNavi Plugin Market
 
-GoNavi 插件市场官网（plugin.gonavi.org）：浏览与安装 GoNavi 插件。
+GoNavi 插件市场官网（plugin.gonavi.org）：浏览与安装 GoNavi 插件；**同时是 GoNavi 官方插件的源码仓**——站点、上架目录与官方插件一个仓库。
 
 - 设计定稿：暖纸赤铜（paper `#f6f1ea` / copper `#c4622d` / card `#fffcf8` / ink `#1c1612`），IBM Plex Sans。
 - 页面：首页（双列精选 + 目录列表）、插件详情（功能 / 权限清单 / 评价 / SHA-256 核对）、设备码登录。
 
 ## 技术栈
 
-Vite + React 18 + TypeScript + Tailwind CSS（无 UI 组件库，静态构建，任意 CDN/边缘托管可部署）。
+- 站点：Vite + React 18 + TypeScript + Tailwind CSS（无 UI 组件库，静态构建，任意 CDN/边缘托管可部署）。
+- 官方插件：Go（单 module，SDK 伪版本引用 `github.com/Syngnat/GoNavi/sdk/go`），`cmd/buildtool` 多平台打包。
+
+## 官方插件开发（本仓约定）
+
+**官方插件（GoNavi 作者拆宿主能力做的插件）一律在本仓开发发布，不新建仓库**；第三方作者一仓一插件或一仓多插件均可。
+
+- 源码:`plugins/<name>/`(manifest + 后端 + `ui/` + `skills/`),模板参考 `plugins/nginx-inspector/`。
+- 构建:仓库根 `go run ./cmd/buildtool -manifest plugins/<name>/gonavi.plugin.json -output plugin-dist/<name> -zip plugin-dist/<name>-<ver>.zip`(产物进 `plugin-dist/`,与站点 `dist/` 互不混淆;5 平台二进制打进单 ZIP)。
+- 发布:tag `<插件名>-v<semver>`(如 `nginx-inspector-v1.0.0`),一 Release 一 ZIP;安装引用 `github:Syngnat/GoNavi-Plugin-Market@<tag>`(**必须带 @tag**,无 tag 解析 latest 会拿错 release)。
+- 上架:`public/catalog.json` 增补条目,前提是 Release 已建、直链可下载、SHA-256 真实。
+- 验证:`go test ./plugins/...`;宿主侧静态检查与 CLI 闭环见 `release-notes/`。
 
 ## 开发
 

@@ -47,15 +47,16 @@ gonavi plugin --root <data-root>/plugins enable com.gonavi.nginx-inspector
 
 ## 从源码构建
 
-本插件位于 GoNavi 官方插件 monorepo(`github.com/Syngnat/gonavi-plugins`,
-本目录即 `plugins/nginx-inspector/`)。依赖:Go ≥ 1.24;SDK 以伪版本引用
-`github.com/Syngnat/GoNavi/sdk/go`,无其他第三方依赖(仅 `golang.org/x/crypto/ssh`)。
+本插件位于 GoNavi 官方插件源码仓 `github.com/Syngnat/GoNavi-Plugin-Market`
+(本目录即 `plugins/nginx-inspector/`,官方插件与市场站点同仓)。依赖:Go ≥ 1.24;
+SDK 以伪版本引用 `github.com/Syngnat/GoNavi/sdk/go`,无其他第三方依赖
+(仅 `golang.org/x/crypto/ssh`)。
 
-在 **monorepo 根**执行:
+在**仓库根**执行:
 
 ```sh
 go test ./plugins/nginx-inspector/...
-go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output dist/nginx-inspector -zip dist/gonavi-plugin-nginx-inspector-1.0.0.zip
+go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.0.zip
 ```
 
 `buildtool` 交叉编译 5 个平台(windows/amd64、linux/amd64、linux/arm64、
