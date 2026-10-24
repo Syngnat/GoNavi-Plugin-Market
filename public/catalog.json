@@ -1,5 +1,46 @@
 {
   "sourceId": "plugin-market-site",
-  "updatedAt": "2026-10-24T11:20:00Z",
-  "items": []
+  "updatedAt": "2026-10-24T12:10:00Z",
+  "items": [
+    {
+      "id": "com.gonavi.nginx-inspector",
+      "name": "Nginx 诊断助手",
+      "description": "通过 SSH 对远程 nginx 做只读诊断：主配置与 include 展开成结构树、nginx -t 校验并定位报错行、错误/访问日志检索、访问统计聚合、TLS 证书到期检查、从远程主机探测 upstream 健康度。唯一的写命令 service.reload 强制先通过 nginx -t 并要求显式确认。",
+      "author": "GoNavi Project",
+      "publisherId": "gonavi",
+      "official": true,
+      "version": "1.0.0",
+      "category": "运维",
+      "minHostVersion": "1.1.5",
+      "platforms": ["windows", "macos", "linux"],
+      "updatedAt": "2026-10-24T12:10:00Z",
+      "icon": "dns",
+      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@nginx-inspector-v1.0.0",
+      "repoUrl": "https://github.com/Syngnat/GoNavi-Plugin-Market",
+      "contentDigest": "b4ac31560be017f2ce6812eefaa8d22944e36d1a5b8297e7d8ab1ff399fd9dac",
+      "license": "Apache-2.0",
+      "artifact": {
+        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/nginx-inspector-v1.0.0/gonavi-plugin-nginx-inspector-1.0.0.zip",
+        "sha256": "dbb945c7e61e102532955fce061393730379b98f1036795eed4e88fa9963cfb8",
+        "sizeBytes": 21295677,
+        "platform": "all",
+        "version": "1.0.0"
+      },
+      "sourceId": "plugin-market-site",
+      "features": [
+        "独立插件窗口九区布局：概览、配置、校验、服务、日志、访问统计、证书、上游、连接管理。",
+        "nginx 配置按块解析并以 include 递归展开，server/upstream/location 结构一目了然；点击文件名直接查看原文。",
+        "access.log 聚合出状态码分布、来源 IP、Top 路径（含平均上游耗时）；日志支持正则过滤与有界搜索。",
+        "TLS 证书自动到期检查（≤30 天预警）；upstream 成员从远程主机发起 TCP 探测，不产生业务流量。",
+        "AI 侧提供 nginx-triage 技能文档与 Agent 工具接入；所有写命令仍需逐次审批。"
+      ],
+      "permissions": [
+        { "name": "暴露 Agent 工具", "key": "ai.tools", "scope": "Agent", "granted": true },
+        { "name": "提供 AI 技能", "key": "ai.skills", "scope": "技能", "granted": true },
+        { "name": "写诊断日志", "key": "host.log", "scope": "诊断", "granted": true },
+        { "name": "编辑远程配置文件", "key": "", "scope": "未授予（reload 仅在 nginx -t 通过并确认后执行）", "granted": false },
+        { "name": "访问 GoNavi 连接凭据", "key": "", "scope": "未授予", "granted": false }
+      ]
+    }
+  ]
 }
