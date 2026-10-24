@@ -1,6 +1,6 @@
 const GITHUB_BASE = 'https://github.com/Syngnat/GoNavi';
 const PLUGIN_DOCS_URL = `${GITHUB_BASE}/tree/dev/docs/plugins`;
-const ISSUES_URL = `${GITHUB_BASE}/issues`;
+const COMMUNITY_URL = `${GITHUB_BASE}/discussions/1582`;
 
 export function Footer() {
   return (
@@ -17,12 +17,12 @@ export function Footer() {
             插件文档
           </a>
           <a
-            href={ISSUES_URL}
+            href={COMMUNITY_URL}
             target="_blank"
             rel="noreferrer"
             className="text-[#8a7e74] hover:text-[#c4622d] transition-colors"
           >
-            问题反馈
+            社区讨论
           </a>
           <a
             href="https://github.com/Syngnat/GoNavi-Plugin-Market"

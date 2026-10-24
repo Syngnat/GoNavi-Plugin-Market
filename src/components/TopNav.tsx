@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 const GITHUB_BASE = 'https://github.com/Syngnat/GoNavi';
 const PLUGIN_DOCS_URL = `${GITHUB_BASE}/tree/dev/docs/plugins`;
 const PLUGIN_DEV_GUIDE_URL = `${GITHUB_BASE}/blob/dev/docs/plugins/development.md`;
-const ISSUES_URL = `${GITHUB_BASE}/issues`;
+const COMMUNITY_URL = `${GITHUB_BASE}/discussions/1582`;
 
 const navLinkClass = (active: boolean) =>
   active
@@ -38,7 +38,7 @@ export function TopNav() {
           <a href={PLUGIN_DOCS_URL} target="_blank" rel="noreferrer" className={externalLinkClass}>
             开发者文档
           </a>
-          <a href={ISSUES_URL} target="_blank" rel="noreferrer" className={externalLinkClass}>
+          <a href={COMMUNITY_URL} target="_blank" rel="noreferrer" className={externalLinkClass}>
             社区
           </a>
           <a
