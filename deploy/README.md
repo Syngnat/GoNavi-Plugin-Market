@@ -67,26 +67,20 @@ Let's Encrypt ECDSA，cert-name `plugin.gonavi.org`，webroot 续期（certbot �
 - 开通脚本的留档：`deploy/provision-market.sh`（首run专用；服务二进制由主仓 `go build ./cmd/gonavi-market-server` 交叉编译上传 `/srv/gonavi-plugin-market/server/`）。
 - 常用运维：`systemctl status|restart gonavi-market`、`journalctl -u gonavi-market -e`、
   `curl -s http://127.0.0.1:8090/api/v1/plugins`（服务器上自检）。
-- 公网验收：`https://plugin.gonavi.org/api/v1/plugins` 应 200 返回 `{"items":[]}`（未上架服务端条目前为空是正常态，站点目录仍走静态 catalog.json）。
+- 公网验收：`https://plugin.gonavi.org/api/v1/plugins` 应 200；站点默认读取同源 `/api/v1/plugins`，服务不可用时才回退 `catalog.json`。
 
-### 登录/提交（待启用，需要 GitHub OAuth App）
+### 登录/发布（v2，需要 GitHub OAuth App）
 
-公共读已可用；登录（提交/审核/评分）在 OAuth 配置前返回 503 `auth_unavailable`。启用步骤：
+公共读无需登录；网站登录、发布、评分写入使用 HttpOnly 会话 Cookie + `X-GoNavi-CSRF`。GitHub OAuth 回调与设备码流程共用已注册的 `https://plugin.gonavi.org/api/v1/auth/github/callback`；网站发起入口是 `/api/v1/auth/web/start`。
 
-1. GitHub → Settings → Developer settings → OAuth Apps → New OAuth App：
-   Homepage `https://plugin.gonavi.org`，Callback
-   `https://plugin.gonavi.org/api/v1/auth/github/callback`，拿到 Client ID/Secret。
-2. 填入服务器 `/etc/gonavi-market/env` 的两行注释处，`systemctl restart gonavi-market`。
-3. 授予管理员（Syngnat 数字 ID 92659908）：
-   `ssh Bero-6H16-DE "cd /srv/gonavi-plugin-market/server && GONAVI_MARKET_DATABASE_URL=\"<operator串>\" ./gonavi-market-server -grant-github-id 92659908 -grant-role admin"`
-   （operator 连接串在 `/root/gonavi-market-credentials.txt`。）
-4. 设备码换 token（浏览器登录一次）：`POST /api/v1/auth/device` → 打开 verificationUri 输入 userCode → GitHub 授权 → `POST /auth/device/token`。
-5. 之后第三方发布走 `POST /api/v1/submissions`（multipart：pluginId/version/package），管理员在 `/api/v1/admin/submissions` 审核，详见主仓库 `deploy/plugin-market/admin-api.md`。服务端目录有数据后，站点可切 `VITE_API_BASE=https://plugin.gonavi.org` 重新构建发布。
+1. GitHub → Settings → Developer settings → OAuth Apps：Homepage `https://plugin.gonavi.org`，Callback 为上面的 `/api/v1/auth/github/callback`，拿到 Client ID/Secret。
+2. 填入服务器 `/etc/gonavi-market/env` 的 `GONAVI_MARKET_GITHUB_CLIENT_ID` / `_SECRET`，`systemctl restart gonavi-market`。
+3. 首次网站登录自动分配 `gh-<github-login>` 发布者命名空间；插件 ID 必须以该命名空间加英文句点开头。
+4. 发布：网站 `/publish` 上传 ZIP/TGZ → `/api/v1/publisher/inspect` 静态预检 → 确认摘要 → `POST /api/v1/submissions`；校验通过即上架（官方徽标由运营单独授予，违规可 yank）。
+5. 作者工作台 `/account` 读取 `/api/v1/publisher/plugins`、`/submissions`，可在 `/api/v1/publisher/plugins/{id}/source` 登记或清空 GitHub Release 自动同步来源。完整契约见 `docs/v2-api.md`。
+6. 管理员仍可用 `/api/v1/admin/submissions` 审核/下架、`/api/v1/admin/audit` 查审计；运营授权用 `gonavi-market-server -grant-github-id ... -grant-role admin|publisher`。
 
-### 官方插件上架（当前路径，静态目录）
+### 官方插件上架
 
-站点运行时 `fetch('catalog.json')`，上架官方插件＝更新服务器一个文件：
-
-1. 仓里改 `public/catalog.json`（真实 SHA-256/摘要，Release 先建好直链可下载）并提交推送；
-2. `python deploy/update-catalog.py`（校验→scp→原子替换→线上复核）。
+服务端目录是主路径：`gonavi-market-server -publish-official <zip>` 走同一条静态校验/发布流水线（官方徽标由运营授予）。`public/catalog.json` 作为服务不可用时的静态兜底，仍可用 `python deploy/update-catalog.py` 更新。
 

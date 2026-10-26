@@ -3,7 +3,7 @@
 GoNavi 插件市场官网（plugin.gonavi.org）：浏览与安装 GoNavi 插件；**同时是 GoNavi 官方插件的源码仓**——站点、上架目录与官方插件一个仓库。
 
 - 设计定稿：暖纸赤铜（paper `#f6f1ea` / copper `#c4622d` / card `#fffcf8` / ink `#1c1612`），IBM Plex Sans。
-- 页面：首页（双列精选 + 目录列表）、插件详情（功能 / 权限清单 / 评价 / SHA-256 核对）、设备码登录。
+- 页面：首页（目录与分类）、插件详情（功能 / 权限清单 / 评分 / SHA-256 核对）、GitHub 登录、作者工作台（`/publish`）、我的插件（`/account`）、开发者与社区。
 
 ## 技术栈
 
@@ -29,19 +29,25 @@ npm run build     # tsc --noEmit && vite build → dist/
 npm run preview
 ```
 
-未配置 `VITE_API_BASE` 时运行在**演示模式**：目录数据来自 `src/data/seed.ts`，不发网络请求。
+未配置 `VITE_API_BASE` 时默认请求同源 `/api/v1`；市场服务不可用时回退到 `public/catalog.json`（静态目录）。账号与发布接口需要市场服务的 HttpOnly 会话 Cookie，因此生产环境应同源部署。
 
-## API 约定（与 GoNavi 主仓库 internal/pluginmarket 契约对齐）
+## API 约定（v2 账号与发布）
 
-配置 `VITE_API_BASE`（如 `https://plugin.gonavi.org`）后，站点请求：
+目录/详情对客户端保持只读；网站登录与发布走 v2 接口，完整契约见 [`docs/v2-api.md`](docs/v2-api.md)。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/v1/plugins?category=&q=&sort=recent\|rating\|downloads&cursor=` | 目录分页，返回 `CatalogPage` |
+| GET | `/api/v1/plugins?category=&q=&sort=updated\|rating\|downloads&cursor=` | 目录分页，返回 `CatalogPage` |
 | GET | `/api/v1/plugins/{id}` | 插件详情，返回 `Item`（含 artifact.sha256） |
-| POST | `/api/v1/auth/device/verify` | 设备码登录确认，body `{ userCode }`，返回 `LoginStatus` |
+| GET | `/api/v1/auth/web/session` | 网站登录态；返回 `authenticated/account/csrfToken` |
+| GET | `/api/v1/auth/web/start?returnTo=/publish` | 发起 GitHub 登录，303 到 GitHub |
+| POST | `/api/v1/auth/web/logout` | 退出（需 `X-GoNavi-CSRF`） |
+| POST | `/api/v1/publisher/inspect` | 发布预检（multipart `package`），不落库 |
+| POST | `/api/v1/submissions` | 发布（multipart `package/pluginId/version/expectedDigest/source`） |
+| GET | `/api/v1/publisher/plugins` / `submissions` | 作者工作台列表 |
+| PUT | `/api/v1/publisher/plugins/{id}/source` | 设置/清空 GitHub Release 自动更新来源 |
 
-类型镜像见 `src/api/types.ts`，字段与主仓库 `internal/pluginmarket/types.go` 的 JSON tag 一致。
+类型镜像见 `src/api/types.ts`；网站会话与发布者接口由主仓库 `internal/market` 提供。
 
 ## 安装深链契约
 
