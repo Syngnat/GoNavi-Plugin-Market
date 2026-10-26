@@ -8,11 +8,12 @@ export interface DocCatalogItem {
   source: string;
   order: number;
   featured?: boolean;
+  searchText: string;
 }
 
 export const DOC_GROUPS: DocGroup[] = ['开始使用', '贡献类型', '接口与契约', '发布与运营'];
 
-export const DOC_CATALOG: DocCatalogItem[] = [
+const DOC_ENTRIES: Omit<DocCatalogItem, 'searchText'>[] = [
   {
     slug: 'author-guide',
     title: '第三方插件作者指南',
@@ -224,6 +225,19 @@ export const DOC_CATALOG: DocCatalogItem[] = [
     order: 35,
   },
 ];
+
+export const DOC_CATALOG: DocCatalogItem[] = DOC_ENTRIES.map((doc) => ({
+  ...doc,
+  searchText: [
+    doc.title,
+    doc.description,
+    doc.group,
+    doc.slug,
+    doc.featured ? '开始 入门 指南 新手 完整流程' : '',
+    doc.slug === 'faq' ? '常见问题 问答 错误 排查 发布 安装 版本' : '',
+    doc.slug === 'permissions' ? '权限 授予 宿主能力 host 安全边界' : '',
+  ].join(' ').toLowerCase(),
+}));
 
 export const DOC_BY_SLUG = new Map(DOC_CATALOG.map((doc) => [doc.slug, doc]));
 

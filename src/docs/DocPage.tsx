@@ -140,9 +140,7 @@ export function DocPage() {
   const filteredDocs = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return DOC_CATALOG;
-    return DOC_CATALOG.filter((entry) =>
-      [entry.title, entry.description, entry.slug].some((value) => value.toLowerCase().includes(q)),
-    );
+    return DOC_CATALOG.filter((entry) => entry.searchText.includes(q));
   }, [query]);
 
   useEffect(() => {
@@ -336,7 +334,7 @@ export function DocsIndexPage() {
   const [query, setQuery] = useState('');
   const filtered = DOC_CATALOG.filter((doc) => {
     const q = query.trim().toLowerCase();
-    return !q || [doc.title, doc.description, doc.group].some((value) => value.toLowerCase().includes(q));
+    return !q || doc.searchText.includes(q);
   });
 
   return (
