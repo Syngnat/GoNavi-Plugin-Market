@@ -71,7 +71,7 @@ Let's Encrypt ECDSA，cert-name `plugin.gonavi.org`，webroot 续期（certbot �
 
 ### 登录/发布（v2，需要 GitHub OAuth App）
 
-公共读无需登录；网站登录、发布、评分写入使用 HttpOnly 会话 Cookie + `X-GoNavi-CSRF`。GitHub OAuth 回调与设备码流程共用已注册的 `https://plugin.gonavi.org/api/v1/auth/github/callback`；网站发起入口是 `/api/v1/auth/web/start`。
+公共读无需登录；网站登录、发布、评分写入使用 HttpOnly 会话 Cookie + `X-GoNavi-CSRF`。网站发起入口是 `/api/v1/auth/web/start`，GitHub OAuth 回调复用已注册的 `https://plugin.gonavi.org/api/v1/auth/github/callback`。
 
 1. GitHub → Settings → Developer settings → OAuth Apps：Homepage `https://plugin.gonavi.org`，Callback 为上面的 `/api/v1/auth/github/callback`，拿到 Client ID/Secret。
 2. 填入服务器 `/etc/gonavi-market/env` 的 `GONAVI_MARKET_GITHUB_CLIENT_ID` / `_SECRET`，`systemctl restart gonavi-market`。

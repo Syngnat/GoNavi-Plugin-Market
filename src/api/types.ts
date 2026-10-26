@@ -50,18 +50,6 @@ export interface CatalogPage {
   sourceId: string;
 }
 
-export interface DeviceAuthorization {
-  verificationUri: string;
-  userCode: string;
-  deviceCode: string;
-  intervalSeconds: number;
-  expiresIn: number;
-}
-
-export interface LoginStatus {
-  status: string;
-}
-
 export interface PermissionEntry {
   name: string;
   key: string;
