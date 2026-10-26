@@ -388,10 +388,8 @@ function PublishWorkspace({ account, csrf }: { account: MarketAccount; csrf: str
   const [error, setError] = useState('');
   const [result, setResult] = useState<SubmissionRecord>();
   const [uploadFile, setUploadFile] = useState<File>();
-  const [reloadHint, setReloadHint] = useState(0);
 
   const resetPreview = () => {
-    setReloadHint((value) => value + 1);
     setPreview(undefined);
     setAccepted(false);
     setError('');
@@ -509,7 +507,6 @@ function PublishWorkspace({ account, csrf }: { account: MarketAccount; csrf: str
 
           {method === 'release' ? (
             <ReleasePanel
-              key={`release-${reloadHint}`}
               allowed={allowed}
               phase={phase}
               csrf={csrf}
@@ -523,7 +520,6 @@ function PublishWorkspace({ account, csrf }: { account: MarketAccount; csrf: str
             />
           ) : (
             <UploadPanel
-              key={`upload-${reloadHint}`}
               allowed={allowed}
               phase={phase}
               csrf={csrf}
