@@ -14,5 +14,6 @@ curl -s $RESOLVE "$BASE/plugins/com.gonavi.sql-insights" -o /dev/null -w 'spa fa
 curl -s $RESOLVE "$BASE/login" -o /dev/null -w 'spa login: %{http_code}\n'
 curl -s $RESOLVE "$BASE/favicon.svg" -o /dev/null -w 'favicon: %{http_code}\n'
 curl -s $RESOLVE -X POST "$BASE/assets/x" -o /dev/null -w 'post /assets (want 403): %{http_code}\n'
+curl -s $RESOLVE "$BASE/no-such-page" -o /dev/null -w 'spa unknown route: %{http_code}\n'
 curl -s $RESOLVE "$BASE/gonavi/fonts/v1/catalog.json" -o /dev/null -w 'font namespace isolation (want 404): %{http_code}\n'
 curl -s --resolve plugin.gonavi.org:2053:127.0.0.1 "$BASE/" | grep -c 'GoNavi' | sed 's/^/index mentions GoNavi: /'
