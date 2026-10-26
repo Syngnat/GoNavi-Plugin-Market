@@ -7,9 +7,11 @@ GoNavi 插件市场官网（plugin.gonavi.org）：浏览与安装 GoNavi 插件
 
 第三方作者入口：
 
-- [插件作者完整指南](https://github.com/Syngnat/GoNavi/blob/dev/docs/plugins/author-guide.md)：从插件形态、SDK、打包检查、GitHub Release 到上架与更新。
-- [插件作者 FAQ](https://github.com/Syngnat/GoNavi/blob/dev/docs/plugins/faq.md)：常见概念、错误与发布问题。
-- [插件文档目录](https://github.com/Syngnat/GoNavi/tree/dev/docs/plugins)：SDK、协议、权限及各类贡献专项契约。
+- [站内文档中心](https://plugin.gonavi.org/docs)：作者指南、FAQ、SDK、协议、权限与各类贡献专项契约。
+- [插件作者完整指南](https://plugin.gonavi.org/docs/author-guide)：从插件形态、SDK、打包检查、GitHub Release 到上架与更新。
+- [插件作者 FAQ](https://plugin.gonavi.org/docs/faq)：常见概念、错误与发布问题。
+
+插件文档的权威来源已迁到本仓 `docs/`，由站点构建为独立 Markdown 资源并在 `/docs` 站内渲染；GoNavi 主仓只保留内部实现契约和运行时代码。
 
 ## 技术栈
 

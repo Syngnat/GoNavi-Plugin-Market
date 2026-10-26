@@ -7,6 +7,7 @@ import { AccountPage } from './pages/AccountPage';
 import { AccountPluginPage } from './pages/AccountPluginPage';
 import { CommunityPage } from './pages/CommunityPage';
 import { DevelopersPage } from './pages/DevelopersPage';
+import { DocPage, DocsIndexPage } from './docs/DocPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { PluginDetailPage } from './pages/PluginDetailPage';
@@ -38,6 +39,8 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/plugins/:id" element={<PluginDetailPage />} />
             <Route path="/developers" element={<DevelopersPage />} />
+            <Route path="/docs" element={<DocsIndexPage />} />
+            <Route path="/docs/:slug" element={<DocPage />} />
             <Route path="/community" element={<CommunityPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/publish" element={<PublishPage />} />

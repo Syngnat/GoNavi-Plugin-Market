@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom';
 
-const GITHUB_BASE = 'https://github.com/Syngnat/GoNavi';
-const PLUGIN_DOCS_URL = `${GITHUB_BASE}/tree/dev/docs/plugins`;
-const AUTHOR_GUIDE_URL = `${GITHUB_BASE}/blob/dev/docs/plugins/author-guide.md`;
-const FAQ_URL = `${GITHUB_BASE}/blob/dev/docs/plugins/faq.md`;
-const SDK_URL = `${GITHUB_BASE}/blob/dev/docs/plugins/sdk.md`;
-const DEV_GUIDE_URL = `${GITHUB_BASE}/blob/dev/docs/plugins/development.md`;
-const PUBLISHER_API_URL = `${GITHUB_BASE}/blob/dev/deploy/plugin-market/admin-api.md`;
+const DOC_LINKS = [
+  { label: '作者完整指南', to: '/docs/author-guide' },
+  { label: '作者 FAQ', to: '/docs/faq' },
+  { label: 'SDK 指南', to: '/docs/sdk' },
+  { label: '开发与打包', to: '/docs/development' },
+  { label: '发布者 API', to: '/docs/market-api' },
+  { label: '全部文档', to: '/docs' },
+];
 
 const CONTRIBUTIONS = [
   {
@@ -168,30 +169,34 @@ gonavi plugin --root $root inspect $package`}
         </ul>
       </section>
 
-      <section className="flex flex-col md:flex-row items-center justify-between gap-4 bg-paper border border-hairline rounded-xl px-6 py-5">
-        <p className="text-sm text-muted">需要协议细节、权限清单或故障排查？完整文档在主仓库。</p>
-        <div className="flex flex-wrap items-center gap-4 text-sm">
-          <Link to="/community" className="text-copper hover:underline">
+      <section className="bg-charcoal rounded-xl px-7 py-8 text-card shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-56 h-56 border border-copper/25 rounded-full -translate-y-1/3 translate-x-1/3 pointer-events-none" />
+        <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-7">
+          <div className="space-y-3 max-w-xl">
+            <p className="font-mono text-[10px] tracking-[0.14em] text-copper uppercase">One source of truth</p>
+            <h2 className="text-2xl font-headline font-semibold tracking-tight text-card">插件文档就在这里</h2>
+            <p className="text-sm text-[#d8cabb] leading-relaxed">
+              作者指南、FAQ、SDK、协议、权限和发布契约统一在市场站内维护。涉及源码的链接会明确跳转到
+              GoNavi 主仓，不再把整篇文档带到 GitHub。
+            </p>
+          </div>
+          <Link
+            to="/docs"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-copper text-white text-sm font-medium hover:bg-[#d37442] transition-colors shrink-0"
+          >
+            打开文档中心
+            <span className="material-symbols-outlined text-base">arrow_forward</span>
+          </Link>
+        </div>
+        <div className="relative flex flex-wrap gap-x-6 gap-y-2 mt-7 pt-5 border-t border-white/10 text-sm">
+          {DOC_LINKS.map((link) => (
+            <Link key={link.to} to={link.to} className="text-[#c9b7a5] hover:text-copper transition-colors">
+              {link.label}
+            </Link>
+          ))}
+          <Link to="/community" className="text-[#c9b7a5] hover:text-copper transition-colors">
             社区讨论
           </Link>
-          <a href={AUTHOR_GUIDE_URL} target="_blank" rel="noreferrer" className="text-copper hover:underline">
-            作者完整指南
-          </a>
-          <a href={FAQ_URL} target="_blank" rel="noreferrer" className="text-copper hover:underline">
-            作者 FAQ
-          </a>
-          <a href={SDK_URL} target="_blank" rel="noreferrer" className="text-copper hover:underline">
-            SDK 指南
-          </a>
-          <a href={DEV_GUIDE_URL} target="_blank" rel="noreferrer" className="text-copper hover:underline">
-            开发与打包
-          </a>
-          <a href={PUBLISHER_API_URL} target="_blank" rel="noreferrer" className="text-copper hover:underline">
-            发布者 API
-          </a>
-          <a href={PLUGIN_DOCS_URL} target="_blank" rel="noreferrer" className="text-copper hover:underline">
-            全部文档
-          </a>
         </div>
       </section>
     </main>

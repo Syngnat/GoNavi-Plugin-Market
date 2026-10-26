@@ -67,6 +67,7 @@ function AccountMenu() {
 export function TopNav() {
   const { pathname, hash } = useLocation();
   const catalogActive = pathname.startsWith('/plugins') || (pathname === '/' && hash === '#catalog');
+  const docsActive = pathname.startsWith('/docs');
 
   return (
     <header className="bg-paper border-b border-hairline sticky top-0 z-50">
@@ -87,7 +88,7 @@ export function TopNav() {
           <Link to="/#catalog" className={navLinkClass(catalogActive)}>
             插件分类
           </Link>
-          <Link to="/developers" className={navLinkClass(pathname.startsWith('/developers'))}>
+          <Link to="/docs" className={navLinkClass(docsActive || pathname.startsWith('/developers'))}>
             开发者文档
           </Link>
           <Link to="/community" className={navLinkClass(pathname.startsWith('/community'))}>

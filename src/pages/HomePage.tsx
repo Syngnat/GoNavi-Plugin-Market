@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { CategoryPills, type Category } from '../components/CategoryPills';
 import { FeaturedCard } from '../components/FeaturedCard';
 import { PluginRow } from '../components/PluginRow';
@@ -93,14 +94,12 @@ export function HomePage() {
             <p className="text-xs text-muted">
               上架要求：插件包通过 GoNavi 的静态检查与内容摘要校验，且提供真实可验证的发布源。
             </p>
-            <a
-              href="https://github.com/Syngnat/GoNavi/blob/dev/docs/plugins/author-guide.md"
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              to="/docs/author-guide"
               className="text-sm text-copper hover:underline inline-flex items-center gap-1"
             >
-              想让自己的插件上架？看开发指南 <span className="material-symbols-outlined text-sm">open_in_new</span>
-            </a>
+              想让自己的插件上架？看开发指南 <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </Link>
           </div>
         ) : (
           <div className="bg-card rounded-xl border border-hairline shadow-sm divide-y divide-hairline">
