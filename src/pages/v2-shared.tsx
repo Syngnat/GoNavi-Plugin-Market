@@ -216,7 +216,7 @@ export function OwnedPluginList({ refreshKey = 0 }: { refreshKey?: number }) {
         </div>
       ) : (
         <div className="bg-card border border-hairline rounded-xl p-8 text-sm text-muted">
-          还没有所属插件，可先在发布页上传包做静态预检；预检不会创建上架条目。
+          还没有所属插件，可先在发布页从 GitHub Release 预检并发布，或使用兜底上传包。
         </div>
       )}
 

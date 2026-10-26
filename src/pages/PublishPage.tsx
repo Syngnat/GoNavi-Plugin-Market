@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { canPublishWith, useAuth } from '../auth/AuthContext';
 import { formatBytes } from '../lib/format';
@@ -7,227 +8,77 @@ import {
   categoryLabel,
   fetchPublisherSubmissions,
   inspectPackage,
-  isGithubRepoUrl,
+  inspectRelease,
+  isGithubReleaseUrl,
   isPackageFile,
   marketErrorMessage,
+  publishRelease,
   submitPackage,
 } from '../api/v2';
-import type { MarketAccount, PackageInspection, SubmissionRecord } from '../api/types';
+import type {
+  MarketAccount,
+  PackageInspection,
+  ReleaseInspection,
+  SubmissionRecord,
+} from '../api/types';
 import { LoginGate } from './v2-shared';
 
-type Phase = 'idle' | 'inspecting' | 'ready' | 'publishing' | 'unknown' | 'done';
+type Phase =
+  | 'idle'
+  | 'inspecting'
+  | 'ready'
+  | 'publishing'
+  | 'unknown'
+  | 'done';
 
-interface PublishFlow {
-  file?: File;
-  preview?: PackageInspection;
-  source: string;
-  setSource: (value: string) => void;
-  phase: Phase;
-  error: string;
-  result?: SubmissionRecord;
-  accepted: boolean;
-  setAccepted: (value: boolean) => void;
-  chooseFile: (file?: File) => void;
-  inspect: () => Promise<void>;
-  publish: () => Promise<void>;
-  reconcile: () => Promise<void>;
+type PublishMethod = 'release' | 'upload';
+
+/** 预检返回的 Release 摘要必须带 releaseUrl；否则它不是可直发的 Release 预检。 */
+function isReleasePreview(preview: PackageInspection | ReleaseInspection): preview is ReleaseInspection {
+  return 'releaseUrl' in preview;
 }
 
 function errorText(err: unknown): string {
   return err instanceof Error && err.message ? err.message : '请求未完成，请稍后重试。';
 }
 
-function usePublishFlow(csrf: string): PublishFlow {
-  const [file, setFile] = useState<File>();
-  const [preview, setPreview] = useState<PackageInspection>();
-  const [source, setSource] = useState('');
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [error, setError] = useState('');
-  const [result, setResult] = useState<SubmissionRecord>();
-  const [accepted, setAccepted] = useState(false);
-  const run = useRef(0);
-  const inflight = useRef<AbortController>();
-
-  useEffect(
-    () => () => {
-      run.current += 1;
-      inflight.current?.abort();
-    },
-    [],
-  );
-
-  const busy = phase === 'inspecting' || phase === 'publishing';
-
-  const chooseFile = (next?: File) => {
-    if (busy) return;
-    run.current += 1;
-    inflight.current?.abort();
-    setFile(next);
-    setPreview(undefined);
-    setResult(undefined);
-    setAccepted(false);
-    setError('');
-    setPhase('idle');
-    if (next && !isPackageFile(next)) {
-      setError('请选择不超过 64 MiB 的 ZIP、TGZ 或 TAR.GZ 插件包。');
-    }
-  };
-
-  const inspect = async () => {
-    if (!file || !isPackageFile(file)) return;
-    const id = ++run.current;
-    inflight.current?.abort();
-    const controller = new AbortController();
-    inflight.current = controller;
-    setPhase('inspecting');
-    setError('');
-    setAccepted(false);
-    try {
-      const next = await inspectPackage(file, csrf, controller.signal);
-      if (id !== run.current) return;
-      setPreview(next);
-      setPhase('ready');
-    } catch (err) {
-      if (id !== run.current || controller.signal.aborted) return;
-      setError(errorText(err));
-      setPhase('idle');
-    }
-  };
-
-  const publish = async () => {
-    if (!file || !preview?.canPublish || phase !== 'ready' || !accepted) return;
-    if (!isGithubRepoUrl(source)) {
-      setError('仓库地址必须是无凭据、无参数的公开 GitHub 仓库 HTTPS 链接。');
-      return;
-    }
-    const id = run.current;
-    setPhase('publishing');
-    setError('');
-    try {
-      const record = await submitPackage(file, preview, source, csrf);
-      if (id !== run.current) return;
-      setResult(record);
-      setPhase('done');
-    } catch (err) {
-      if (id !== run.current) return;
-      setError(errorText(err));
-      // 4xx 说明请求被明确拒绝；网络中断/5xx 时结果未知，先核对再重试。
-      setPhase(err instanceof MarketRequestError && err.status < 500 ? 'ready' : 'unknown');
-    }
-  };
-
-  const reconcile = async () => {
-    if (!preview) return;
-    const id = run.current;
-    setError('');
-    try {
-      const page = await fetchPublisherSubmissions(undefined, preview.pluginId);
-      if (id !== run.current) return;
-      const match = page.items.find(
-        (item) => item.version === preview.version && item.sha256 === preview.sha256,
-      );
-      if (match?.state === 'published') {
-        setResult(match);
-        setPhase('done');
-        return;
-      }
-      if (match?.state === 'rejected' || match?.state === 'yanked') {
-        setError('该版本已被拒绝或下架，请查看版本记录，不可重试覆盖。');
-        return;
-      }
-      setPhase('ready');
-      setError('尚未确认上架，可以使用相同包再次提交；服务器会幂等恢复。');
-    } catch (err) {
-      if (id !== run.current) return;
-      setError(errorText(err));
-    }
-  };
-
-  return {
-    file,
-    preview,
-    source,
-    setSource,
-    phase,
-    error,
-    result,
-    accepted,
-    setAccepted,
-    chooseFile,
-    inspect,
-    publish,
-    reconcile,
-  };
-}
-
-function PackagePicker({ flow }: { flow: PublishFlow }) {
-  const disabled = flow.phase === 'inspecting' || flow.phase === 'publishing';
+function Result({ result }: { result: SubmissionRecord }) {
   return (
-    <section className="bg-card border border-hairline rounded-xl p-6 space-y-5">
-      <label
-        className="block rounded-xl border border-dashed border-hairline bg-paper p-8 text-center cursor-pointer hover:border-copper transition-colors"
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => {
-          event.preventDefault();
-          if (disabled) return;
-          flow.chooseFile(event.dataTransfer.files[0]);
-        }}
-      >
-        <span className="block font-semibold mb-2">选择或拖入插件包</span>
-        <span className="block text-sm text-muted mb-4">
-          ZIP / TGZ / TAR.GZ，最大 64 MiB，根目录需包含 gonavi.plugin.json
-        </span>
-        <input
-          aria-label="插件包"
-          type="file"
-          accept=".zip,.tgz,.tar.gz"
-          disabled={disabled}
-          onChange={(event) => {
-            const picked = event.target.files?.[0];
-            event.target.value = '';
-            flow.chooseFile(picked);
-          }}
-          className="max-w-full text-sm"
-        />
-        {flow.file && (
-          <span className="block mt-3 text-xs text-muted font-mono break-all">
-            {flow.file.name} · {formatBytes(flow.file.size)}
-          </span>
-        )}
-      </label>
-
-      <label className="block text-sm font-medium">
-        GitHub 源仓库（可选）
-        <input
-          aria-label="GitHub 源仓库"
-          value={flow.source}
-          disabled={disabled}
-          onChange={(event) => flow.setSource(event.target.value)}
-          placeholder="https://github.com/owner/repo"
-          className="mt-2 w-full rounded-lg border border-hairline bg-paper p-3 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper"
-        />
-      </label>
-      <p className="text-xs text-muted leading-relaxed">
-        首次登记后，发布含一个插件归档的稳定 GitHub Release 可自动同步；默认每 6 小时检查一次，手动上传仍可用。
+    <section role="status" className="bg-card border border-copper/40 rounded-xl p-6 space-y-3">
+      <h2 className="text-xl font-headline font-bold">插件已上架</h2>
+      <p>
+        {result.pluginId} · {result.version}
       </p>
-
-      <button
-        type="button"
-        disabled={!flow.file || disabled}
-        onClick={() => void flow.inspect()}
-        className="px-5 py-2.5 rounded-lg bg-charcoal text-card font-medium disabled:opacity-50 hover:opacity-95 transition-all"
-      >
-        {flow.phase === 'inspecting' ? '静态预检中…' : '预检安装包'}
-      </button>
+      {result.warning && (
+        <p className="text-sm text-copper">
+          插件已发布，但自动更新来源登记未完成；请到账号页重试。
+        </p>
+      )}
+      <div className="flex flex-wrap gap-4 text-sm">
+        <Link to={`/plugins/${encodeURIComponent(result.pluginId)}`} className="text-copper hover:underline">
+          查看市场详情
+        </Link>
+        <Link
+          to={`/account/plugins/${encodeURIComponent(result.pluginId)}`}
+          className="text-copper hover:underline"
+        >
+          管理版本与来源
+        </Link>
+      </div>
     </section>
   );
 }
 
-function PreviewCard({ preview }: { preview: PackageInspection }) {
+function InspectionPreview({
+  preview,
+  source,
+}: {
+  preview: PackageInspection | ReleaseInspection;
+  source?: ReactNode;
+}) {
   const permissions = Array.isArray(preview.manifest?.permissions)
     ? preview.manifest.permissions.filter((item): item is string => typeof item === 'string')
     : [];
-
   return (
     <section className="rounded-xl border border-hairline bg-card p-6 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -241,9 +92,8 @@ function PreviewCard({ preview }: { preview: PackageInspection }) {
           {categoryLabel(preview.category)}
         </span>
       </div>
-
       <p className="text-sm text-muted leading-relaxed">{preview.description}</p>
-
+      {source}
       <dl className="grid sm:grid-cols-2 gap-3 text-sm">
         <div>
           <dt className="text-muted">安装包大小</dt>
@@ -262,7 +112,6 @@ function PreviewCard({ preview }: { preview: PackageInspection }) {
           <dd className="font-mono text-xs break-all">{preview.sha256}</dd>
         </div>
       </dl>
-
       <div>
         <h3 className="font-headline font-semibold text-sm mb-2">包内权限声明</h3>
         {permissions.length ? (
@@ -280,7 +129,6 @@ function PreviewCard({ preview }: { preview: PackageInspection }) {
           <p className="text-sm text-muted">未声明额外权限。</p>
         )}
       </div>
-
       {!preview.canPublish && (
         <p role="alert" className="rounded-lg border border-copper/40 bg-paper p-3 text-sm">
           {preview.reason
@@ -288,7 +136,6 @@ function PreviewCard({ preview }: { preview: PackageInspection }) {
             : '当前账号不可发布此插件，请核对包内 ID 前缀与发布者权限。'}
         </p>
       )}
-
       <p className="text-xs text-muted leading-relaxed">
         预检不会运行代码、预约版本或上架；只有确认发布才会提交。摘要是完整性证明，不代表插件代码可信。
       </p>
@@ -296,16 +143,28 @@ function PreviewCard({ preview }: { preview: PackageInspection }) {
   );
 }
 
-function ConfirmPublish({ flow }: { flow: PublishFlow }) {
-  const busy = flow.phase === 'inspecting' || flow.phase === 'publishing';
+function Confirm({
+  preview,
+  accepted,
+  setAccepted,
+  phase,
+  onPublish,
+}: {
+  preview: PackageInspection | ReleaseInspection;
+  accepted: boolean;
+  setAccepted: (value: boolean) => void;
+  phase: Phase;
+  onPublish: () => void;
+}) {
+  const busy = phase === 'inspecting' || phase === 'publishing';
   return (
     <section className="bg-card border border-hairline rounded-xl p-6 space-y-4">
       <label className="flex items-start gap-3 text-sm">
         <input
           type="checkbox"
-          checked={flow.accepted}
+          checked={accepted}
           disabled={busy}
-          onChange={(event) => flow.setAccepted(event.target.checked)}
+          onChange={(event) => setAccepted(event.target.checked)}
           className="mt-0.5"
         />
         <span>
@@ -314,42 +173,287 @@ function ConfirmPublish({ flow }: { flow: PublishFlow }) {
       </label>
       <button
         type="button"
-        disabled={!flow.accepted || flow.phase !== 'ready'}
-        onClick={() => void flow.publish()}
+        disabled={!accepted || !preview.canPublish || phase !== 'ready' || busy}
+        onClick={onPublish}
         className="px-6 py-3 rounded-lg bg-charcoal text-card font-semibold disabled:opacity-50 hover:opacity-95 transition-all"
       >
-        {flow.phase === 'publishing' ? '正在发布，请勿关闭页面…' : '确认发布到插件市场'}
+        {phase === 'publishing' ? '正在发布，请勿关闭页面…' : '确认发布到插件市场'}
       </button>
     </section>
   );
 }
 
-function PublishResult({ result }: { result: SubmissionRecord }) {
+function ReleasePanel({
+  allowed,
+  phase,
+  csrf,
+  onPrepared,
+  onInspectStart,
+  onInspectError,
+  onDirty,
+}: {
+  allowed: boolean;
+  phase: Phase;
+  csrf: string;
+  onPrepared: (inspection: ReleaseInspection) => void;
+  onInspectStart: () => void;
+  onInspectError: () => void;
+  onDirty: () => void;
+}) {
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [error, setError] = useState('');
+  const request = useRef(0);
+  const controller = useRef<AbortController>();
+  const busy = phase === 'inspecting' || phase === 'publishing';
+
+  useEffect(() => () => controller.current?.abort(), []);
+
+  const inspect = async () => {
+    if (!isGithubReleaseUrl(sourceUrl)) {
+      setError('请输入公开 GitHub 仓库、Release 页面或 Release 资产链接。');
+      return;
+    }
+    const run = ++request.current;
+    controller.current?.abort();
+    const next = new AbortController();
+    controller.current = next;
+    setError('');
+    onInspectStart();
+    try {
+      const inspection = await inspectRelease(sourceUrl, csrf, next.signal);
+      if (run === request.current) onPrepared(inspection);
+    } catch (err) {
+      if (run === request.current && !next.signal.aborted) {
+        setError(errorText(err));
+        onInspectError();
+      }
+    }
+  };
+
   return (
-    <section role="status" className="bg-card border border-copper/40 rounded-xl p-6 space-y-3">
-      <h2 className="text-xl font-headline font-bold">插件已上架</h2>
-      <p>
-        {result.pluginId} · {result.version}
-      </p>
-      {result.warning && <p className="text-sm text-copper">{result.warning}</p>}
-      <div className="flex flex-wrap gap-4 text-sm">
-        <Link to={`/plugins/${encodeURIComponent(result.pluginId)}`} className="text-copper hover:underline">
-          查看市场详情
-        </Link>
-        <Link
-          to={`/account/plugins/${encodeURIComponent(result.pluginId)}`}
-          className="text-copper hover:underline"
-        >
-          管理版本与来源
-        </Link>
+    <section className="bg-card border border-copper/40 rounded-xl p-6 space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-headline font-bold">从 GitHub Release 发布</h2>
+        <span className="rounded-full bg-copper/10 px-2 py-1 text-xs text-copper">推荐</span>
       </div>
+      <label className="block text-sm font-medium">
+        GitHub 仓库或 Release 链接
+        <input
+          aria-label="GitHub Release 链接"
+          value={sourceUrl}
+          onChange={(event) => {
+            setSourceUrl(event.target.value);
+            setError('');
+            onDirty();
+          }}
+          disabled={!allowed || busy}
+          placeholder="https://github.com/owner/repo/releases/tag/v1.0.0"
+          className="mt-2 w-full rounded-lg border border-hairline bg-paper p-3 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-copper focus:border-copper"
+        />
+      </label>
+      <p className="text-xs text-muted leading-relaxed">
+        单插件仓库可以直接填仓库链接，市场读取 latest stable Release。官方
+        <code className="mx-1">Syngnat/GoNavi-Plugin-Market</code>
+        monorepo 必须填具体 Release Tag 或 Release 资产链接，避免误发其他插件。
+      </p>
+      {error && (
+        <p role="alert" className="text-sm text-copper">
+          {error}
+        </p>
+      )}
+      <button
+        type="button"
+        disabled={!allowed || !sourceUrl.trim() || busy}
+        onClick={() => void inspect()}
+        className="px-5 py-2.5 rounded-lg bg-charcoal text-card font-medium disabled:opacity-50 hover:opacity-95 transition-all"
+      >
+        {phase === 'inspecting' ? '正在读取 Release 并预检…' : '读取并预检 Release'}
+      </button>
+      {!allowed && (
+        <p className="text-xs text-muted">当前账号没有发布权限。</p>
+      )}
+    </section>
+  );
+}
+
+function UploadPanel({
+  allowed,
+  phase,
+  csrf,
+  onPrepared,
+  onInspectStart,
+  onInspectError,
+  onDirty,
+}: {
+  allowed: boolean;
+  phase: Phase;
+  csrf: string;
+  onPrepared: (inspection: PackageInspection, file: File) => void;
+  onInspectStart: () => void;
+  onInspectError: () => void;
+  onDirty: () => void;
+}) {
+  const [file, setFile] = useState<File>();
+  const [error, setError] = useState('');
+  const request = useRef(0);
+  const controller = useRef<AbortController>();
+  const busy = phase === 'inspecting' || phase === 'publishing';
+
+  useEffect(() => () => controller.current?.abort(), []);
+
+  const choose = (next?: File) => {
+    request.current++;
+    controller.current?.abort();
+    setFile(next);
+    onDirty();
+    setError(next && !isPackageFile(next) ? '请选择不超过 64 MiB 的 ZIP、TGZ 或 TAR.GZ。' : '');
+  };
+
+  const inspect = async () => {
+    if (!file || !isPackageFile(file)) return;
+    const run = ++request.current;
+    controller.current?.abort();
+    const next = new AbortController();
+    controller.current = next;
+    setError('');
+    onInspectStart();
+    try {
+      const inspection = await inspectPackage(file, csrf, next.signal);
+      if (run === request.current) onPrepared(inspection, file);
+    } catch (err) {
+      if (run === request.current && !next.signal.aborted) {
+        setError(errorText(err));
+        onInspectError();
+      }
+    }
+  };
+
+  return (
+    <section className="bg-card border border-hairline rounded-xl p-6 space-y-4">
+      <h2 className="text-lg font-headline font-bold">手动上传插件包</h2>
+      <p className="text-sm text-muted leading-relaxed">
+        适用于离线包、私有仓库或 Release 暂时不可用的情况。上传入口不是主流程。
+      </p>
+      <label
+        className="block rounded-xl border border-dashed border-hairline bg-paper p-6 text-center cursor-pointer hover:border-copper transition-colors"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          if (!busy) choose(event.dataTransfer.files[0]);
+        }}
+      >
+        <span className="block font-semibold mb-2">选择或拖入插件包</span>
+        <span className="block text-sm text-muted mb-3">ZIP / TGZ / TAR.GZ，最大 64 MiB</span>
+        <input
+          aria-label="插件包"
+          type="file"
+          accept=".zip,.tgz,.tar.gz"
+          disabled={!allowed || busy}
+          onChange={(event) => {
+            const picked = event.target.files?.[0];
+            event.target.value = '';
+            choose(picked);
+          }}
+          className="max-w-full text-sm"
+        />
+        {file && (
+          <span className="block mt-3 text-xs text-muted font-mono break-all">
+            {file.name} · {formatBytes(file.size)}
+          </span>
+        )}
+      </label>
+      {error && (
+        <p role="alert" className="text-sm text-copper">
+          {error}
+        </p>
+      )}
+      <button
+        type="button"
+        disabled={!allowed || !file || busy}
+        onClick={() => void inspect()}
+        className="px-5 py-2.5 rounded-lg border border-hairline font-medium disabled:opacity-50 hover:border-copper transition-colors"
+      >
+        {phase === 'inspecting' ? '静态预检中…' : '预检上传包'}
+      </button>
     </section>
   );
 }
 
 function PublishWorkspace({ account, csrf }: { account: MarketAccount; csrf: string }) {
-  const flow = usePublishFlow(csrf);
   const allowed = canPublishWith(account);
+  const [method, setMethod] = useState<PublishMethod>('release');
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [preview, setPreview] = useState<PackageInspection | ReleaseInspection>();
+  const [accepted, setAccepted] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<SubmissionRecord>();
+  const [uploadFile, setUploadFile] = useState<File>();
+  const [reloadHint, setReloadHint] = useState(0);
+
+  const resetPreview = () => {
+    setReloadHint((value) => value + 1);
+    setPreview(undefined);
+    setAccepted(false);
+    setError('');
+    setResult(undefined);
+    setPhase('idle');
+  };
+
+  const chooseMethod = (next: PublishMethod) => {
+    if (phase === 'publishing') return;
+    setMethod(next);
+    resetPreview();
+  };
+
+  const prepared = (inspection: PackageInspection | ReleaseInspection, file?: File) => {
+    setPreview(inspection);
+    setUploadFile(file);
+    setAccepted(false);
+    setError('');
+    setPhase('ready');
+  };
+
+  const publish = async () => {
+    if (!preview?.canPublish || phase !== 'ready' || !accepted) return;
+    setPhase('publishing');
+    setError('');
+    try {
+      let record: SubmissionRecord;
+      if (method === 'release' && isReleasePreview(preview)) {
+        record = await publishRelease(preview.releaseUrl, preview.sha256, csrf);
+      } else {
+        if (!uploadFile) {
+          setError('插件包已失效，请重新选择并预检。');
+          setPhase('idle');
+          return;
+        }
+        record = await submitPackage(uploadFile, preview, '', csrf);
+      }
+      setResult(record);
+      setPhase('done');
+    } catch (err) {
+      setError(errorText(err));
+      setPhase(err instanceof MarketRequestError && err.status < 500 ? 'ready' : 'unknown');
+    }
+  };
+
+  const reconcile = async () => {
+    if (!preview) return;
+    setError('');
+    try {
+      const page = await fetchPublisherSubmissions(undefined, preview.pluginId);
+      const match = page.items.find((item) => item.version === preview.version && item.sha256 === preview.sha256);
+      if (match?.state === 'published') {
+        setResult(match);
+        setPhase('done');
+        return;
+      }
+      setPhase('ready');
+      setError('尚未确认上架；可再次发布相同 Release，服务器会保持同一身份与摘要。');
+    } catch (err) {
+      setError(errorText(err));
+    }
+  };
 
   return (
     <main className="w-full max-w-4xl mx-auto px-6 py-10 space-y-6">
@@ -357,7 +461,7 @@ function PublishWorkspace({ account, csrf }: { account: MarketAccount; csrf: str
         <p className="text-sm text-copper">作者工作台</p>
         <h1 className="text-3xl font-headline font-bold mt-2">发布插件</h1>
         <p className="text-muted mt-3 leading-relaxed">
-          先上传包做完整静态预检，再确认上架。发布后的版本内容不可覆盖。
+          优先从 GitHub Release 读取已构建的插件包；上传包仅作兜底。
         </p>
       </div>
 
@@ -378,22 +482,71 @@ function PublishWorkspace({ account, csrf }: { account: MarketAccount; csrf: str
 
       {allowed ? (
         <>
-          <PackagePicker flow={flow} />
+          <div className="flex gap-2" role="tablist" aria-label="发布方式">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={method === 'release'}
+              onClick={() => chooseMethod('release')}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                method === 'release' ? 'bg-charcoal text-card' : 'border border-hairline text-muted hover:text-ink'
+              }`}
+            >
+              GitHub Release（推荐）
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={method === 'upload'}
+              onClick={() => chooseMethod('upload')}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                method === 'upload' ? 'bg-charcoal text-card' : 'border border-hairline text-muted hover:text-ink'
+              }`}
+            >
+              手动上传兜底
+            </button>
+          </div>
 
-          {flow.error && (
+          {method === 'release' ? (
+            <ReleasePanel
+              key={`release-${reloadHint}`}
+              allowed={allowed}
+              phase={phase}
+              csrf={csrf}
+              onPrepared={(inspection) => prepared(inspection)}
+              onInspectStart={() => {
+                setError('');
+                setPhase('inspecting');
+              }}
+              onInspectError={() => setPhase('idle')}
+              onDirty={resetPreview}
+            />
+          ) : (
+            <UploadPanel
+              key={`upload-${reloadHint}`}
+              allowed={allowed}
+              phase={phase}
+              csrf={csrf}
+              onPrepared={prepared}
+              onInspectStart={() => {
+                setError('');
+                setPhase('inspecting');
+              }}
+              onInspectError={() => setPhase('idle')}
+              onDirty={resetPreview}
+            />
+          )}
+
+          {error && (
             <div
               role="alert"
               className="border border-copper/40 bg-card rounded-xl p-4 space-y-2 text-sm"
             >
-              <p className="text-copper">{flow.error}</p>
-              {flow.phase === 'unknown' && (
+              <p className="text-copper">{error}</p>
+              {phase === 'unknown' && (
                 <>
-                  <p>网络中断不代表发布失败，请先核对结果，避免换包覆盖。</p>
-                  <button
-                    type="button"
-                    onClick={() => void flow.reconcile()}
-                    className="text-copper underline"
-                  >
+                  <p>网络中断不代表发布失败，请先核对结果，避免重复提交。</p>
+                  <button type="button" onClick={() => void reconcile()} className="text-copper underline">
                     确认发布结果
                   </button>
                 </>
@@ -401,9 +554,36 @@ function PublishWorkspace({ account, csrf }: { account: MarketAccount; csrf: str
             </div>
           )}
 
-          {flow.preview && <PreviewCard preview={flow.preview} />}
-          {flow.preview?.canPublish && flow.phase !== 'done' && <ConfirmPublish flow={flow} />}
-          {flow.result && <PublishResult result={flow.result} />}
+          {preview && (
+            <InspectionPreview
+              preview={preview}
+              source={
+                method === 'release' && 'releaseUrl' in preview ? (
+                  <div className="rounded-lg bg-paper p-3 text-sm space-y-1">
+                    <p>
+                      Release：
+                      <a href={preview.releaseUrl} target="_blank" rel="noreferrer" className="text-copper hover:underline break-all">
+                        {preview.releaseTag}
+                      </a>
+                      {preview.prerelease && <span className="ml-2 text-xs text-muted">预发布</span>}
+                    </p>
+                    <p className="font-mono text-xs text-muted break-all">{preview.assetName}</p>
+                  </div>
+                ) : undefined
+              }
+            />
+          )}
+
+          {preview?.canPublish && phase !== 'done' && (
+            <Confirm
+              preview={preview}
+              accepted={accepted}
+              setAccepted={setAccepted}
+              phase={phase}
+              onPublish={() => void publish()}
+            />
+          )}
+          {result && <Result result={result} />}
         </>
       ) : (
         <p role="alert" className="border border-copper/40 bg-card rounded-xl p-4 text-sm">

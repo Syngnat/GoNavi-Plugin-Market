@@ -60,6 +60,34 @@ multipart：`package`（ZIP/TGZ/TAR.GZ，≤64 MiB，根含 `gonavi.plugin.json`
 - 包无效：400 `{"code":"artifact_invalid","message":"artifact_invalid"}`。
 - 预检不落库、不预约版本。
 
+### `POST /api/v1/publisher/release/inspect`
+
+优先发布路径。body：
+
+```json
+{"sourceUrl":"https://github.com/owner/repo/releases/tag/v1.0.0"}
+```
+
+- 接受仓库根 `https://github.com/owner/repo`、Release 页面或 Release 资产下载链接。
+- 根链接读取 latest stable Release，仅适用于单插件仓库；monorepo 必须给出明确 Tag/Release，不能让服务端猜目录。
+- 官方 `Syngnat/GoNavi-Plugin-Market` 的仓库根链接会被拒绝（400 `release_required`）；必须填具体 Release/Tag，且此路径不会把仓库根登记为后台自动更新来源，避免 latest 指向另一个插件。
+- 服务端读取 GitHub Release 中唯一的 ZIP/TGZ 插件包并执行与上传相同的静态预检；不执行插件代码，不落库、不预约版本。
+- 200 响应在 `PackageInspection` 字段之外增加 `sourceUrl/releaseUrl/releaseTag/assetName/prerelease`。
+- Release 不存在、无归档、多个归档或包无效：400 `artifact_invalid`；命名空间不匹配：200 `canPublish:false, reason:"forbidden"`。
+
+### `POST /api/v1/publisher/release/publish`
+
+body：
+
+```json
+{"sourceUrl":"https://github.com/owner/repo/releases/tag/v1.0.0","expectedDigest":"<预检 SHA-256>"}
+```
+
+- 提交时重新读取同一 Release/Tag，并要求实测 SHA-256 与预检一致；不一致返回 409 `inspection_changed`，不落库。
+- 发布走与上传包相同的版本状态机；成功后把仓库根登记为自动更新来源。
+- 自动更新来源登记失败时插件已上架，响应 `warning:"source_update_failed"`，作者可在账号页重试。
+- 上传包的 `POST /api/v1/submissions` 保留，作为离线包、私有仓库和故障兜底。
+
 ### `GET /api/v1/publisher/plugins?limit=24&cursor=&pluginId=`
 200：
 ```json
@@ -89,7 +117,7 @@ body `{"sourceUrl":"https://github.com/owner/repo"}`；空串表示关闭自动�
 ## 前端页面
 
 - `/login`：GitHub 登录按钮（`/api/v1/auth/web/start?returnTo=...`）；已登录显示“继续前往目标页面”；错误码映射。
-- `/publish`：未登录显示登录引导；登录后显示账号/命名空间；选包或拖入 → 预检 → 展示包身份/版本/分类/大小/平台/SHA-256/权限；勾选确认 → 发布；处理 `unknown` 状态并引导“确认发布结果”；可选 GitHub 源仓库。
+- `/publish`：GitHub Release 直发为默认方式；单插件仓库可只填仓库链接，官方 `Syngnat/GoNavi-Plugin-Market` monorepo 应填具体 Release/Tag。预检后展示包身份、版本、分类、大小、平台、SHA-256 与权限，勾选确认后发布。手动上传插件包保留为兜底入口。
 - `/account`：账号/命名空间/角色；所属插件列表（分页、状态、公开版本、来源入口）；发布记录列表（分页、原因、SHA-256）。
 - `/account/plugins/:id`：插件信息、GitHub 源仓库保存、版本/发布记录。
 - `TopNav`：登录/我的插件/退出；保留现有导航与发布按钮。

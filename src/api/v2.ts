@@ -2,6 +2,7 @@ import type {
   ListPage,
   PackageInspection,
   PublisherPlugin,
+  ReleaseInspection,
   SourceUpdateResult,
   SubmissionRecord,
   WebSession,
@@ -46,6 +47,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   forbidden: '当前账号没有操作此插件的权限。',
   invalid_csrf: '登录状态已变化，请刷新账号后重试。',
   invalid_request: '请求内容不完整或格式不正确。',
+  release_required: '该官方仓库包含多个插件，请填写具体的 Release Tag 或 Release 资产链接。',
   artifact_invalid: '插件包未通过静态校验，请检查 manifest、贡献声明和归档内容。',
   conflict: '此版本已被使用，不能覆盖已有内容；请查看版本记录。',
   version_locked: '该版本已拒绝或下架，不能重新发布。',
@@ -208,6 +210,35 @@ export function submitPackage(
   return requestJson('/submissions', { method: 'POST', body, csrf });
 }
 
+// ---- GitHub Release 直发 ----
+
+export function inspectRelease(
+  sourceUrl: string,
+  csrf: string,
+  signal?: AbortSignal,
+): Promise<ReleaseInspection> {
+  return requestJson('/publisher/release/inspect', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sourceUrl: sourceUrl.trim() }),
+    csrf,
+    signal,
+  });
+}
+
+export function publishRelease(
+  sourceUrl: string,
+  expectedDigest: string,
+  csrf: string,
+): Promise<SubmissionRecord> {
+  return requestJson('/publisher/release/publish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sourceUrl: sourceUrl.trim(), expectedDigest }),
+    csrf,
+  });
+}
+
 export function fetchPublisherPlugins(
   cursor?: string,
   pluginId?: string,
@@ -274,4 +305,32 @@ export function isGithubRepoUrl(value: string): boolean {
     !url.hash &&
     url.pathname.split('/').filter(Boolean).length === 2
   );
+}
+
+/** Release 直发接受仓库根、Release 页或 Release 资产下载链接。 */
+export function isGithubReleaseUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!/^https:\/\/github\.com\//i.test(trimmed)) return false;
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return false;
+  }
+  if (
+    url.protocol !== 'https:' ||
+    url.hostname !== 'github.com' ||
+    url.port ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    return false;
+  }
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (parts.length === 2) return true;
+  if (parts.length === 5 && parts[2] === 'releases' && parts[3] === 'tag') return true;
+  // owner/repo/releases/download/tag/asset = 6 segments; tags may contain '/'.
+  return parts.length >= 6 && parts.length <= 9 && parts[2] === 'releases' && parts[3] === 'download';
 }

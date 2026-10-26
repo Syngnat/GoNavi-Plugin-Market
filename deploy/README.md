@@ -76,7 +76,7 @@ Let's Encrypt ECDSA，cert-name `plugin.gonavi.org`，webroot 续期（certbot �
 1. GitHub → Settings → Developer settings → OAuth Apps：Homepage `https://plugin.gonavi.org`，Callback 为上面的 `/api/v1/auth/github/callback`，拿到 Client ID/Secret。
 2. 填入服务器 `/etc/gonavi-market/env` 的 `GONAVI_MARKET_GITHUB_CLIENT_ID` / `_SECRET`，`systemctl restart gonavi-market`。
 3. 首次网站登录自动分配 `gh-<github-login>` 发布者命名空间；插件 ID 必须以该命名空间加英文句点开头。
-4. 发布：网站 `/publish` 上传 ZIP/TGZ → `/api/v1/publisher/inspect` 静态预检 → 确认摘要 → `POST /api/v1/submissions`；校验通过即上架（官方徽标由运营单独授予，违规可 yank）。
+4. 发布：网站 `/publish` 优先填写 GitHub 仓库/Release 链接 → `/api/v1/publisher/release/inspect` 静态预检 → 确认摘要 → `/api/v1/publisher/release/publish`。单插件仓库可用仓库根链接；官方 `Syngnat/GoNavi-Plugin-Market` monorepo 必须给具体 Release/Tag。上传 ZIP/TGZ 走 `/publisher/inspect` + `/submissions`，仅作兜底。校验通过即上架（官方徽标由运营单独授予，违规可 yank）。
 5. 作者工作台 `/account` 读取 `/api/v1/publisher/plugins`、`/submissions`，可在 `/api/v1/publisher/plugins/{id}/source` 登记或清空 GitHub Release 自动同步来源。完整契约见 `docs/v2-api.md`。
 6. 管理员仍可用 `/api/v1/admin/submissions` 审核/下架、`/api/v1/admin/audit` 查审计；运营授权用 `gonavi-market-server -grant-github-id ... -grant-role admin|publisher`。
 

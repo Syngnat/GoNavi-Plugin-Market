@@ -110,6 +110,15 @@ export interface PackageInspection {
   manifest: PluginManifestSummary;
 }
 
+/** GitHub Release 直发预检：复用包身份字段，并附带具体 Release 来源。 */
+export interface ReleaseInspection extends PackageInspection {
+  sourceUrl: string;
+  releaseUrl: string;
+  releaseTag: string;
+  assetName: string;
+  prerelease: boolean;
+}
+
 export type SubmissionState =
   | 'draft'
   | 'submitted'

@@ -136,7 +136,7 @@ gonavi plugin --root $root inspect $package`}
         <h2 className="text-xl font-headline font-bold text-ink">发布到市场</h2>
         <p className="text-sm text-muted leading-relaxed max-w-3xl">
           登录后以「我的插件」显示的命名空间为准，示例 ID 仅示意；首次提交可登记公开
-          GitHub 仓库，后续稳定 Release 自动同步，手动上传仍可用。
+          可直接填写 GitHub 仓库或具体 Release/Tag；单插件仓库会读取 latest stable Release，monorepo 请指定 Tag。
         </p>
         <Link
           to="/publish"

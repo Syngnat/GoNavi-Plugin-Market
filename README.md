@@ -42,7 +42,9 @@ npm run preview
 | GET | `/api/v1/auth/web/session` | 网站登录态；返回 `authenticated/account/csrfToken` |
 | GET | `/api/v1/auth/web/start?returnTo=/publish` | 发起 GitHub 登录，303 到 GitHub |
 | POST | `/api/v1/auth/web/logout` | 退出（需 `X-GoNavi-CSRF`） |
-| POST | `/api/v1/publisher/inspect` | 发布预检（multipart `package`），不落库 |
+| POST | `/api/v1/publisher/release/inspect` | GitHub Release 发布预检（JSON `sourceUrl`），不落库 |
+| POST | `/api/v1/publisher/release/publish` | 从同一 Release 发布（CSRF），摘要变化拒绝 |
+| POST | `/api/v1/publisher/inspect` | 上传包兜底预检（multipart `package`），不落库 |
 | POST | `/api/v1/submissions` | 发布（multipart `package/pluginId/version/expectedDigest/source`） |
 | GET | `/api/v1/publisher/plugins` / `submissions` | 作者工作台列表 |
 | PUT | `/api/v1/publisher/plugins/{id}/source` | 设置/清空 GitHub Release 自动更新来源 |
