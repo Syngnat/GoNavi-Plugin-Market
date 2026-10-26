@@ -10,7 +10,7 @@
 
 ## 认证
 
-- 浏览器登录：`GET /api/v1/auth/web/start?returnTo=/publish` → 303 GitHub OAuth；GitHub 回调复用已注册的 `GET /api/v1/auth/github/callback`（与设备码共用），服务端按 `AuthFlow.UserCode` 是否为空区分网站/设备流程；成功后写 HttpOnly 会话 Cookie 并 303 回 `returnTo`。`/api/v1/auth/web/callback` 仅保留为内部/测试别名。
+- 浏览器登录：`GET /api/v1/auth/web/start?returnTo=/publish` → 303 GitHub OAuth；GitHub 回调使用已注册的唯一回调 `GET /api/v1/auth/github/callback`（仅网站登录，不再有设备码流程）；成功后写 HttpOnly 会话 Cookie 并 303 回 `returnTo`。
 - 会话 Cookie：`__Host-gonavi_market_session`（`GONAVI_MARKET_PUBLIC_URL` 为 https 时）；本地 http 用 `gonavi_market_session`。`Path=/; HttpOnly; SameSite=Lax; Secure=https; Max-Age=86400`。
 - CSRF：`X-GoNavi-CSRF` 请求头。token = base64url(sha256("gonavi-market-csrf:" + sessionToken))，由 `GET /auth/web/session` 返回。Cookie 认证的 POST/PUT/DELETE 必须校验；Bearer 客户端跳过。
 - 登录态复用 `market_sessions` 表；新增 `CreateSession(ctx, tokenHash, accountID, expiresAt)`。
@@ -26,7 +26,7 @@
 - `returnTo` 必须同源路径：以 `/` 开头、不以 `//` 开头、不含 `\`，否则回退 `/account`。
 - 303 到 GitHub；设置 oauth state Cookie 与 returnTo Cookie。
 
-`GET /api/v1/auth/github/callback?code=&state=`（GitHub 实际回调；`/auth/web/callback` 为同逻辑别名）
+`GET /api/v1/auth/github/callback?code=&state=`（GitHub 唯一回调，仅网站登录）
 - state 不匹配 → 303 `/login?error=invalid_oauth_state`
 - code 空 → 303 `/login?error=oauth_denied`
 - 成功 → 303 `returnTo`
