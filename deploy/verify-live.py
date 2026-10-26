@@ -10,7 +10,7 @@ body = urllib.request.urlopen(base + src, timeout=20).read().decode('utf-8', 're
 
 checks = {
     '社区 → Discussions #1582': 'discussions/1582' in body,
-    '开发者文档 → 站内文档中心': '/docs/author-guide' in body and '/docs/v2-api' in body,
+    '开发者文档 → 站内文档中心': 'to:"/docs"' in body and '/docs/author-guide' in body,
     '旧 GitHub 插件文档链接已移除': 'tree/dev/docs/plugins' not in body and 'blob/dev/docs/plugins' not in body,
     '旧 Issues 社区链接已换': 'GoNavi/issues' not in body.replace('github.com/Syngnat/GoNavi/issues', ''),
 }
