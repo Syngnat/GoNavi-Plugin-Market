@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { PluginItem } from '../api/types';
 import { InstallButton } from './InstallButton';
@@ -49,10 +49,10 @@ const CATEGORY_COLORS: Record<GalaxyCategory, string> = {
 };
 
 const PLANETS = [
-  '/galaxy/copper-giant.png',
-  '/galaxy/teal-ocean.png',
-  '/galaxy/ice-world.png',
-  '/galaxy/violet-world.png',
+  '/galaxy/copper-giant.png?v=4',
+  '/galaxy/teal-ocean.png?v=4',
+  '/galaxy/ice-world.png?v=4',
+  '/galaxy/violet-world.png?v=4',
 ];
 
 const WORLD = { width: 1440, height: 900, cx: 738, cy: 423 };
@@ -73,11 +73,14 @@ interface GalaxyNode {
   category: GalaxyCategory;
   x: number;
   y: number;
+  angle: number;
+  rx: number;
+  ry: number;
+  spin: number;
   orbit: 'inner' | 'outer';
   planet: string;
   color: string;
   sigil: string;
-  labelSide: 'left' | 'right';
 }
 
 function categoryOf(item: PluginItem): GalaxyCategory {
@@ -97,6 +100,23 @@ function stableFraction(text: string, salt: number): number {
   const hash = hashText(`${text}:${salt}`);
   return (hash % 10000) / 10000;
 }
+
+function makeStars(count: number, salt: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const key = `star-${salt}-${index}`;
+    const mag = stableFraction(key, 1);
+    return {
+      x: stableFraction(key, 2) * WORLD.width,
+      y: stableFraction(key, 3) * WORLD.height,
+      r: mag > 0.95 ? 1.8 : mag > 0.82 ? 1.05 : 0.42,
+      o: 0.16 + mag * 0.78,
+      glow: mag > 0.95,
+    };
+  });
+}
+
+const FAR_STARS = makeStars(170, 11);
+const NEAR_STARS = makeStars(42, 29);
 
 function sigilOf(item: PluginItem): string {
   const words = item.name
@@ -123,41 +143,66 @@ function pluginMatches(item: PluginItem, category: GalaxyCategory, query: string
     .some((value) => value.toLowerCase().includes(q));
 }
 
+const SECTOR_ANGLE: Record<GalaxyCategory, number> = {
+  全部: 0,
+  数据源: -Math.PI / 2,
+  'AI 供应商': 0,
+  导出器: Math.PI / 4,
+  技能: Math.PI / 2,
+  面板: (Math.PI * 3) / 4,
+  命令: Math.PI,
+  运维: (-Math.PI * 3) / 4,
+  其他: -Math.PI / 4,
+};
+
+const LANES = [
+  { rx: 168, ry: 110 },
+  { rx: 248, ry: 162 },
+  { rx: 338, ry: 220 },
+];
+
 function layoutNodes(items: PluginItem[]): GalaxyNode[] {
-  const sorted = [...items].sort((a, b) => {
-    if (a.official !== b.official) return a.official ? -1 : 1;
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-  });
-  const official = sorted.filter((item) => item.official);
-  const community = sorted.filter((item) => !item.official);
-
-  const inner = official.length > 0 ? official : sorted.slice(0, Math.min(4, sorted.length));
-  const outer = official.length > 0 ? community : sorted.slice(inner.length);
-
-  return sorted.map((item) => {
-    const isInner = inner.includes(item);
-    const ring = isInner ? inner : outer;
-    const index = Math.max(0, ring.indexOf(item));
-    const count = Math.max(1, ring.length);
-    const baseAngle = isInner ? -Math.PI * 0.7 : Math.PI * 0.12;
-    const angle = baseAngle + (Math.PI * 2 * index) / count + (stableFraction(item.id, 3) - 0.5) * 0.12;
-    const orbit = isInner ? INNER_ORBIT : OUTER_ORBIT;
-    const radiusJitter = 0.92 + stableFraction(item.id, 4) * 0.16;
-    const x = WORLD.cx + Math.cos(angle) * orbit.rx * radiusJitter;
-    const y = WORLD.cy + Math.sin(angle) * orbit.ry * radiusJitter;
+  const groups = new Map<GalaxyCategory, PluginItem[]>();
+  for (const item of items) {
     const category = categoryOf(item);
-    return {
-      item,
-      category,
-      x,
-      y,
-      orbit: isInner ? 'inner' : 'outer',
-      planet: planetOf(item, index),
-      color: item.official ? '#cf7542' : CATEGORY_COLORS[category],
-      sigil: sigilOf(item),
-      labelSide: x >= WORLD.cx ? 'right' : 'left',
-    };
-  });
+    const list = groups.get(category) ?? [];
+    list.push(item);
+    groups.set(category, list);
+  }
+
+  const nodes: GalaxyNode[] = [];
+  for (const [category, list] of groups) {
+    const sorted = [...list].sort((a, b) => {
+      if (a.official !== b.official) return a.official ? -1 : 1;
+      return a.name.localeCompare(b.name, 'zh');
+    });
+    const span = Math.min(0.62, Math.max(0, sorted.length - 1) * 0.26);
+    const center = SECTOR_ANGLE[category];
+    sorted.forEach((item, index) => {
+      const along = sorted.length === 1 ? 0 : index / (sorted.length - 1) - 0.5;
+      const angle = center + along * span;
+      const lane = LANES[index % LANES.length];
+      const radiusJitter = 0.96 + stableFraction(item.id, 4) * 0.06;
+      const rx = lane.rx * radiusJitter;
+      const ry = lane.ry * radiusJitter;
+      const at = pointOnOrbit(angle, rx, ry);
+      nodes.push({
+        item,
+        category,
+        x: at.x,
+        y: at.y,
+        angle,
+        rx,
+        ry,
+        spin: 0.008,
+        orbit: item.official ? 'inner' : 'outer',
+        planet: planetOf(item, index),
+        color: CATEGORY_COLORS[category],
+        sigil: sigilOf(item),
+      });
+    });
+  }
+  return nodes;
 }
 
 function formatDate(value: string): string {
@@ -197,6 +242,151 @@ function cameraTransform(camera: Camera): string {
   return `translate(${tx.toFixed(2)} ${ty.toFixed(2)}) scale(${camera.scale.toFixed(4)})`;
 }
 
+const ORBIT_ROTATION = (-11 * Math.PI) / 180;
+const FOCUS = { x: 640, y: 448 };
+const FLIGHT_MS = 920;
+
+function pointOnOrbit(angle: number, rx: number, ry: number): { x: number; y: number } {
+  const lx = Math.cos(angle) * rx;
+  const ly = Math.sin(angle) * ry;
+  const cos = Math.cos(ORBIT_ROTATION);
+  const sin = Math.sin(ORBIT_ROTATION);
+  return {
+    x: WORLD.cx + lx * cos - ly * sin,
+    y: WORLD.cy + lx * sin + ly * cos,
+  };
+}
+
+function orbitPoint(node: GalaxyNode, now: number, reduced: boolean): { x: number; y: number } {
+  const seconds = reduced ? 0 : now / 1000;
+  return pointOnOrbit(node.angle + node.spin * seconds, node.rx, node.ry);
+}
+
+function clampCamera(camera: Camera): Camera {
+  const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, camera.scale));
+  const spanX = 520 * scale;
+  const spanY = 340 * scale;
+  return {
+    scale,
+    x: Math.max(-spanX, Math.min(spanX, camera.x)),
+    y: Math.max(-spanY, Math.min(spanY, camera.y)),
+  };
+}
+
+function frameCamera(worldX: number, worldY: number, scale: number): Camera {
+  const next = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+  return clampCamera({
+    scale: next,
+    x: FOCUS.x - WORLD.cx * (1 - next) - worldX * next,
+    y: FOCUS.y - WORLD.cy * (1 - next) - worldY * next,
+  });
+}
+
+function projectNode(worldX: number, worldY: number, camera: Camera, rect: DOMRect): { x: number; y: number } {
+  const viewScale = Math.max(WORLD.width / rect.width, WORLD.height / rect.height);
+  const offsetX = (rect.width * viewScale - WORLD.width) / 2;
+  const offsetY = (rect.height * viewScale - WORLD.height) / 2;
+  const tx = camera.x + WORLD.cx * (1 - camera.scale);
+  const ty = camera.y + WORLD.cy * (1 - camera.scale);
+  return {
+    x: (tx + worldX * camera.scale + offsetX) / viewScale,
+    y: (ty + worldY * camera.scale + offsetY) / viewScale,
+  };
+}
+
+function easeOutQuart(t: number): number {
+  return 1 - (1 - t) ** 4;
+}
+
+interface Flight {
+  from: Camera;
+  to: Camera;
+  start: number;
+  duration: number;
+}
+
+interface Rig {
+  current: Camera;
+  desiredScale: number;
+  vx: number;
+  vy: number;
+  mode: 'idle' | 'drag' | 'coast' | 'zoom' | 'flight';
+  zoomAnchor: { x: number; y: number } | null;
+  flight: Flight | null;
+  reduced: boolean;
+}
+
+const MODE_LABEL: Record<Rig['mode'], string> = {
+  idle: 'ORBITAL',
+  drag: 'PAN',
+  coast: 'INERTIA',
+  zoom: 'ZOOM',
+  flight: 'GLIDE',
+};
+
+function stepRig(rig: Rig, dt: number, now: number) {
+  if (rig.mode === 'coast') {
+    const next = {
+      ...rig.current,
+      x: rig.current.x + rig.vx * dt,
+      y: rig.current.y + rig.vy * dt,
+    };
+    const clamped = clampCamera(next);
+    if (clamped.x !== next.x) rig.vx = 0;
+    if (clamped.y !== next.y) rig.vy = 0;
+    rig.current = clamped;
+    const decay = Math.exp(-dt / 0.45);
+    rig.vx *= decay;
+    rig.vy *= decay;
+    if (Math.hypot(rig.vx, rig.vy) < 18) {
+      rig.vx = 0;
+      rig.vy = 0;
+      rig.mode = 'idle';
+    }
+    return;
+  }
+  if (rig.mode === 'zoom' && rig.zoomAnchor) {
+    const delta = rig.desiredScale - rig.current.scale;
+    if (Math.abs(delta) < 0.0012) {
+      const applied = rig.current.scale === 0 ? 1 : rig.desiredScale / rig.current.scale;
+      const anchor = rig.zoomAnchor;
+      rig.current = clampCamera({
+        scale: rig.desiredScale,
+        x: anchor.x - WORLD.cx - (anchor.x - WORLD.cx - rig.current.x) * applied,
+        y: anchor.y - WORLD.cy - (anchor.y - WORLD.cy - rig.current.y) * applied,
+      });
+      rig.mode = 'idle';
+      return;
+    }
+    const amount = 1 - Math.exp(-dt / 0.12);
+    const nextScale = rig.current.scale + delta * amount;
+    const applied = rig.current.scale === 0 ? 1 : nextScale / rig.current.scale;
+    const anchor = rig.zoomAnchor;
+    rig.current = clampCamera({
+      scale: nextScale,
+      x: anchor.x - WORLD.cx - (anchor.x - WORLD.cx - rig.current.x) * applied,
+      y: anchor.y - WORLD.cy - (anchor.y - WORLD.cy - rig.current.y) * applied,
+    });
+    return;
+  }
+  if (rig.mode === 'flight' && rig.flight) {
+    const t = Math.min(1, (now - rig.flight.start) / rig.flight.duration);
+    const eased = easeOutQuart(t);
+    const { from, to } = rig.flight;
+    rig.current = {
+      scale: from.scale + (to.scale - from.scale) * eased,
+      x: from.x + (to.x - from.x) * eased,
+      y: from.y + (to.y - from.y) * eased,
+    };
+    if (t >= 1) {
+      rig.current = to;
+      rig.desiredScale = to.scale;
+      rig.mode = 'idle';
+      rig.flight = null;
+    }
+  }
+}
+
 function zoomLevel(scale: number): string {
   if (scale >= 1.5) return 'close';
   if (scale < 0.8) return 'far';
@@ -232,8 +422,13 @@ export function PluginGalaxy({
 }: PluginGalaxyProps) {
   const observatoryRef = useRef<HTMLElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const zoomAtRef = useRef<(clientX: number, clientY: number, factor: number) => void>(() => {});
+  const worldRef = useRef<SVGGElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const cursorRef = useRef<HTMLSpanElement>(null);
+  const scaleRef = useRef<HTMLSpanElement>(null);
+  const modeReadoutRef = useRef<HTMLSpanElement>(null);
+  const nodeEls = useRef(new Map<string, HTMLButtonElement>());
+  const paintRef = useRef<(now: number) => void>(() => {});
   const nodes = useMemo(() => layoutNodes(items), [items]);
   const visibleNodes = useMemo(
     () => nodes.filter((node) => pluginMatches(node.item, activeCategory, query)),
@@ -249,81 +444,185 @@ export function PluginGalaxy({
   }, [visibleNodes, selectedId]);
 
   const [view, setView] = useState<'map' | 'list'>('map');
-  const [camera, setCamera] = useState<Camera>(DEFAULT_CAMERA);
-  const [dragging, setDragging] = useState(false);
-  const [cursor, setCursor] = useState({ x: WORLD.cx, y: WORLD.cy });
-  const [mapRectVersion, setMapRectVersion] = useState(0);
-  const cameraRef = useRef(camera);
-  const mapRectRef = useRef<DOMRect | null>(null);
+  const nodesRef = useRef(nodes);
+  const viewRef = useRef(view);
+  const rigRef = useRef<Rig>({
+    current: { ...DEFAULT_CAMERA },
+    desiredScale: DEFAULT_CAMERA.scale,
+    vx: 0,
+    vy: 0,
+    mode: 'idle',
+    zoomAnchor: null,
+    flight: null,
+    reduced: false,
+  });
   const dragRef = useRef({
     pointerId: -1,
     startX: 0,
     startY: 0,
     originX: 0,
     originY: 0,
+    lastX: 0,
+    lastY: 0,
+    lastT: 0,
     moved: false,
   });
+  const suppressClickRef = useRef(false);
+  nodesRef.current = nodes;
+  viewRef.current = view;
 
-  useEffect(() => {
-    cameraRef.current = camera;
-  }, [camera]);
-
-  useEffect(() => {
-    const element = observatoryRef.current;
-    if (!element) return;
-    mapRectRef.current = element.getBoundingClientRect();
-    const update = () => {
-      mapRectRef.current = element.getBoundingClientRect();
-      setMapRectVersion((value) => value + 1);
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    window.addEventListener('resize', update);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', update);
-    };
+  const bindNode = useCallback((id: string) => (element: HTMLButtonElement | null) => {
+    if (element) nodeEls.current.set(id, element);
+    else nodeEls.current.delete(id);
   }, []);
 
   const selectNode = useCallback((id: string) => {
     setSelectedId(id);
   }, []);
 
-  const focusNode = useCallback((node: GalaxyNode, targetScale = 1.25) => {
-    setCamera({
-      scale: targetScale,
-      x: 730 - node.x * targetScale,
-      y: 430 - node.y * targetScale,
-    });
+  const focusNode = useCallback((node: GalaxyNode, targetScale = 1.48) => {
+    const rig = rigRef.current;
+    const now = performance.now();
+    const live = orbitPoint(node, now, rig.reduced);
+    const to = frameCamera(live.x, live.y, targetScale);
+    if (rig.reduced) {
+      rig.current = to;
+      rig.desiredScale = to.scale;
+      rig.mode = 'idle';
+      rig.flight = null;
+      paintRef.current(now);
+      return;
+    }
+    rig.flight = { from: { ...rig.current }, to, start: now, duration: FLIGHT_MS };
+    rig.mode = 'flight';
+    rig.vx = 0;
+    rig.vy = 0;
   }, []);
 
-  const projectedNodeStyle = useCallback((node: GalaxyNode): CSSProperties => {
-    void mapRectVersion;
-    const rect = mapRectRef.current;
-    if (!rect) return { left: '50%', top: '50%', transform: 'translate(-50%, -50%)' };
-    const canvasWidth = rect.width;
-    const canvasHeight = rect.height;
-    const viewScale = Math.max(WORLD.width / canvasWidth, WORLD.height / canvasHeight);
-    const offsetX = (canvasWidth * viewScale - WORLD.width) / 2;
-    const offsetY = (canvasHeight * viewScale - WORLD.height) / 2;
-    const tx = camera.x + WORLD.cx * (1 - camera.scale);
-    const ty = camera.y + WORLD.cy * (1 - camera.scale);
-    const x = (tx + node.x * camera.scale + offsetX) / viewScale;
-    const y = (ty + node.y * camera.scale + offsetY) / viewScale;
-    return {
-      left: `${x}px`,
-      top: `${y}px`,
-      '--node-color': node.color,
-      '--node-planet': `url(${node.planet})`,
-      '--node-scale': camera.scale,
-    } as CSSProperties;
-  }, [camera, mapRectVersion]);
+  const focusHome = useCallback(() => {
+    const rig = rigRef.current;
+    const now = performance.now();
+    const to = { ...DEFAULT_CAMERA };
+    if (rig.reduced) {
+      rig.current = to;
+      rig.desiredScale = to.scale;
+      rig.mode = 'idle';
+      rig.flight = null;
+      paintRef.current(now);
+      return;
+    }
+    rig.flight = { from: { ...rig.current }, to, start: now, duration: FLIGHT_MS };
+    rig.mode = 'flight';
+    rig.vx = 0;
+    rig.vy = 0;
+  }, []);
+
+  const beginZoom = useCallback((clientX: number, clientY: number, factor: number) => {
+    const rect = observatoryRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const rig = rigRef.current;
+    const base = rig.mode === 'zoom' ? rig.desiredScale : rig.current.scale;
+    const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, base * factor));
+    rig.desiredScale = scale;
+    rig.zoomAnchor = clientPointToView(clientX, clientY, rect);
+    rig.flight = null;
+    rig.vx = 0;
+    rig.vy = 0;
+    if (rig.reduced || Math.abs(scale - rig.current.scale) < 0.0001) {
+      const applied = rig.current.scale === 0 ? 1 : scale / rig.current.scale;
+      const anchor = rig.zoomAnchor;
+      rig.current = clampCamera({
+        scale,
+        x: anchor.x - WORLD.cx - (anchor.x - WORLD.cx - rig.current.x) * applied,
+        y: anchor.y - WORLD.cy - (anchor.y - WORLD.cy - rig.current.y) * applied,
+      });
+      rig.desiredScale = rig.current.scale;
+      rig.mode = 'idle';
+      paintRef.current(performance.now());
+      return;
+    }
+    rig.mode = 'zoom';
+  }, []);
+
+  useLayoutEffect(() => {
+    const root = observatoryRef.current;
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const syncReduced = () => {
+      rigRef.current.reduced = media.matches;
+    };
+    syncReduced();
+    media.addEventListener('change', syncReduced);
+
+    const paint = (now: number) => {
+      const rig = rigRef.current;
+      const camera = rig.current;
+      const world = worldRef.current;
+      const host = observatoryRef.current;
+      if (world) {
+        world.setAttribute('transform', cameraTransform(camera));
+        world.dataset.zoomLevel = zoomLevel(camera.scale);
+      }
+      if (host) {
+        host.dataset.zoomLevel = zoomLevel(camera.scale);
+        host.style.setProperty('--star-shift-x', `${(camera.x * 0.055).toFixed(2)}px`);
+        host.style.setProperty('--star-shift-y', `${(camera.y * 0.055).toFixed(2)}px`);
+        host.style.setProperty('--grid-shift-x', `${(camera.x * 0.022).toFixed(2)}px`);
+        host.style.setProperty('--grid-shift-y', `${(camera.y * 0.022).toFixed(2)}px`);
+      }
+      const rect = host?.getBoundingClientRect();
+      if (rect && rect.width > 0) {
+        const body = Math.max(0.8, Math.min(1.62, camera.scale)).toFixed(3);
+        for (const node of nodesRef.current) {
+          const element = nodeEls.current.get(node.item.id);
+          if (!element) continue;
+          const live = orbitPoint(node, now, rig.reduced);
+          const projected = projectNode(live.x, live.y, camera, rect);
+          element.style.left = `${projected.x}px`;
+          element.style.top = `${projected.y}px`;
+          element.style.setProperty('--body-scale', body);
+          element.classList.toggle('label-left', live.x < WORLD.cx);
+        }
+      }
+      if (scaleRef.current) scaleRef.current.textContent = `SCALE ${camera.scale.toFixed(2)}×`;
+      if (modeReadoutRef.current) modeReadoutRef.current.textContent = `MODE ${MODE_LABEL[rig.mode]}`;
+    };
+    paintRef.current = paint;
+
+    const handleWheel = (event: WheelEvent) => {
+      if (viewRef.current !== 'map') return;
+      const target = event.target;
+      if (target instanceof Element && target.closest('.galaxy-inspector, .galaxy-list-panel, .galaxy-sectors')) return;
+      event.preventDefault();
+      const factor = Math.exp(Math.max(-0.42, Math.min(0.42, -event.deltaY * 0.00105)));
+      beginZoom(event.clientX, event.clientY, factor);
+    };
+    root?.addEventListener('wheel', handleWheel, { passive: false });
+
+    let last = performance.now();
+    let frame = 0;
+    const loop = (now: number) => {
+      const dt = Math.min(0.034, (now - last) / 1000);
+      last = now;
+      const rig = rigRef.current;
+      if (!rig.reduced && rig.mode !== 'idle' && rig.mode !== 'drag') stepRig(rig, dt, now);
+      paint(now);
+      frame = requestAnimationFrame(loop);
+    };
+    paint(performance.now());
+    frame = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(frame);
+      media.removeEventListener('change', syncReduced);
+      root?.removeEventListener('wheel', handleWheel);
+    };
+  }, [beginZoom]);
+
+  useLayoutEffect(() => {
+    paintRef.current(performance.now());
+  });
 
   useEffect(() => {
-    if (selected && view === 'map' && query.trim()) {
-      focusNode(selected, 1.24);
-    }
+    if (selected && view === 'map' && query.trim()) focusNode(selected, 1.48);
   }, [focusNode, query, selected, view]);
 
   useEffect(() => {
@@ -345,101 +644,110 @@ export function PluginGalaxy({
       if (event.key === 'Escape' && !typing) {
         onQueryChange('');
         onCategoryChange('全部');
-        setCamera(DEFAULT_CAMERA);
+        focusHome();
         return;
       }
       if (event.key === '0' && !typing) {
-        setCamera(DEFAULT_CAMERA);
+        focusHome();
         return;
       }
-      if (event.key === '+' || event.key === '=') {
-        if (typing) return;
-        setCamera((current) => ({ ...current, scale: Math.min(MAX_SCALE, current.scale * 1.18) }));
-        return;
-      }
-      if (event.key === '-' && !typing) {
-        setCamera((current) => ({ ...current, scale: Math.max(MIN_SCALE, current.scale / 1.18) }));
-      }
+      const rect = observatoryRef.current?.getBoundingClientRect();
+      if (!rect || typing || viewRef.current !== 'map') return;
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      if (event.key === '+' || event.key === '=') beginZoom(centerX, centerY, 1.16);
+      if (event.key === '-') beginZoom(centerX, centerY, 1 / 1.16);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onCategoryChange, onQueryChange]);
+  }, [beginZoom, focusHome, onCategoryChange, onQueryChange]);
 
-  const zoomAt = useCallback((clientX: number, clientY: number, factor: number) => {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const point = clientPointToView(clientX, clientY, rect);
-    setCamera((current) => {
-      const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, current.scale * factor));
-      const applied = scale / current.scale;
-      return {
-        scale,
-        x: point.x - WORLD.cx - (point.x - WORLD.cx - current.x) * applied,
-        y: point.y - WORLD.cy - (point.y - WORLD.cy - current.y) * applied,
-      };
-    });
-  }, []);
-
-  useEffect(() => {
-    zoomAtRef.current = zoomAt;
-  }, [zoomAt]);
-
-  useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const handleWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      const factor = Math.exp(-event.deltaY * 0.0017 * 2.6);
-      zoomAtRef.current(event.clientX, event.clientY, factor);
-    };
-    svg.addEventListener('wheel', handleWheel, { passive: false });
-    return () => svg.removeEventListener('wheel', handleWheel);
-  }, []);
-
-  const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (event.button !== 0) return;
-    const target = event.target as Element;
-    if (target.closest('[data-galaxy-node]')) return;
+  const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || viewRef.current !== 'map') return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest('.galaxy-inspector, .galaxy-sectors, .galaxy-hero, .galaxy-zoom, .galaxy-status, .galaxy-list-panel, .galaxy-metrics, .galaxy-empty, .galaxy-view-toggle')) return;
+    const rig = rigRef.current;
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      originX: cameraRef.current.x,
-      originY: cameraRef.current.y,
+      originX: rig.current.x,
+      originY: rig.current.y,
+      lastX: rig.current.x,
+      lastY: rig.current.y,
+      lastT: performance.now(),
       moved: false,
     };
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // Synthetic pointers and some embedded WebViews do not support capture.
-    }
-    setDragging(true);
   };
 
-  const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const point = clientPointToView(event.clientX, event.clientY, rect);
-    setCursor({ x: point.x, y: point.y });
+  const onPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    const host = observatoryRef.current;
+    const rect = host?.getBoundingClientRect();
+    if (rect && cursorRef.current) {
+      const point = clientPointToView(event.clientX, event.clientY, rect);
+      cursorRef.current.textContent = `CURSOR ${String(Math.round(point.x)).padStart(4, '0')} / ${String(Math.round(point.y)).padStart(4, '0')}`;
+    }
     const drag = dragRef.current;
-    if (drag.pointerId !== event.pointerId || !dragging) return;
+    if (!rect || !host || drag.pointerId !== event.pointerId) return;
     const viewScale = Math.max(WORLD.width / rect.width, WORLD.height / rect.height);
     const dx = (event.clientX - drag.startX) * viewScale;
     const dy = (event.clientY - drag.startY) * viewScale;
-    if (Math.hypot(dx, dy) > 5) drag.moved = true;
-    setCamera((current) => ({
-      ...current,
+    const now = performance.now();
+    const wasMoving = drag.moved;
+    if (!drag.moved) {
+      if (Math.hypot(dx, dy) < 6) return;
+      drag.moved = true;
+      const rig = rigRef.current;
+      rig.mode = 'drag';
+      rig.flight = null;
+      rig.vx = 0;
+      rig.vy = 0;
+      host.classList.add('is-panning');
+      try {
+        host.setPointerCapture(event.pointerId);
+      } catch {
+        // Synthetic pointers and some embedded WebViews do not support capture.
+      }
+    }
+    const next = clampCamera({
+      ...rigRef.current.current,
       x: drag.originX + dx,
       y: drag.originY + dy,
-    }));
+    });
+    const rig = rigRef.current;
+    if (wasMoving) {
+      const dt = Math.max(0.008, (now - drag.lastT) / 1000);
+      rig.vx = Math.max(-980, Math.min(980, (next.x - drag.lastX) / dt));
+      rig.vy = Math.max(-980, Math.min(980, (next.y - drag.lastY) / dt));
+    }
+    drag.lastX = next.x;
+    drag.lastY = next.y;
+    drag.lastT = now;
+    rig.current = next;
+    rig.desiredScale = next.scale;
+    paintRef.current(now);
   };
 
-  const endPointer = (event: ReactPointerEvent<SVGSVGElement>) => {
-    if (dragRef.current.pointerId === event.pointerId) {
-      dragRef.current.pointerId = -1;
-      setDragging(false);
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      }
+  const endPointer = (event: ReactPointerEvent<HTMLElement>) => {
+    const drag = dragRef.current;
+    if (drag.pointerId !== event.pointerId) return;
+    const moved = drag.moved;
+    drag.pointerId = -1;
+    const host = observatoryRef.current;
+    host?.classList.remove('is-panning');
+    if (host?.hasPointerCapture(event.pointerId)) host.releasePointerCapture(event.pointerId);
+    if (!moved) return;
+    suppressClickRef.current = true;
+    requestAnimationFrame(() => {
+      suppressClickRef.current = false;
+    });
+    const rig = rigRef.current;
+    if (!rig.reduced && Math.hypot(rig.vx, rig.vy) > 80) rig.mode = 'coast';
+    else {
+      rig.mode = 'idle';
+      rig.vx = 0;
+      rig.vy = 0;
     }
   };
 
@@ -462,24 +770,39 @@ export function PluginGalaxy({
       ref={observatoryRef}
       className={`galaxy-observatory ${view === 'list' ? 'is-list-mode' : ''}`}
       aria-label="GoNavi 插件星图"
+      data-zoom-level="normal"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endPointer}
+      onPointerCancel={endPointer}
     >
       <div className="galaxy-backdrop" aria-hidden="true">
+        <div className="galaxy-nebula" />
+        <div className="galaxy-band" />
+        <svg className="galaxy-stars-far" viewBox={`0 0 ${WORLD.width} ${WORLD.height}`} preserveAspectRatio="xMidYMid slice">
+          {FAR_STARS.map((star, index) => (
+            <circle key={index} cx={star.x} cy={star.y} r={star.r} fill="#e7f3ee" opacity={star.o} />
+          ))}
+        </svg>
+        <svg className="galaxy-stars-near" viewBox={`0 0 ${WORLD.width} ${WORLD.height}`} preserveAspectRatio="xMidYMid slice">
+          {NEAR_STARS.map((star, index) => (
+            <g key={index}>
+              {star.glow && <circle cx={star.x} cy={star.y} r={star.r * 5} fill="#d7fff4" opacity="0.14" />}
+              <circle cx={star.x} cy={star.y} r={star.r} fill="#f4fff9" opacity={star.o} />
+            </g>
+          ))}
+        </svg>
         <div className="galaxy-grid" />
-        <div className="galaxy-stars" />
         <div className="galaxy-grain" />
       </div>
 
       <svg
         ref={svgRef}
-        className={`galaxy-map ${dragging ? 'is-dragging' : ''}`}
+        className="galaxy-map"
         viewBox={`0 0 ${WORLD.width} ${WORLD.height}`}
         preserveAspectRatio="xMidYMid slice"
         role="application"
         aria-label="可缩放、可拖拽的插件星图"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endPointer}
-        onPointerCancel={endPointer}
       >
         <defs>
           <radialGradient id="galaxyHalo">
@@ -502,37 +825,54 @@ export function PluginGalaxy({
             <stop offset="72%" stopColor="#77d8c6" stopOpacity="0.025" />
             <stop offset="100%" stopColor="#77d8c6" stopOpacity="0.28" />
           </radialGradient>
+          <radialGradient id="coreCorona">
+            <stop offset="0%" stopColor="#ffd7b0" stopOpacity="0.55" />
+            <stop offset="18%" stopColor="#cf7542" stopOpacity="0.28" />
+            <stop offset="46%" stopColor="#3c8884" stopOpacity="0.08" />
+            <stop offset="100%" stopColor="#061015" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id="orbitWash">
+            <stop offset="62%" stopColor="#12343a" stopOpacity="0" />
+            <stop offset="82%" stopColor="#1c4d52" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="#77d8c6" stopOpacity="0" />
+          </radialGradient>
           <filter id="galaxyPlanetShadow">
             <feDropShadow dx="3" dy="5" stdDeviation="4" floodColor="#000" floodOpacity="0.78" />
           </filter>
         </defs>
 
         <g
+          ref={worldRef}
           className="galaxy-world"
-          data-zoom-level={zoomLevel(camera.scale)}
-          transform={cameraTransform(camera)}
+          data-zoom-level="normal"
+          transform={cameraTransform(DEFAULT_CAMERA)}
         >
-          <circle cx={WORLD.cx} cy={WORLD.cy} r="525" fill="url(#galaxyHalo)" />
-          <g className="galaxy-axis" aria-hidden="true">
-            <line x1="170" y1={WORLD.cy} x2="1280" y2={WORLD.cy} />
-            <line x1={WORLD.cx} y1="70" x2={WORLD.cx} y2="800" />
-            <ellipse cx={WORLD.cx} cy={WORLD.cy} rx={INNER_ORBIT.rx} ry={INNER_ORBIT.ry} transform={`rotate(-11 ${WORLD.cx} ${WORLD.cy})`} />
-            <ellipse className="is-dashed" cx={WORLD.cx} cy={WORLD.cy} rx="294" ry="186" transform={`rotate(-11 ${WORLD.cx} ${WORLD.cy})`} />
-            <ellipse cx={WORLD.cx} cy={WORLD.cy} rx={OUTER_ORBIT.rx} ry={OUTER_ORBIT.ry} transform={`rotate(-11 ${WORLD.cx} ${WORLD.cy})`} />
-            <text x="728" y="112">NORTH / DATASOURCE</text>
+          <circle cx={WORLD.cx} cy={WORLD.cy} r="620" fill="url(#galaxyHalo)" />
+          <g className="galaxy-axis" aria-hidden="true" transform={`rotate(-11 ${WORLD.cx} ${WORLD.cy})`}>
+            <ellipse className="orbit-wash" cx={WORLD.cx} cy={WORLD.cy} rx={OUTER_ORBIT.rx} ry={OUTER_ORBIT.ry} fill="url(#orbitWash)" />
+            <ellipse className="orbit-glow outer" cx={WORLD.cx} cy={WORLD.cy} rx={OUTER_ORBIT.rx} ry={OUTER_ORBIT.ry} />
+            <ellipse className="orbit-hair outer" cx={WORLD.cx} cy={WORLD.cy} rx={OUTER_ORBIT.rx} ry={OUTER_ORBIT.ry} />
+            <ellipse className="orbit-glow mid" cx={WORLD.cx} cy={WORLD.cy} rx="294" ry="186" />
+            <ellipse className="orbit-hair mid is-dashed" cx={WORLD.cx} cy={WORLD.cy} rx="294" ry="186" />
+            <ellipse className="orbit-glow inner" cx={WORLD.cx} cy={WORLD.cy} rx={INNER_ORBIT.rx} ry={INNER_ORBIT.ry} />
+            <ellipse className="orbit-hair inner" cx={WORLD.cx} cy={WORLD.cy} rx={INNER_ORBIT.rx} ry={INNER_ORBIT.ry} />
+          </g>
+          <g className="galaxy-axis-labels" aria-hidden="true">
+            <text x="728" y="108">NORTH / DATASOURCE</text>
             <text x="1030" y="438">EAST / AI PROVIDER</text>
-            <text x="735" y="746">SOUTH / SKILL</text>
+            <text x="735" y="748">SOUTH / SKILL</text>
             <text x="322" y="430" textAnchor="end">WEST / OPS</text>
           </g>
 
           <g className="galaxy-core" transform={`translate(${WORLD.cx} ${WORLD.cy})`}>
-            <circle className="core-halo" r="84" fill="url(#galaxySweep)" />
-            <circle className="core-ring" r="63" />
-            <circle className="core-ring reverse" r="47" />
-            <circle className="core-body" r="29" />
-            <circle className="core-inner" r="24" fill="url(#galaxyCore)" />
-            <text y="4">GN</text>
-            <text className="core-caption" y="48">GONAVI CORE</text>
+            <circle className="core-corona" r="230" fill="url(#coreCorona)" />
+            <circle className="core-halo" r="96" fill="url(#galaxySweep)" />
+            <circle className="core-ring" r="58" />
+            <circle className="core-ring reverse" r="40" />
+            <circle className="core-body" r="22" />
+            <circle className="core-inner" r="16" fill="url(#galaxyCore)" />
+            <circle className="core-hot" r="5.5" />
+            <text className="core-caption" y="46">GONAVI</text>
           </g>
 
           <g className="galaxy-coordinates" aria-hidden="true">
@@ -549,23 +889,28 @@ export function PluginGalaxy({
           return (
             <button
               key={node.item.id}
+              ref={bindNode(node.item.id)}
               type="button"
-              className={`galaxy-dom-node ${selected?.item.id === node.item.id ? 'is-selected' : ''} ${visible ? '' : 'is-filtered'} ${node.labelSide === 'left' ? 'label-left' : ''}`}
-              style={projectedNodeStyle(node)}
+              className={`galaxy-dom-node ${selected?.item.id === node.item.id ? 'is-selected' : ''} ${visible ? '' : 'is-filtered'}`}
+              style={{ '--node-color': node.color, '--node-planet': `url(${node.planet})` } as CSSProperties}
               aria-label={`${node.item.name}，${node.item.official ? '官方' : '社区'}${node.category}插件`}
               onClick={() => {
-                if (dragRef.current.moved) {
-                  dragRef.current.moved = false;
-                  return;
-                }
+                if (suppressClickRef.current) return;
                 selectNode(node.item.id);
+                focusNode(node, 1.7);
               }}
             >
-              <span className="dom-node-orbit" aria-hidden="true" />
-              <span className="dom-node-aura" aria-hidden="true" />
-              <span className="dom-node-ring" aria-hidden="true" />
-              <img className="dom-node-planet" src={node.planet} alt="" draggable={false} />
-              <span className="dom-node-moon" aria-hidden="true" />
+              <span className="dom-node-hit" aria-hidden="true" />
+              <span className="dom-node-body" aria-hidden="true">
+                <span className="dom-node-orbit" />
+                <span className="dom-node-aura" />
+                <span className="dom-node-atmo" />
+                <span className="dom-node-reticle" />
+                <span className="dom-node-sphere">
+                  <img className="dom-node-planet" src={node.planet} alt="" draggable={false} />
+                </span>
+                <span className="dom-node-moon-track"><span className="dom-node-moon" /></span>
+              </span>
               <span className="dom-node-label">
                 <i />
                 <small>{node.item.official ? `GN-${String(index + 1).padStart(3, '0')} / OFFICIAL` : `GH-${String(index + 1).padStart(3, '0')} / COMMUNITY`}</small>
@@ -625,7 +970,7 @@ export function PluginGalaxy({
                 onClick={() => {
                   onCategoryChange(category);
                   const first = nodes.find((node) => pluginMatches(node.item, category, query));
-                  if (first) focusNode(first, category === '全部' ? 1.08 : 1.28);
+                  if (first) focusNode(first, category === '全部' ? 1.05 : 1.42);
                 }}
               >
                 <span>{String(index).padStart(2, '0')}</span>
@@ -695,21 +1040,21 @@ export function PluginGalaxy({
       </aside>
 
       <div className="galaxy-coordinate-line" aria-hidden="true">
-        <span>CURSOR {String(Math.round(cursor.x)).padStart(4, '0')} / {String(Math.round(cursor.y)).padStart(4, '0')}</span>
-        <span>SCALE {camera.scale.toFixed(2)}×</span>
-        <span>MODE ORBITAL</span>
+        <span ref={cursorRef}>CURSOR 0738 / 0423</span>
+        <span ref={scaleRef}>SCALE 1.00×</span>
+        <span ref={modeReadoutRef}>MODE ORBITAL</span>
       </div>
 
       <div className="galaxy-zoom" aria-label="星图缩放控制">
         <button type="button" aria-label="放大星图" onClick={() => {
           const rect = observatoryRef.current?.getBoundingClientRect();
-          if (rect) zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.24);
+          if (rect) beginZoom(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.2);
         }}><span className="material-symbols-outlined">add</span></button>
         <button type="button" aria-label="缩小星图" onClick={() => {
           const rect = observatoryRef.current?.getBoundingClientRect();
-          if (rect) zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1 / 1.24);
+          if (rect) beginZoom(rect.left + rect.width / 2, rect.top + rect.height / 2, 1 / 1.2);
         }}><span className="material-symbols-outlined">remove</span></button>
-        <button type="button" aria-label="重置星图视角" onClick={() => setCamera(DEFAULT_CAMERA)}>
+        <button type="button" aria-label="重置星图视角" onClick={focusHome}>
           <span className="material-symbols-outlined">restart_alt</span>
         </button>
       </div>
@@ -761,7 +1106,8 @@ export function PluginGalaxy({
           <span>星区 / {activeCategory}</span>
         </div>
         <div className="galaxy-status-right">
-          <span>拖拽平移 · 滚轮缩放 · / 搜索</span>
+          <span>拖拽后惯性滑行 · 滚轮对准缩放 · 点击飞近 · / 搜索</span>
+          <span className="galaxy-credit">纹理 NASA · Solar System Scope</span>
           <div className="galaxy-view-toggle">
             <button type="button" className={view === 'map' ? 'is-active' : ''} onClick={() => setView('map')}>
               <span className="material-symbols-outlined">radar</span>星图
