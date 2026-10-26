@@ -29,9 +29,12 @@ function ScrollManager() {
 }
 
 export default function App() {
+  const { pathname } = useLocation();
+  const home = pathname === '/';
+
   return (
     <AuthProvider>
-      <div className="min-h-screen flex flex-col">
+      <div className={`min-h-screen flex flex-col ${home ? 'market-home-shell' : ''}`}>
         <ScrollManager />
         <TopNav />
         <div className="flex-grow flex flex-col">
