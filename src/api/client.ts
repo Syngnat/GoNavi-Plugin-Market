@@ -1,7 +1,7 @@
 import type { CatalogPage, LoginStatus, PluginDetail, PluginItem } from './types';
 
-// 默认数据源是随站点发布的 catalog.json（真实上架目录，无运营数据）；
-// 配置 VITE_API_BASE 后切换到市场服务的 /api/v1。
+// 站点与市场服务同源；默认直接使用 /api/v1，只有服务不可用时才回退到随站点发布的
+// catalog.json。VITE_API_BASE 仍可指向另一个市场来源（开发/预览）。
 const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/+$/, '');
 export const isMarketServiceConnected = API_BASE !== '';
 
@@ -14,6 +14,38 @@ export interface CatalogQuery {
   cursor?: string;
 }
 
+// 站点分类是中文展示名，服务端 /api/v1 使用稳定的英文 category。
+const SERVER_CATEGORY: Record<string, string> = {
+  数据源: 'datasource',
+  'AI 供应商': 'ai-provider',
+  导出器: 'exporter',
+  技能: 'skill',
+  面板: 'panel',
+  命令: 'command',
+  运维: 'ops',
+  其他: 'other',
+};
+
+function remoteCatalogParams(query: CatalogQuery): URLSearchParams {
+  const params = new URLSearchParams();
+  if (query.category && query.category !== '全部') {
+    params.set('category', SERVER_CATEGORY[query.category] ?? query.category);
+  }
+  if (query.q) params.set('q', query.q);
+  if (query.cursor) params.set('cursor', query.cursor);
+  // 服务端只接受 updated/rating/downloads；站点的 "recent" 对应 updated。
+  params.set('sort', query.sort === 'rating' || query.sort === 'downloads' ? query.sort : 'updated');
+  params.set('limit', '48');
+  return params;
+}
+
+async function fetchRemoteCatalog(query: CatalogQuery): Promise<CatalogPage> {
+  const resp = await fetch(`${API_BASE}/api/v1/plugins?${remoteCatalogParams(query).toString()}`);
+  if (!resp.ok) throw new Error(`catalog request failed: ${resp.status}`);
+  const page = (await resp.json()) as CatalogPage;
+  return { ...page, stale: false, sourceId: page.sourceId || 'plugin-market-service' };
+}
+
 async function fetchLocalCatalog(): Promise<PluginItem[]> {
   const resp = await fetch('catalog.json');
   if (!resp.ok) throw new Error(`catalog.json request failed: ${resp.status}`);
@@ -21,19 +53,7 @@ async function fetchLocalCatalog(): Promise<PluginItem[]> {
   return page.items;
 }
 
-export async function fetchCatalog(query: CatalogQuery): Promise<CatalogPage> {
-  if (isMarketServiceConnected) {
-    const params = new URLSearchParams();
-    if (query.category && query.category !== '全部') params.set('category', query.category);
-    if (query.q) params.set('q', query.q);
-    if (query.cursor) params.set('cursor', query.cursor);
-    params.set('sort', query.sort ?? 'recent');
-    const resp = await fetch(`${API_BASE}/api/v1/plugins?${params.toString()}`);
-    if (!resp.ok) throw new Error(`catalog request failed: ${resp.status}`);
-    return (await resp.json()) as CatalogPage;
-  }
-
-  const items = await fetchLocalCatalog();
+function localCatalogPage(query: CatalogQuery, items: PluginItem[]): CatalogPage {
   const q = (query.q ?? '').trim().toLowerCase();
   const filtered = items.filter((entry) => {
     if (query.category && query.category !== '全部' && entry.category !== query.category) return false;
@@ -51,20 +71,36 @@ export async function fetchCatalog(query: CatalogQuery): Promise<CatalogPage> {
   return { items: sorted, stale: false, sourceId: 'plugin-market-site', nextCursor: undefined };
 }
 
+export async function fetchCatalog(query: CatalogQuery): Promise<CatalogPage> {
+  try {
+    return await fetchRemoteCatalog(query);
+  } catch (remoteError) {
+    // 服务不可用/接口异常时保留静态目录兜底，避免首页直接空白。
+    try {
+      const page = localCatalogPage(query, await fetchLocalCatalog());
+      return { ...page, stale: true, error: '目录服务暂不可用，显示本地缓存' };
+    } catch {
+      throw remoteError;
+    }
+  }
+}
+
 export async function fetchPluginDetail(id: string): Promise<PluginDetail> {
-  if (isMarketServiceConnected) {
+  try {
     const resp = await fetch(`${API_BASE}/api/v1/plugins/${encodeURIComponent(id)}`);
     if (resp.status === 404) throw new NotFoundError(id);
     if (!resp.ok) throw new Error(`plugin request failed: ${resp.status}`);
     return (await resp.json()) as PluginDetail;
+  } catch (remoteError) {
+    if (remoteError instanceof NotFoundError) throw remoteError;
+    const found = (await fetchLocalCatalog()).find((entry) => entry.id === id);
+    if (!found) throw new NotFoundError(id);
+    return found;
   }
-  const items = await fetchLocalCatalog();
-  const found = items.find((entry) => entry.id === id);
-  if (!found) throw new NotFoundError(id);
-  return found;
 }
 
 // 设备码登录：客户端展示 userCode，用户在本页输入完成绑定。
+// v2 网站已改用 /auth/web/start 的 GitHub 登录；该函数仅为未路由的旧页面保留。
 export async function verifyDeviceCode(userCode: string): Promise<LoginStatus> {
   if (!isMarketServiceConnected) {
     return Promise.resolve({ status: 'pending_approval' });

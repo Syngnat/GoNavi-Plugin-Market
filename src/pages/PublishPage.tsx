@@ -9,6 +9,7 @@ import {
   inspectPackage,
   isGithubRepoUrl,
   isPackageFile,
+  marketErrorMessage,
   submitPackage,
 } from '../api/v2';
 import type { MarketAccount, PackageInspection, SubmissionRecord } from '../api/types';
@@ -283,7 +284,7 @@ function PreviewCard({ preview }: { preview: PackageInspection }) {
       {!preview.canPublish && (
         <p role="alert" className="rounded-lg border border-copper/40 bg-paper p-3 text-sm">
           {preview.reason
-            ? `当前不可发布：${preview.reason}`
+            ? `当前不可发布：${marketErrorMessage(preview.reason)}`
             : '当前账号不可发布此插件，请核对包内 ID 前缀与发布者权限。'}
         </p>
       )}
