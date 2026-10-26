@@ -94,7 +94,7 @@ export function HomePage() {
               上架要求：插件包通过 GoNavi 的静态检查与内容摘要校验，且提供真实可验证的发布源。
             </p>
             <a
-              href="https://github.com/Syngnat/GoNavi/blob/dev/docs/plugins/development.md"
+              href="https://github.com/Syngnat/GoNavi/blob/dev/docs/plugins/author-guide.md"
               target="_blank"
               rel="noreferrer"
               className="text-sm text-copper hover:underline inline-flex items-center gap-1"

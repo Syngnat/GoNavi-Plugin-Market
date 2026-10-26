@@ -5,6 +5,12 @@ GoNavi 插件市场官网（plugin.gonavi.org）：浏览与安装 GoNavi 插件
 - 设计定稿：暖纸赤铜（paper `#f6f1ea` / copper `#c4622d` / card `#fffcf8` / ink `#1c1612`），IBM Plex Sans。
 - 页面：首页（目录与分类）、插件详情（功能 / 权限清单 / 评分 / SHA-256 核对）、GitHub 登录、作者工作台（`/publish`）、我的插件（`/account`）、开发者与社区。
 
+第三方作者入口：
+
+- [插件作者完整指南](https://github.com/Syngnat/GoNavi/blob/dev/docs/plugins/author-guide.md)：从插件形态、SDK、打包检查、GitHub Release 到上架与更新。
+- [插件作者 FAQ](https://github.com/Syngnat/GoNavi/blob/dev/docs/plugins/faq.md)：常见概念、错误与发布问题。
+- [插件文档目录](https://github.com/Syngnat/GoNavi/tree/dev/docs/plugins)：SDK、协议、权限及各类贡献专项契约。
+
 ## 技术栈
 
 - 站点：Vite + React 18 + TypeScript + Tailwind CSS（无 UI 组件库，静态构建，任意 CDN/边缘托管可部署）。

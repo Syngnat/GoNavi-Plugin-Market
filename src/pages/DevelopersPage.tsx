@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 
 const GITHUB_BASE = 'https://github.com/Syngnat/GoNavi';
 const PLUGIN_DOCS_URL = `${GITHUB_BASE}/tree/dev/docs/plugins`;
+const AUTHOR_GUIDE_URL = `${GITHUB_BASE}/blob/dev/docs/plugins/author-guide.md`;
+const FAQ_URL = `${GITHUB_BASE}/blob/dev/docs/plugins/faq.md`;
 const SDK_URL = `${GITHUB_BASE}/blob/dev/docs/plugins/sdk.md`;
 const DEV_GUIDE_URL = `${GITHUB_BASE}/blob/dev/docs/plugins/development.md`;
 const PUBLISHER_API_URL = `${GITHUB_BASE}/blob/dev/deploy/plugin-market/admin-api.md`;
@@ -45,16 +47,16 @@ const STEPS = [
     body: 'ZIP/TGZ 根目录包含 gonavi.plugin.json；用示例打包器或你自己的脚本生成产物，先在本地用 GoNavi CLI 校验。',
   },
   {
-    title: '登录',
-    body: '在本网站直接使用 GitHub 登录。首次登录自动分配独立发布者命名空间，以「我的插件」页面显示值为准，无需客户端配对或手工申请。',
+    title: '选择仓库',
+    body: '单插件仓库可直接填仓库根，市场读取 latest stable Release；一仓多插件必须填具体 Release/Tag，避免发布错插件。',
   },
   {
-    title: '发布',
-    body: '在官网登录 GitHub，进入「发布插件」选择 ZIP/TGZ 包，先静态预检再明确确认上架。服务器不执行插件代码；客户端不承担发布。',
+    title: '登录并预检',
+    body: '在本网站用 GitHub 登录，进入「发布插件」粘贴 Release 链接。市场读取真实归档并展示 ID、版本、权限和 SHA-256。',
   },
   {
     title: '上架',
-    body: '校验通过后立即进入市场目录，无需等待人工审核。官方徽标仍由市场方单独认证；违规插件会被下架。',
+    body: '确认摘要后自助上架，无需等待人工审核。上传 ZIP/TGZ 仅作离线或 Release 不可用时的兜底。',
   },
 ];
 
@@ -135,8 +137,8 @@ gonavi plugin --root $root inspect $package`}
       <section className="space-y-6">
         <h2 className="text-xl font-headline font-bold text-ink">发布到市场</h2>
         <p className="text-sm text-muted leading-relaxed max-w-3xl">
-          登录后以「我的插件」显示的命名空间为准，示例 ID 仅示意；首次提交可登记公开
-          可直接填写 GitHub 仓库或具体 Release/Tag；单插件仓库会读取 latest stable Release，monorepo 请指定 Tag。
+          登录后以「我的插件」显示的命名空间为准，示例 ID 仅示意。优先填写 GitHub 仓库或具体 Release/Tag；
+          单插件仓库会读取 latest stable Release，monorepo 必须指定 Tag。上传 ZIP/TGZ 仅作兜底。
         </p>
         <Link
           to="/publish"
@@ -172,6 +174,12 @@ gonavi plugin --root $root inspect $package`}
           <Link to="/community" className="text-copper hover:underline">
             社区讨论
           </Link>
+          <a href={AUTHOR_GUIDE_URL} target="_blank" rel="noreferrer" className="text-copper hover:underline">
+            作者完整指南
+          </a>
+          <a href={FAQ_URL} target="_blank" rel="noreferrer" className="text-copper hover:underline">
+            作者 FAQ
+          </a>
           <a href={SDK_URL} target="_blank" rel="noreferrer" className="text-copper hover:underline">
             SDK 指南
           </a>
