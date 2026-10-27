@@ -58,6 +58,11 @@ body {
   color: #91a5a7;
 }
 
+.market-home-shell > header a.bg-copper,
+.market-home-shell > header a.bg-copper:hover {
+  color: #ffffff;
+}
+
 .market-home-shell > header a:hover,
 .market-home-shell > header a[aria-current='page'] {
   color: #eef2ed;
@@ -69,6 +74,27 @@ body {
 
 .market-home-shell > header .text-muted {
   color: #63787b;
+}
+
+.market-home-shell .account-menu-dropdown {
+  background: #091216;
+  border-color: rgba(164, 195, 197, 0.2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
+}
+
+.market-home-shell .account-menu-dropdown .account-divider {
+  border-color: rgba(164, 195, 197, 0.12);
+}
+
+.market-home-shell .account-menu-dropdown a,
+.market-home-shell .account-menu-dropdown button {
+  color: #eef2ed;
+}
+
+.market-home-shell .account-menu-dropdown a:hover,
+.market-home-shell .account-menu-dropdown button:hover {
+  background: rgba(164, 195, 197, 0.08);
+  color: #c4622d;
 }
 
 .market-home-shell > footer {
