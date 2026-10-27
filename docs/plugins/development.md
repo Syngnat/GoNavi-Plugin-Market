@@ -87,7 +87,7 @@ Compress-Archive -Path (Join-Path $package "*") -DestinationPath $archive
 gonavi plugin --root $root check $archive
 ```
 
-The host also accepts a local directory or TGZ/tar.gz. Inspect the final archive again before installation. ZIP/TGZ transport bytes and canonical unpacked-content digests serve different purposes; see [package identity](<protocol.md#manifest-and-package-identity>). The current validator limits individual files to 64 MiB, total package contents and compressed archives to 256 MiB, and entries to 4,096. Manifest and UI/schema limits are stricter. Limits can tighten in later host releases.
+The host also accepts a local directory or TGZ/tar.gz. Inspect the final archive again before installation. ZIP/TGZ transport bytes and canonical unpacked-content digests serve different purposes; see [package identity](<protocol.md#manifest-and-package-identity>). The client validator no longer enforces fixed 64/256 MiB archive or per-file caps: package entries stream to disk and the scan is bounded by 4,096 entries, the manifest limit and available disk. The hosted market service may still apply its own operator upload policy. Manifest and UI/schema limits remain stricter.
 
 Sideloading is an explicit local trust decision, not marketplace approval. Community marketplace versions require review for each release, and published version bytes cannot be replaced. A manifest's author/name is not an official-publisher badge. Publishing, authentication and deployment belong to the marketplace service; these SDK commands do not publish or contact production services.
 

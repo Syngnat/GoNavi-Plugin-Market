@@ -10,6 +10,8 @@
 - [插件作者 FAQ](<faq.md>)：文档入口、清单、打包、发布、安装验收和常见错误。
 - [开发、打包与检查](<development.md>)：hello 示例、CLI 校验、安装和故障夹具。
 - [Go / TypeScript SDK](<sdk.md>)：类型、校验函数、数据源分发器与 UI 接入点。
+- [连接右键动作](<connection-actions.md>)：把 MongoShell 等工具挂到连接/库/集合菜单。
+- [插件 UI SDK](<ui-sdk.md>)：宿主同源主题、布局、表格、编辑器、弹窗与能力客户端。
 - [插件 JSON-RPC 协议](<protocol.md>)：stdio 帧、取消、错误码和包身份。
 - [权限参考](<permissions.md>)：宿主实际强制的权限及其边界。
 - [市场多来源与聚合浏览](./market-sources.md)：来源管理、独立分页与来源隔离。

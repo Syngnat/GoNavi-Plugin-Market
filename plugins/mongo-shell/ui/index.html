@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MongoShell</title>
+  <link rel="stylesheet" href="/__gonavi/plugin-window/ui/style.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <script type="importmap">
+    {"imports":{"@gonavi/plugin-ui":"/__gonavi/plugin-window/ui/index.js"}}
+  </script>
+</head>
+<body class="gonavi-plugin-root">
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <div class="brand-text">
+          <strong>MongoShell</strong>
+          <span id="connection-name" class="brand-sub">Loading connection…</span>
+        </div>
+      </div>
+      <div class="topbar-meta">
+        <span id="environment" class="chip chip-muted" hidden></span>
+        <span id="readonly-chip" class="chip" hidden>Read-only</span>
+        <span id="status" class="status status-connecting" role="status" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="status-text">Starting…</span>
+        </span>
+        <button id="ping-button" class="button button-quiet" type="button" disabled>Ping</button>
+        <button id="connect-button" class="button button-quiet" type="button" disabled>Disconnect</button>
+      </div>
+    </header>
+
+    <div id="error" class="error-banner" role="alert" hidden>
+      <div class="error-copy">
+        <span id="error-code" class="error-code"></span>
+        <span id="error-message" class="error-message"></span>
+      </div>
+      <button id="error-dismiss" class="button button-quiet" type="button">Dismiss</button>
+    </div>
+
+    <section class="toolbar" aria-label="Query controls">
+      <label class="field">
+        <span class="field-label">Database</span>
+        <select id="database-select" class="control" disabled>
+          <option value="">(none)</option>
+        </select>
+      </label>
+      <label class="field field-grow">
+        <span class="field-label">Collection</span>
+        <input id="collection-input" class="control" type="text" list="collection-options"
+          placeholder="optional collection" spellcheck="false" autocomplete="off" disabled />
+        <datalist id="collection-options"></datalist>
+      </label>
+      <label class="field field-narrow">
+        <span class="field-label">Max rows</span>
+        <input id="max-rows" class="control" type="number" min="1" max="2000" step="1" value="200" />
+      </label>
+      <div class="toolbar-actions">
+        <button id="clear-button" class="button button-quiet" type="button">Clear</button>
+        <button id="run-button" class="button button-primary" type="button" disabled>
+          Run
+          <kbd>⌘/Ctrl ↵</kbd>
+        </button>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <section class="pane editor-pane" aria-label="Script editor">
+        <header class="pane-header">
+          <span class="pane-title">Script</span>
+          <span id="editor-scope" class="pane-meta"></span>
+        </header>
+        <textarea id="editor" class="editor" spellcheck="false" wrap="off"
+          aria-label="JavaScript shell script" placeholder="db.getCollectionNames()"></textarea>
+      </section>
+
+      <section class="pane result-pane" aria-label="Results">
+        <header class="pane-header">
+          <span class="pane-title">Result</span>
+          <span id="result-meta" class="pane-meta">No query yet</span>
+        </header>
+        <div id="table-wrap" class="table-wrap">
+          <div class="empty-state" id="table-empty">Run a script to see documents here.</div>
+          <table id="result-table" class="result-table" hidden>
+            <thead id="result-head"></thead>
+            <tbody id="result-body"></tbody>
+          </table>
+        </div>
+        <header class="pane-header pane-header-split">
+          <span class="pane-title">Output</span>
+          <span id="output-meta" class="pane-meta"></span>
+        </header>
+        <pre id="output" class="output" aria-live="polite"></pre>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <span id="footer-host" class="footer-item">—</span>
+      <span id="footer-database" class="footer-item">Database: —</span>
+      <span id="footer-readonly" class="footer-item">Writes enabled</span>
+      <span class="footer-spacer"></span>
+      <span id="footer-elapsed" class="footer-item">—</span>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

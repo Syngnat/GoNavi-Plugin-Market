@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 1,
+  "id": "com.gonavi.mongo-shell",
+  "name": "MongoShell",
+  "version": "1.0.0",
+  "description": "Interactive MongoDB JavaScript shell in a dedicated GoNavi window: connect with the saved connection, browse databases, and run bounded goja scripts with find, aggregate, insert, update, delete and runCommand.",
+  "author": "GoNavi",
+  "license": "Apache-2.0",
+  "minHostVersion": "1.2.0",
+  "permissions": [
+    "host.connections.credentials",
+    "host.log",
+    "ai.skills"
+  ],
+  "permissionNotes": {
+    "host.connections.credentials": "Reads the saved MongoDB configuration, including credentials, from the launch context. Credentials are used once and never returned.",
+    "host.log": "Writes bounded connection diagnostics without credentials.",
+    "ai.skills": "Ships the mongo-shell-recipes reference skill document for explicit Agent loading."
+  },
+  "backend": {
+    "default": {
+      "executable": "bin/plugin",
+      "runtime": "native"
+    }
+  },
+  "window": {
+    "entry": "ui/index.html",
+    "title": "MongoShell",
+    "width": 1180,
+    "height": 780
+  },
+  "contributes": {
+    "commands": [
+      {
+        "id": "connect",
+        "title": "Connect to the saved MongoDB connection",
+        "description": "Opens a driver client with the launch-context configuration, verifies it with a bounded ping and returns the database list.",
+        "effect": "read",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "config": {
+              "type": "object"
+            },
+            "readOnly": {
+              "type": "boolean"
+            },
+            "database": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "collection": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "connectionId": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "connectionName": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "environmentType": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "config"
+          ]
+        }
+      },
+      {
+        "id": "disconnect",
+        "title": "Disconnect the MongoDB client",
+        "effect": "read",
+        "inputSchema": {
+          "type": "object"
+        }
+      },
+      {
+        "id": "ping",
+        "title": "Ping the MongoDB server",
+        "effect": "read",
+        "inputSchema": {
+          "type": "object"
+        }
+      },
+      {
+        "id": "run",
+        "title": "Run a JavaScript shell script",
+        "description": "Executes a goja script with the db helper object, print and use. Results are bounded by maxRows and a command timeout.",
+        "effect": "unknown",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "script": {
+              "type": "string"
+            },
+            "database": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "collection": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "maxRows": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2000
+            }
+          },
+          "required": [
+            "script"
+          ]
+        }
+      }
+    ],
+    "connectionActions": [
+      {
+        "id": "open-shell",
+        "title": "MongoShell",
+        "description": "Open a MongoDB JavaScript shell for this connection, database or collection.",
+        "connectionTypes": [
+          "mongodb"
+        ],
+        "scopes": [
+          "connection",
+          "database",
+          "collection"
+        ],
+        "target": {
+          "type": "window"
+        }
+      }
+    ],
+    "skills": [
+      {
+        "id": "mongo-shell-recipes",
+        "name": "MongoShell recipes",
+        "description": "Reference for the bounded MongoShell JavaScript API: connection context, db/collection helpers, row limits, read-only behaviour and safe query patterns.",
+        "entry": "skills/mongo-shell-recipes/SKILL.md"
+      }
+    ]
+  }
+}

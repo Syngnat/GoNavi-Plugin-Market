@@ -67,7 +67,7 @@ Each contribution type has one SDK entry point. Use it instead of writing the JS
 
 | Group | File | Types |
 |---|---|---|
-| Manifest, UI and wire | [types.go](<../../sdk/go/types.go>) | `Manifest`, `Contributions`, `UINode`, `InitializeParams`, `InvokeParams`, `SkillContent` |
+| Manifest, UI and wire | [types.go](<../../sdk/go/types.go>) | `Manifest`, `Contributions`, `UINode`, `InitializeParams`, `InvokeParams`, `SkillContent`, `ConnectionAction`, `LaunchTarget` |
 | Pages and navigation | [pages_manifest.go](<../../sdk/go/pages_manifest.go>) | `Page`, `PageHTML`, `Navigation` |
 | Data sources | [datasource_types.go](<../../sdk/go/datasource_types.go>) | `DataSourceConfig`, `DataSourceRequest`, `DataSourceQueryResult`, `DataSourceColumnDefinition`, `DataSourceColumnDefinitionWithTable`, `DataSourceIndexDefinition`, `DataSourceForeignKeyDefinition`, `DataSourceTriggerDefinition` |
 | AI provider declarations | [ai_provider_manifest.go](<../../sdk/go/ai_provider_manifest.go>) | `AIProvider`, `AIModel` |

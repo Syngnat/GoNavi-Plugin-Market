@@ -71,13 +71,15 @@ func (a *App) PluginPageCall(id, pageID, method, argumentsJSON string) connectio
 
 ### 2.2 错误码
 
-失败码以 `page_` 为前缀返回：`data.code` 形如 `page_not_running`，文案键为 `plugin.backend.error.page_not_running`。条件码集合：`invalid_identity`、`not_running`、`not_declared`、`permission_denied`、`unknown_method`、`invalid_arguments`、`result_too_large`、`internal`；`unsupported` 保留给尚无法安全接通的扩展能力（v1 已登记的 7 个方法都不返回它）。前端同时兼容带前缀与裸码两种拼写。`management_denied` 沿用现有键且不带 `page_` 前缀，用于 Web 运行时未开启插件管理时的整体拒绝。前端桥本地错误用 `plugin.pages.error.bridge`／`plugin.pages.error.timeout`；页面拿到的 Promise 拒绝原因就是本地化后的文案。
+失败码以 `page_` 为前缀返回：`data.code` 形如 `page_not_running`，文案键为 `plugin.backend.error.page_not_running`。条件码集合：`invalid_identity`、`not_running`、`not_declared`、`permission_denied`、`unknown_method`、`invalid_arguments`、`result_too_large`、`internal`；`unsupported` 保留给尚无法安全接通的扩展能力（当前已登记方法都不返回它）。前端同时兼容带前缀与裸码两种拼写。`management_denied` 沿用现有键且不带 `page_` 前缀，用于 Web 运行时未开启插件管理时的整体拒绝。前端桥本地错误用 `plugin.pages.error.bridge`／`plugin.pages.error.timeout`；页面拿到的 Promise 拒绝原因就是本地化后的文案。
 
 ### 2.3 能力目录 v1
 
+> 本节保留 v1 的 7 个页面能力作为稳定基线。宿主随后扩展了 `connections.test`、`metadata.views/objects/allColumns/indexes/foreignKeys/triggers/createStatement/tableInfo/serverVersion/tableExists/databaseForeignKeys/charsets/collations`、`app.capabilities` 等只读能力；完整目录与通道/权限以 [capabilities](<capabilities.md>) 和运行时的 `app.capabilities` 为准。
+
 | 方法 | 权限 | 参数 | 结果 |
 |---|---|---|---|
-| `app.info` | 无（需 page） | `{}` | `{ hostVersion, pluginId, pluginVersion, locale, runtime: "desktop" \| "web" }` |
+| `app.info` | 无（需 page） | `{}` | `{ hostVersion, pluginId, pluginVersion, locale, runtime: "desktop" \| "web", capabilitiesVersion }` |
 | `connections.list` | `host.connections.read` | `{}` | 脱敏数组：`{ id, name, type, host, port, database, environmentType, readOnly }`；不含用户名、密码、SSH／代理凭据、DSN |
 | `metadata.databases` | `host.metadata.read` | `{ connectionId }` | `[string]`，≤2000 项 |
 | `metadata.tables` | `host.metadata.read` | `{ connectionId, database }` | `[{ name, type? }]`，≤5000 项 |
@@ -95,7 +97,7 @@ func (a *App) PluginPageCall(id, pageID, method, argumentsJSON string) connectio
 
 ### 2.4 能力扩展
 
-新增能力 = 一条登记项（方法名、权限、参数上限、处理器）+ 文档 + 测试；处理器只放 `internal/app/plugin_page_capabilities*.go`。目录按域分批开放（连接、元数据、查询、导出、AI、数据同步、驱动、设置、市场、JVM…），每批必须单独评审权限与审计边界。
+新增能力 = 一条登记项（方法名、权限、参数上限、处理器）+ 文档 + 测试；处理器放 `internal/app/plugin_capability_*.go`，并登记到 `internal/app/plugin_capabilities.go` 的唯一注册表。目录按域分批开放（连接、元数据、查询、导出、AI、数据同步、驱动、设置、市场、JVM…），每批必须单独评审权限与审计边界。
 
 ## 3. 主窗口呈现
 
