@@ -1,6 +1,6 @@
 # GoNavi Plugin Market
 
-GoNavi 插件市场官网（plugin.gonavi.org）：浏览与安装 GoNavi 插件；**同时是 GoNavi 官方插件的源码仓**——站点、上架目录与官方插件一个仓库。
+GoNavi 插件市场官网（plugin.gonavi.org）：浏览与安装 GoNavi 插件；**同时是 GoNavi 官方插件与市场服务端（Go API）的源码仓**——站点、上架目录、官方插件与服务端一个仓库。
 
 - 设计定稿：暖纸赤铜（paper `#f6f1ea` / copper `#c4622d` / card `#fffcf8` / ink `#1c1612`），IBM Plex Sans。
 - 页面：首页（目录与分类）、插件详情（功能 / 权限清单 / 评分 / SHA-256 核对）、GitHub 登录、作者工作台（`/publish`）、我的插件（`/account`）、开发者与社区。
@@ -11,12 +11,13 @@ GoNavi 插件市场官网（plugin.gonavi.org）：浏览与安装 GoNavi 插件
 - [插件作者完整指南](https://plugin.gonavi.org/docs/author-guide)：从插件形态、SDK、打包检查、GitHub Release 到上架与更新。
 - [插件作者 FAQ](https://plugin.gonavi.org/docs/faq)：常见概念、错误与发布问题。
 
-插件文档的权威来源已迁到本仓 `docs/`，由站点构建为独立 Markdown 资源并在 `/docs` 站内渲染；GoNavi 主仓只保留内部实现契约和运行时代码。
+插件文档的权威来源已迁到本仓 `docs/`，由站点构建为独立 Markdown 资源并在 `/docs` 站内渲染；GoNavi 主仓只保留桌面客户端与运行时实现。
 
 ## 技术栈
 
 - 站点：Vite + React 18 + TypeScript + Tailwind CSS（无 UI 组件库，静态构建，任意 CDN/边缘托管可部署）。
 - 官方插件：Go（单 module，SDK 伪版本引用 `github.com/Syngnat/GoNavi/sdk/go`），`cmd/buildtool` 多平台打包。
+- 服务端：Go（`internal/market` + `cmd/gonavi-market-server`，PostgreSQL 持久化、静态校验、GitHub Release 同步），部署见 `deploy/server/`。
 
 ## 官方插件开发（本仓约定）
 
@@ -39,6 +40,22 @@ npm run preview
 
 未配置 `VITE_API_BASE` 时默认请求同源 `/api/v1`；市场服务不可用时回退到 `public/catalog.json`（静态目录）。账号与发布接口需要市场服务的 HttpOnly 会话 Cookie，因此生产环境应同源部署。
 
+## 市场服务端（本仓）
+
+`internal/market` 提供 `/api/v1` 服务，`cmd/gonavi-market-server` 是唯一入口；生产环境与站点同源部署（`/api/v1/` 反代到服务监听端口）。
+
+```bash
+go test ./internal/market/... ./cmd/gonavi-market-server
+go test -race ./internal/market
+go build -o gonavi-market-server ./cmd/gonavi-market-server
+
+export GONAVI_MARKET_DATABASE_URL='postgres://...'
+./gonavi-market-server -migrate   # 应用 internal/market/migrations
+./gonavi-market-server            # 另需 GONAVI_MARKET_PUBLIC_URL 等
+```
+
+环境变量、PostgreSQL/S3、GitHub OAuth App 与运维令牌签发见 [`deploy/server/README.md`](deploy/server/README.md)，接口清单见 [`deploy/server/admin-api.md`](deploy/server/admin-api.md)，CI 见 `.github/workflows/server-tests.yml`。
+
 ## API 约定（v2 账号与发布）
 
 目录/详情对客户端保持只读；网站登录与发布走 v2 接口，完整契约见 [`docs/v2-api.md`](docs/v2-api.md)。
@@ -57,7 +74,7 @@ npm run preview
 | GET | `/api/v1/publisher/plugins` / `submissions` | 作者工作台列表 |
 | PUT | `/api/v1/publisher/plugins/{id}/source` | 设置/清空 GitHub Release 自动更新来源 |
 
-类型镜像见 `src/api/types.ts`；网站会话与发布者接口由主仓库 `internal/market` 提供。
+类型镜像见 `src/api/types.ts`；网站会话与发布者接口由本仓 `internal/market` 提供，部署与运维见 [`deploy/server/README.md`](deploy/server/README.md)。
 
 ## 安装深链契约
 
@@ -75,4 +92,4 @@ gonavi://plugin/install?spec=<github:owner/repo 或 npm 包名>&id=<插件ID>&ve
 
 ## 部署
 
-`npm run build` 产出纯静态 `dist/`。SPA 路由需托管层将所有路径回退到 `index.html`（如 Nginx `try_files` / Cloudflare Pages 自动处理）。
+`npm run build` 产出纯静态 `dist/`。SPA 路由需托管层将所有路径回退到 `index.html`（如 Nginx `try_files` / Cloudflare Pages 自动处理）。市场服务端二进制单独构建，容器与运维说明见 [`deploy/server/README.md`](deploy/server/README.md)。

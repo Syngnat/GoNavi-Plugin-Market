@@ -58,13 +58,13 @@ Let's Encrypt ECDSA，cert-name `plugin.gonavi.org`，webroot 续期（certbot �
 
 ## 市场服务（/api/v1，2026-10-24 上线）
 
-主仓库 `internal/market` + `cmd/gonavi-market-server` 的生产实例，systemd 单元 `gonavi-market`：
+本仓 `internal/market` + `cmd/gonavi-market-server` 的生产实例（服务文档见 [`server/README.md`](server/README.md)），systemd 单元 `gonavi-market`：
 
 - PostgreSQL 16 跑在 docker 容器 `gonavi-market-pg`（仅 `127.0.0.1:25433`，数据卷 `gonavi-market-pgdata`）；库 `gonavi_market`，迁移/引导用 operator 角色，服务运行用最小权限 `gonavi_market_app` 角色。
 - 服务监听 `127.0.0.1:8090`，经站点 nginx 的 `/api/v1/` 反代对外（65 MiB 请求上限、120s 上游超时）。
 - 工件目录 `/srv/gonavi-plugin-market/artifacts`（700，gonavi-market 用户私有）；日志 `/var/log/gonavi-market`。
 - 环境/凭据：`/etc/gonavi-market/env`（600）与 `/root/gonavi-market-credentials.txt`（600，含 operator 连接串）。**不要把这两个文件的内容提交进仓库。**
-- 开通脚本的留档：`deploy/provision-market.sh`（首run专用；服务二进制由主仓 `go build ./cmd/gonavi-market-server` 交叉编译上传 `/srv/gonavi-plugin-market/server/`）。
+- 开通脚本的留档：`deploy/provision-market.sh`（首run专用；服务二进制由本仓 `go build ./cmd/gonavi-market-server` 交叉编译上传 `/srv/gonavi-plugin-market/server/`）。
 - 常用运维：`systemctl status|restart gonavi-market`、`journalctl -u gonavi-market -e`、
   `curl -s http://127.0.0.1:8090/api/v1/plugins`（服务器上自检）。
 - 公网验收：`https://plugin.gonavi.org/api/v1/plugins` 应 200；站点默认读取同源 `/api/v1/plugins`，服务不可用时才回退 `catalog.json`。

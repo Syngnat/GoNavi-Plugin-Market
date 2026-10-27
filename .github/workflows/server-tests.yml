@@ -1,0 +1,48 @@
+name: Server tests
+
+on:
+  push:
+    paths:
+      - "internal/**"
+      - "cmd/**"
+      - "deploy/server/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/server-tests.yml"
+  pull_request:
+    paths:
+      - "internal/**"
+      - "cmd/**"
+      - "deploy/server/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/server-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: gofmt
+        run: |
+          files="$(gofmt -l internal cmd)"
+          if [ -n "$files" ]; then
+            echo "gofmt required for:"
+            echo "$files"
+            exit 1
+          fi
+      - name: vet
+        run: go vet ./internal/market/... ./cmd/gonavi-market-server
+      - name: test
+        run: go test ./internal/market/... ./cmd/gonavi-market-server
+      - name: test race
+        run: go test -race ./internal/market
+      - name: build
+        run: go build ./cmd/gonavi-market-server
