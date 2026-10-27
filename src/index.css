@@ -26,21 +26,6 @@ body {
   backdrop-filter: blur(18px);
 }
 
-/* The observatory is full-bleed; its header follows the same 44px gutters as
-   the hero and inspector instead of the centered site container. */
-.market-home-shell > header > div {
-  max-width: none;
-  padding-left: 44px;
-  padding-right: 44px;
-}
-
-@media (max-width: 980px) {
-  .market-home-shell > header > div {
-    padding-left: 24px;
-    padding-right: 24px;
-  }
-}
-
 .market-home-shell > header a {
   color: #91a5a7;
 }
