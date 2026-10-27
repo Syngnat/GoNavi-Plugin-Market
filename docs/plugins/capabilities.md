@@ -30,6 +30,10 @@ GoNavi registers host capabilities explicitly. The page bridge (`PluginPageCall`
 | `metadata.databaseForeignKeys` | `host.metadata.read` | page, window, backend | no |
 | `metadata.charsets` | `host.metadata.read` | page, window, backend | no |
 | `metadata.collations` | `host.metadata.read` | page, window, backend | no |
+| `jvm.capabilities` | `host.query.read` | page, window, backend | no |
+| `jvm.resources` | `host.query.read` | page, window, backend | no |
+| `jvm.value` | `host.query.read` | page, window, backend | no |
+| `jvm.audit` | `host.query.read` | page, window, backend | no |
 | `mongo.discoverMembers` | `host.metadata.read` | page, window, backend | no |
 | `metadata.savedQueries` | `host.metadata.read` | page, window, backend | no |
 | `sessions.list` | `host.query.read` | page, window, backend | no |
