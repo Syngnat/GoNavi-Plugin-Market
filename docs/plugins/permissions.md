@@ -15,6 +15,7 @@
 | `host.connections.credentials` | 在**插件动作**启动的独立窗口中读取所选连接的完整配置与凭据 | 仅随 `connectionActions` 的 launch context 下发，窗口不暴露给插件页面；不代替连接授权，仍受只读/生产保护 |
 | `host.metadata.read` | 通过插件页面桥读取已保存连接的库／表／列元数据 | 不执行查询、不读数据行、不写任何对象 |
 | `host.query.read` | 通过插件页面桥用已保存连接执行单条只读查询 | 仍受只读连接、SQL 审计、30s 超时、扫描层行预算与 256 KiB 结果上限约束；不能写入或开事务。**只读 ≠ 无副作用**：锁子句与常见危险函数被拒绝，其余副作用未穷举 |
+| `host.schema.write` | 通过 `schema.preview` / `schema.apply` 对已保存连接执行受控 DDL | 仅 CREATE/ALTER/DROP TABLE\|INDEX\|VIEW；拒绝只读/结构保护连接、TRUNCATE、数据库/schema 级 DDL、DML 与多语句；apply 必须经宿主原生确认，计划一次性且 5 分钟过期 |
 | `ui.pages` | 渲染 `pages` 并把 `navigation` 挂到主窗口（标题栏「插件」菜单） | 不授予任何 `host.*` 能力，也不授权其他插件页面 |
 | `ui.html-panel` | 在主窗口内以不透明源沙箱 iframe 渲染有界自定义 HTML；面板没有桥，`pages` 里的 HTML 页面自 v1 起可通过页面桥调用**已单独授权**的 `host.*` 能力 | 不提供存储、Cookie、凭据、同源访问、表单或嵌套 frame；CSP 拦截页面 fetch／XHR／WebSocket 与外部资源，但这不是 OS 或网络栈沙箱，也**不阻止页面自我导航**（导航后宿主撤销桥，见页面契约） |
 
