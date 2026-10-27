@@ -26,6 +26,8 @@ export interface PluginItem {
   updatedAt: string;
   artifact?: Artifact | null;
   sourceId: string;
+  /** 市场服务返回的自动更新来源（GitHub Release 仓库地址），用于推导安装源 */
+  sourceUrl?: string;
   /** 站点目录扩展字段 */
   icon?: string;
   featured?: boolean;

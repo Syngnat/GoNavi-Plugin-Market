@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { canPublishWith, useAuth } from '../auth/AuthContext';
 import {
+  deletePublisherPlugin,
   fetchPublisherPlugins,
   isGithubRepoUrl,
   marketErrorMessage,
@@ -105,6 +106,65 @@ function SourceForm({
   );
 }
 
+function DangerZone({
+  pluginId,
+  csrf,
+  allowed,
+}: {
+  pluginId: string;
+  csrf: string;
+  allowed: boolean;
+}) {
+  const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+
+  const remove = async () => {
+    if (!allowed || !csrf || deleting) return;
+    const confirmed = window.confirm(
+      `确定永久删除插件「${pluginId}」？\n\n` +
+        '这会移除该插件及其全部已发布版本、发布记录与自动更新来源；' +
+        '市场页面与安装入口立即失效，且删除后无法恢复。',
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await deletePublisherPlugin(pluginId, csrf);
+      navigate('/account');
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : marketErrorMessage('unavailable'));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <section className="border border-copper/40 bg-card rounded-xl p-6 space-y-3">
+      <h2 className="text-lg font-headline font-bold text-copper">删除插件</h2>
+      <p className="text-sm text-muted leading-relaxed">
+        仅限插件所有者。删除会移除该插件及其全部已发布版本、发布记录与自动更新来源，已上架版本同时从市场下架，且无法恢复。若只想停止自动同步，请清空上方仓库地址。
+      </p>
+      {error && (
+        <p role="alert" className="text-sm text-copper">
+          {error}
+        </p>
+      )}
+      <button
+        type="button"
+        disabled={!allowed || !csrf || deleting}
+        onClick={() => void remove()}
+        className="px-4 py-2 rounded-lg border border-copper text-copper text-sm font-medium hover:bg-copper hover:text-white disabled:opacity-40 transition-all"
+      >
+        {deleting ? '删除中…' : '删除插件'}
+      </button>
+      {!allowed && (
+        <p className="text-xs text-muted">当前账号仅可查看；删除需要插件所有者权限。</p>
+      )}
+    </section>
+  );
+}
+
 export function AccountPluginPage() {
   const { id = '' } = useParams();
   const { loading, account, csrf } = useAuth();
@@ -186,7 +246,9 @@ export function AccountPluginPage() {
               市场公开版本：{plugin.publishedVersion || '尚未上架'} · 最近提交：
               {submissionStateLabel(plugin.latestState)} {plugin.latestVersion || '—'}
             </p>
-            <p className="text-sm">已发布内容不可替换或删除；更新请提升包内版本号后再次提交，或在绑定的仓库发布新 Release。</p>
+            <p className="text-sm">
+              单个版本上架后内容不可替换；如需整体下架，可在本页底部删除插件（会移除该插件的全部版本与发布记录）。更新请提升包内版本号后再次提交，或在绑定的仓库发布新 Release。
+            </p>
             {allowed && (
               <Link
                 to="/publish"
@@ -206,6 +268,8 @@ export function AccountPluginPage() {
           />
 
           <SubmissionList title="版本与发布记录" pluginId={plugin.id} refreshKey={reload} />
+
+          <DangerZone pluginId={plugin.id} csrf={csrf} allowed={allowed} />
         </>
       )}
     </main>

@@ -120,7 +120,7 @@ function fallbackCode(status: number): string {
   return 'unavailable';
 }
 
-async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function perform(path: string, options: RequestOptions): Promise<Response> {
   const { csrf, ...init } = options;
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
@@ -138,21 +138,28 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
     cache: 'no-store',
   });
 
-  const text = await response.text();
-  let payload: unknown = null;
-  if (text) {
-    try {
-      payload = JSON.parse(text) as unknown;
-    } catch {
-      payload = null;
-    }
-  }
-
   if (response.status === 401) window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  return response;
+}
 
-  if (!response.ok) {
-    throw new MarketRequestError(errorCodeOf(payload) ?? fallbackCode(response.status), response.status);
+async function readPayload(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
   }
+}
+
+function throwForStatus(status: number, payload: unknown): never {
+  throw new MarketRequestError(errorCodeOf(payload) ?? fallbackCode(status), status);
+}
+
+async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const response = await perform(path, options);
+  const payload = await readPayload(response);
+  if (!response.ok) throwForStatus(response.status, payload);
   if (payload === null) throw new MarketRequestError('invalid_response', response.status);
   return payload as T;
 }
@@ -264,6 +271,16 @@ export function updatePluginSource(
     body: JSON.stringify({ sourceUrl }),
     csrf,
   });
+}
+
+/** 删除插件（连同全部已发布版本与发布记录）；需要 CSRF，且不可恢复。 */
+export async function deletePublisherPlugin(pluginId: string, csrf: string): Promise<void> {
+  const response = await perform(`/publisher/plugins/${encodeURIComponent(pluginId)}`, {
+    method: 'DELETE',
+    csrf,
+  });
+  const payload = await readPayload(response);
+  if (!response.ok) throwForStatus(response.status, payload);
 }
 
 // ---- 展示辅助 ----
