@@ -30,6 +30,7 @@ GoNavi registers host capabilities explicitly. The page bridge (`PluginPageCall`
 | `metadata.databaseForeignKeys` | `host.metadata.read` | page, window, backend | no |
 | `metadata.charsets` | `host.metadata.read` | page, window, backend | no |
 | `metadata.collations` | `host.metadata.read` | page, window, backend | no |
+| `backup.status` | `host.metadata.read` | page, window, backend | no |
 | `sync.runs` | `host.metadata.read` | page, window, backend | no |
 | `sync.run` | `host.metadata.read` | page, window, backend | no |
 | `sync.jobs` | `host.metadata.read` | page, window, backend | no |
