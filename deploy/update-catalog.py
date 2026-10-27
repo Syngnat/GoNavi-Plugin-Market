@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REMOTE = "Bero-6H16-DE"
+REMOTE = "BeroHost-6h16-DE"
 DEST = "/srv/gonavi-plugin-market/current/catalog.json"
 STAGING = "/root/plugin-market-catalog-staging.json"
 
