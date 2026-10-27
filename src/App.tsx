@@ -5,6 +5,7 @@ import { Footer } from './components/Footer';
 import { TopNav } from './components/TopNav';
 import { AccountPage } from './pages/AccountPage';
 import { AccountPluginPage } from './pages/AccountPluginPage';
+import { CatalogPage } from './pages/CatalogPage';
 import { CommunityPage } from './pages/CommunityPage';
 import { DevelopersPage } from './pages/DevelopersPage';
 import { DocPage, DocsIndexPage } from './docs/DocPage';
@@ -40,6 +41,7 @@ export default function App() {
         <div className="flex-grow flex flex-col">
           <Routes>
             <Route path="/" element={<HomePage />} />
+            <Route path="/plugins" element={<CatalogPage />} />
             <Route path="/plugins/:id" element={<PluginDetailPage />} />
             <Route path="/developers" element={<DevelopersPage />} />
             <Route path="/docs" element={<DocsIndexPage />} />

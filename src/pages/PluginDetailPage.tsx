@@ -71,7 +71,7 @@ export function PluginDetailPage() {
           首页
         </Link>
         <span className="material-symbols-outlined text-base">chevron_right</span>
-        <Link to="/#catalog" className="hover:text-copper transition-colors">
+        <Link to="/plugins" className="hover:text-copper transition-colors">
           插件分类
         </Link>
         <span className="material-symbols-outlined text-base">chevron_right</span>

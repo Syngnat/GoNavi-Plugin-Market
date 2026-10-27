@@ -65,8 +65,8 @@ function AccountMenu() {
 }
 
 export function TopNav() {
-  const { pathname, hash } = useLocation();
-  const catalogActive = pathname.startsWith('/plugins') || (pathname === '/' && hash === '#catalog');
+  const { pathname } = useLocation();
+  const catalogActive = pathname === '/plugins' || pathname.startsWith('/plugins/');
   const docsActive = pathname.startsWith('/docs');
 
   return (
@@ -82,10 +82,10 @@ export function TopNav() {
           </div>
         </Link>
         <nav className="flex w-full flex-wrap items-center gap-x-5 gap-y-3 text-sm md:w-auto md:gap-x-8">
-          <Link to="/" className={navLinkClass(pathname === '/' && !catalogActive)}>
+          <Link to="/" className={navLinkClass(pathname === '/')}>
             首页
           </Link>
-          <Link to="/#catalog" className={navLinkClass(catalogActive)}>
+          <Link to="/plugins" className={navLinkClass(catalogActive)}>
             插件分类
           </Link>
           <Link to="/docs" className={navLinkClass(docsActive || pathname.startsWith('/developers'))}>
