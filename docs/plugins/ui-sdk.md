@@ -76,9 +76,9 @@ if (identity.context?.kind === 'connectionAction') {
 
 ## 已导出
 
-- 主题：`GonaviThemeProvider`、`useGonaviTheme`、`--gonavi-*` CSS 变量。
+- 主题：`GonaviThemeProvider`（`light`/`dark`/`system` 跟随系统）、`useGonaviTheme`、`--gonavi-*` CSS 变量。
 - 布局：`GonaviPanel`、`GonaviToolbar`、`GonaviEmptyState`、`GonaviLoadingState`、`GonaviErrorState`。
-- 数据：`GonaviDataTable`（只读）、`GonaviResultGrid`（按行推断列）、`GonaviJsonViewer`、`GonaviTreeView`、`GonaviCodeEditor`（轻量编辑器）、`GonaviConfirmDialog`。
+- 数据：`GonaviDataTable`（只读）、`GonaviResultGrid`（按行推断列）、`GonaviJsonViewer`、`GonaviTreeView`、`GonaviCodeEditor`、`GonaviSqlEditor`（Ctrl/Cmd+Enter 执行）、`GonaviConfirmDialog`。
 - Hooks：`usePluginContext`（读取窗口启动上下文）、`useGonaviPageLaunch`（读取页面标签启动上下文）、`useCapability`（单次能力调用状态）、`useGonaviTheme`。
 - antd：Button、Input、Select、Modal、Tabs、Table 等常用组件与 `GonaviIcons`。
 - 能力：`createGonaviClient`、`GonaviCapabilityError`。
