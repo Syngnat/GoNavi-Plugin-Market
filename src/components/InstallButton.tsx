@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PluginItem } from '../api/types';
-import { buildInstallDeepLink } from '../lib/deeplink';
+import { buildInstallDeepLink, resolveInstallSpec } from '../lib/deeplink';
 
 type Phase = 'idle' | 'launching' | 'launched' | 'fallback';
 
@@ -39,7 +39,8 @@ export function InstallButton({ item, variant }: InstallButtonProps) {
     };
   }, []);
 
-  const copyValue = item.installSpec?.trim() || item.id;
+  // 回退复制也用与深链相同的安装源；只有完全没有 GitHub 来源时才退回插件 ID。
+  const copyValue = resolveInstallSpec(item) || item.id;
 
   const launch = () => {
     if (phase === 'launching') return;
