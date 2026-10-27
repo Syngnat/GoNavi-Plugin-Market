@@ -49,6 +49,7 @@ GoNavi registers host capabilities explicitly. The page bridge (`PluginPageCall`
 | `redis.value` | `host.query.read` | page, window, backend | no |
 | `redis.serverInfo` | `host.query.read` | page, window, backend | no |
 | `redis.databases` | `host.query.read` | page, window, backend | no |
+| `query.explain` | `host.query.read` | page, window, backend | no |
 | `query.read` | `host.query.read` | page, window, backend | no |
 | `ui.notify` | — | page | no |
 
