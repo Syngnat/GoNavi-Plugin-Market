@@ -23,8 +23,8 @@
 
 - `connectionTypes`：与保存连接的大小写不敏感匹配，最多 32 个；只允许小写 ASCII、`.`、`_`、`:`、`-`。
 - `scopes`：`connection`、`database`、`collection`；省略等价于 `["connection"]`。
-- `target.type`：`window` 需要 manifest 声明 `window`；`page` 预留给后续工作台标签页切片，当前宿主会拒绝。
-- 动作 id 在插件内唯一，最多 16 个；窗口动作打开独立窗口，同一插件可同时打开多个窗口（宿主上限 16 个窗口）。
+- `target.type`：`window` 需要 manifest 声明 `window`；`page` 需要 `ui.pages` 且页面已声明，点击后在主工作台打开独立插件页标签。
+- 动作 id 在插件内唯一，最多 16 个；窗口动作打开独立窗口，同一插件可同时打开多个窗口（宿主上限 16 个窗口）；页面动作按“动作/连接/库/集合”打开独立标签，同一实例会聚焦而不是重复打开。
 
 ## 启动上下文
 
@@ -46,6 +46,8 @@ type LaunchContext = {
 ```
 
 窗口通过 `window.gonaviPlugin.ready.context` 读取。`config` 含宿主已解析的完整连接配置与凭据，只在 manifest 声明 `host.connections.credentials` 时出现；它是原生插件窗口，不是沙箱页面，插件作者必须把配置留在本进程内，不要写日志或上传。
+
+页面动作通过主工作台标签打开，页面脚本读取 `window.__gonaviLaunch`。页面上下文**永远不含 `config`/凭据**，只有 connectionId、库、集合、标题与只读标记；页面需要数据时用 `query.read` 等能力按 connectionId 请求，宿主在进程内解析配置。
 
 ## 宿主行为
 

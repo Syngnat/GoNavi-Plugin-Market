@@ -65,6 +65,8 @@ if (identity.context?.kind === 'connectionAction') {
 
 `config` 只在 manifest 声明 `host.connections.credentials` 时出现。窗口必须把凭据留在本进程内，不要写日志、DOM 或远程请求。
 
+若连接动作的 `target.type` 是 `page`，主工作台标签中的页面通过 `window.__gonaviLaunch` 读取同一份**非敏感**标识（没有 `config`）；数据用 `query.read` 等能力按 `connectionId` 获取。
+
 ## 能力客户端
 
 - 插件窗口：`window.gonaviPlugin.capability(method, args)` 返回 `{ ok, data, error }` envelope。
