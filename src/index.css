@@ -26,13 +26,25 @@ body {
   backdrop-filter: blur(18px);
 }
 
-/* On wide screens the right-side account/publish group ends on the inspector's
-   left edge, so the header, hero and right panel share the same vertical rules. */
-@media (min-width: 1360px) {
+/* The right-side account/publish group ends on the inspector's left edge on
+   desktop widths; the header, hero and right panel then share vertical rules. */
+.market-home-shell > header > div {
+  max-width: none;
+  padding-left: 44px;
+  padding-right: 376px;
+}
+
+@media (max-width: 1180px) {
   .market-home-shell > header > div {
-    max-width: none;
-    padding-left: 44px;
-    padding-right: 376px;
+    padding-right: 336px;
+  }
+}
+
+@media (max-width: 980px) {
+  .market-home-shell > header > div {
+    max-width: 80rem;
+    padding-left: 24px;
+    padding-right: 24px;
   }
 }
 
