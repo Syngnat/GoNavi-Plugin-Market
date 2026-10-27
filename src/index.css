@@ -26,6 +26,16 @@ body {
   backdrop-filter: blur(18px);
 }
 
+/* On wide screens the right-side account/publish group ends on the inspector's
+   left edge, so the header, hero and right panel share the same vertical rules. */
+@media (min-width: 1360px) {
+  .market-home-shell > header > div {
+    max-width: none;
+    padding-left: 44px;
+    padding-right: 376px;
+  }
+}
+
 .market-home-shell > header a {
   color: #91a5a7;
 }
