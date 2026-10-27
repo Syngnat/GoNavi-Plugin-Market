@@ -18,6 +18,7 @@ const docFiles = new Map<string, string>([
   ['ai-tools', 'plugins/ai-tools.md'],
   ['ui-sdk', 'plugins/ui-sdk.md'],
   ['capabilities', 'plugins/capabilities.md'],
+  ['write-capabilities', 'plugins/write-capabilities.md'],
   ['sdk', 'plugins/sdk.md'],
   ['protocol', 'plugins/protocol.md'],
   ['permissions', 'plugins/permissions.md'],

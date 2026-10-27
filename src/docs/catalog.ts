@@ -121,6 +121,14 @@ const DOC_ENTRIES: Omit<DocCatalogItem, 'searchText'>[] = [
     order: 20.5,
   },
   {
+    slug: 'write-capabilities',
+    title: '写与 DDL 能力边界（设计稿）',
+    description: '宿主确认、一次性 token、只读连接拒绝与审计约束；当前未启用写能力。',
+    group: '接口与契约',
+    source: 'docs/plugins/write-capabilities.md',
+    order: 20.6,
+  },
+  {
     slug: 'sdk',
     title: 'Go / TypeScript SDK',
     description: '协议 transport、清单类型、校验函数、数据源分发器与 UI 接入点。',
