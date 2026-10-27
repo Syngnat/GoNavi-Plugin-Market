@@ -65,7 +65,7 @@ if (identity.context?.kind === 'connectionAction') {
 
 `config` 只在 manifest 声明 `host.connections.credentials` 时出现。窗口必须把凭据留在本进程内，不要写日志、DOM 或远程请求。
 
-若连接动作的 `target.type` 是 `page`，主工作台标签中的页面通过 `window.__gonaviLaunch` 读取同一份**非敏感**标识（没有 `config`）；数据用 `query.read` 等能力按 `connectionId` 获取。
+若连接动作的 `target.type` 是 `page`，主工作台标签中的页面通过 `useGonaviPageLaunch()`（或直接读 `window.__gonaviLaunch`）获取同一份**非敏感**标识（没有 `config`）；数据用 `query.read` 等能力按 `connectionId` 获取。
 
 ## 能力客户端
 
@@ -79,7 +79,7 @@ if (identity.context?.kind === 'connectionAction') {
 - 主题：`GonaviThemeProvider`、`useGonaviTheme`、`--gonavi-*` CSS 变量。
 - 布局：`GonaviPanel`、`GonaviToolbar`、`GonaviEmptyState`、`GonaviLoadingState`、`GonaviErrorState`。
 - 数据：`GonaviDataTable`（只读）、`GonaviResultGrid`（按行推断列）、`GonaviJsonViewer`、`GonaviTreeView`、`GonaviCodeEditor`（轻量编辑器）、`GonaviConfirmDialog`。
-- Hooks：`usePluginContext`（读取窗口启动上下文）、`useCapability`（单次能力调用状态）、`useGonaviTheme`。
+- Hooks：`usePluginContext`（读取窗口启动上下文）、`useGonaviPageLaunch`（读取页面标签启动上下文）、`useCapability`（单次能力调用状态）、`useGonaviTheme`。
 - antd：Button、Input、Select、Modal、Tabs、Table 等常用组件与 `GonaviIcons`。
 - 能力：`createGonaviClient`、`GonaviCapabilityError`。
 
