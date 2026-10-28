@@ -19,9 +19,9 @@ export default {
         full: '9999px',
       },
       fontFamily: {
-        headline: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
-        body: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
-        label: ['"Public Sans"', 'system-ui', 'sans-serif'],
+        headline: ['"IBM Plex Sans"', '"Noto Sans SC"', 'system-ui', 'sans-serif'],
+        body: ['"IBM Plex Sans"', '"Noto Sans SC"', 'system-ui', 'sans-serif'],
+        label: ['"Public Sans"', '"Noto Sans SC"', 'system-ui', 'sans-serif'],
       },
     },
   },
