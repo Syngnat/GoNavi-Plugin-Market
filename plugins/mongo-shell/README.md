@@ -201,29 +201,19 @@ node --test ui/page.test.mjs ui/window.test.mjs
 `plugin-dist/` 已在 `.gitignore`，不要提交产物；`-output` 目录必须不存在）：
 
 ```sh
-rm -rf ../../plugin-dist/mongo-shell-release
-go run ./cmd/pack \
-  -manifest gonavi.plugin.json \
-  -output ../../plugin-dist/mongo-shell-release \
-  -zip ../../plugin-dist/gonavi-plugin-mongo-shell-1.0.0.zip
+# 在 GoNavi-Plugin-Market 仓库根；每次选择尚不存在的输出目录。
+go run ./cmd/buildtool \
+  -manifest plugins/mongo-shell/gonavi.plugin.json \
+  -output plugin-dist/mongo-shell-1.0.2 \
+  -zip plugin-dist/gonavi-plugin-mongo-shell-1.0.2.zip
 ```
 
 只验证本机时可加 `-platforms darwin/arm64`，产物名相应改为
-`gonavi-plugin-mongo-shell-1.0.0-darwin-arm64.zip`。
+`gonavi-plugin-mongo-shell-1.0.2-darwin-arm64.zip`。
 
-`cmd/pack` 的行为与市场仓根 `cmd/buildtool` 一致（`CGO_ENABLED=0`、多平台交叉编译、
-复制 `ui`/`skills`/`README.md`/`LICENSE`、最后写 manifest 与 ZIP），唯一差别是它把
-manifest 当原始 JSON 编辑、只替换 `backend`。原因：市场仓当前依赖的 SDK 发布版
-（`v0.0.0-20261024091534`）尚未声明 `contributes.connectionActions`，用 `buildtool`
-会把该字段整个丢掉，导致右键入口消失。等 SDK 发布含该字段的版本后，可直接改用：
-
-```sh
-# 在 GoNavi-Plugin-Market 仓库根
-go run ./cmd/buildtool \
-  -manifest plugins/mongo-shell/gonavi.plugin.json \
-  -output plugin-dist/mongo-shell-release \
-  -zip plugin-dist/gonavi-plugin-mongo-shell-1.0.0.zip
-```
+1.0.2 起使用市场仓统一 `cmd/buildtool`。工具保留原始清单中的页面、右键动作等声明，
+只替换生成的 `backend.platforms`，避免旧版 SDK 类型往返导致贡献字段丢失。
+后端按 `CGO_ENABLED=0` 交叉编译；UI、技能、README 和许可证随同一个 ZIP 分发。
 
 插件包静态检查（在 GoNavi 宿主仓执行；不执行插件代码）：
 

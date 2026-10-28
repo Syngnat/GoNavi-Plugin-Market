@@ -3,7 +3,7 @@
   "apiVersion": 1,
   "id": "com.gonavi.mongo-shell",
   "name": "MongoShell",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Interactive MongoDB JavaScript shell in a dedicated GoNavi window or workbench tab: connect with the saved connection, browse databases, and run bounded goja scripts with find, aggregate, insert, update, delete and runCommand.",
   "author": "GoNavi",
   "license": "Apache-2.0",

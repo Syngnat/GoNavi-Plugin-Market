@@ -1,3 +1,16 @@
+# MongoShell 1.0.2
+
+- 修复多窗口／工作台标签页共享连接：每次 connect 返回独立 sessionId，run／ping／disconnect 按会话路由，保留各自只读策略。
+- 修复工作台页未解包后端响应：连接或脚本失败不再误报 ready／done，数据库列表与只读状态正常展示。
+- 增加会话上限、关闭取消、迟到连接回收与空闲会话回收；失败连接清理受 5 秒预算约束。
+- 窗口、工作台页、清单和后端必须配套更新；旧调用方需保存并传回 connect 返回的 sessionId。
+- 回归包含双连接隔离、只读保护、会话关闭／容量／清理，以及真实页面和窗口脚本响应处理。
+- 五平台 ZIP：`gonavi-plugin-mongo-shell-1.0.2.zip`；最低宿主版本仍为 1.2.0，开发版宿主按现有兼容规则安装。
+- 传输大小：38,136,129 bytes；展开大小：96,168,442 bytes。
+- SHA-256：`b6b7411b3122aa6d84ab682de42cd8ec3b7eaea038252096db8c2515d5db48e3`。
+- 规范内容摘要：`83ca638db5a53c1be7d7f5d627b46de96f68b43a4bf42d5374dd50363c6bddeb`。
+- 使用市场仓统一 `cmd/buildtool` 打包，回归验证清单贡献字段不会丢失。
+
 # MongoShell 1.0.1
 
 - 新增工作台入口：连接/库/集合右键 **MongoShell (Workbench)** 打开工作台标签页。
@@ -77,8 +90,7 @@
 
 ## 注意
 
-- 本插件包使用 `plugins/mongo-shell/cmd/pack`，因为市场仓固定 SDK 尚未声明
-  `contributes.connectionActions`；直接使用根 `cmd/buildtool` 会丢掉右键入口。
-  SDK 发布后应切回 `buildtool` 并删除 `cmd/pack`。
+- 历史 1.0.0/1.0.1 使用插件内的 `cmd/pack` 保留右键声明；1.0.2 起使用市场仓根
+  `cmd/buildtool`，统一工具仅替换后端平台条目并保留全部原始清单贡献。
 - 不提交 `plugin-dist/`、ZIP 或运行态数据。
 - 发布前需在真实宿主 1.2.0 上验证：安装启用 → 右键 MongoDB 连接/库/集合 → 打开窗口 → connect/run。
