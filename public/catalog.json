@@ -1,6 +1,6 @@
 {
   "sourceId": "plugin-market-site",
-  "updatedAt": "2026-10-28T00:26:00Z",
+  "updatedAt": "2026-10-28T04:07:01Z",
   "items": [
     {
       "id": "com.gonavi.nginx-inspector",
@@ -78,7 +78,7 @@
       "author": "GoNavi Project",
       "publisherId": "gonavi",
       "official": true,
-      "version": "1.0.1",
+      "version": "1.0.2",
       "category": "数据库",
       "minHostVersion": "1.2.0",
       "platforms": [
@@ -86,22 +86,24 @@
         "macos",
         "linux"
       ],
-      "updatedAt": "2026-10-28T00:26:00Z",
+      "updatedAt": "2026-10-28T04:07:01Z",
       "icon": "database",
-      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@mongo-shell-v1.0.1",
+      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@mongo-shell-v1.0.2",
       "repoUrl": "https://github.com/Syngnat/GoNavi-Plugin-Market",
-      "contentDigest": "6ac03fc540502fc7232f2528528d6b6fc5b863d3abcb81afe25a6aeede06586b",
+      "contentDigest": "83ca638db5a53c1be7d7f5d627b46de96f68b43a4bf42d5374dd50363c6bddeb",
       "license": "Apache-2.0",
       "artifact": {
-        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/mongo-shell-v1.0.1/gonavi-plugin-mongo-shell-1.0.1.zip",
-        "sha256": "19152a69d4f1fe543c3e67dd6d6b6b0aabf0e49598ee0894c22d363f6491155c",
-        "sizeBytes": 38093767,
+        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/mongo-shell-v1.0.2/gonavi-plugin-mongo-shell-1.0.2.zip",
+        "sha256": "b6b7411b3122aa6d84ab682de42cd8ec3b7eaea038252096db8c2515d5db48e3",
+        "sizeBytes": 38136129,
         "platform": "all",
-        "version": "1.0.1"
+        "version": "1.0.2"
       },
       "sourceId": "plugin-market-site",
       "features": [
         "连接/库/集合右键直接打开 MongoShell 窗口或工作台标签。",
+        "每个窗口/工作台使用独立会话，切换标签不会串连接或只读策略。",
+        "连接和脚本失败正确显示错误，支持关闭取消与空闲会话回收。",
         "goja JavaScript Shell，支持查询、聚合与写入。",
         "只读连接拒绝写入；行数上限 200/2000，命令超时 30 秒。",
         "工作台页通过受控 plugin.invoke 复用 connect/run，页面不接触凭据。",
@@ -111,7 +113,7 @@
         {
           "name": "读取连接凭据",
           "key": "host.connections.credentials",
-          "scope": "仅插件动作启动窗口",
+          "scope": "启动上下文或受控命令向后端注入，界面不直接接收凭据",
           "granted": true
         },
         {
