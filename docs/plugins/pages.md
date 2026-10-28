@@ -84,16 +84,16 @@ func (a *App) PluginPageCall(id, pageID, method, argumentsJSON string) connectio
 | `metadata.databases` | `host.metadata.read` | `{ connectionId }` | `[string]`，≤2000 项 |
 | `metadata.tables` | `host.metadata.read` | `{ connectionId, database }` | `[{ name, type? }]`，≤5000 项 |
 | `metadata.columns` | `host.metadata.read` | `{ connectionId, database, table }` | `[{ name, type, nullable? }]`，≤5000 项 |
-| `plugin.invoke` | `ui.pages` | `{ command, arguments?, connectionId? }` | 调用本插件 manifest 已声明的命令；带 `connectionId` 且命令声明 `config` 时由宿主注入连接配置，页面永远拿不到凭据 |
+| `plugin.invoke` | `ui.pages` | `{ command, arguments?, connectionId? }` | 调用本插件 manifest 已声明的命令并绑定当前代际；持 `host.connections.credentials`、带 `connectionId` 且命令声明 `config` 时，宿主可向插件后端参数注入保存配置；后端不得把凭据回传页面 |
 | `query.read` | `host.query.read` | `{ connectionId, sql, maxRows? }` | `{ columns: [{name,type?}], rows: [[…]], truncated, elapsedMs }`；maxRows 1..1000，默认 100；扫描层行预算为 maxRows+1 |
 | `ui.notify` | 无（前端本地处理） | `{ message, type? }` | 无；在页面桥内直接展示 antd message |
 
-- 连接一律用**保存连接 ID** 解析，插件永远拿不到凭据；宿主侧从现有仓储／secretstore 取完整配置。
+- 连接一律用**保存连接 ID** 解析；连接列表、元数据和读取查询不向插件返回凭据，宿主从现有仓储／secretstore 解析配置。`plugin.invoke` 的凭据注入仅面向明确授权的可信插件后端，不是凭据不会被插件代码接触的保证。
 - `connections.list` 的 `readOnly` 是**有效只读**：连接模式本身支持只读且被强制只读时才为 `true`，不能当成「这次查询不会改数据」的承诺。多主机／副本集连接可能没有单一 `host`／`port`，这两个字段可为空。
-- `query.read` 只接受单条只读语句（SELECT／WITH／SHOW／DESCRIBE／EXPLAIN），拒绝多语句、写入与可执行注释；直接复用宿主现有查询路径，因此只读连接策略、SQL 审计（来源 `plugin_page`）与执行超时与内置查询完全一致。页面不能指定数据库、不能提交多条语句、也拿不到连接凭据。
-- **只读 ≠ 无副作用**：SELECT 仍可能触发锁等待、序列推进或函数副作用。v1 额外拒绝 `FOR UPDATE`／`FOR NO KEY UPDATE`／`FOR SHARE`／`FOR KEY SHARE`／`LOCK IN SHARE MODE`／`UPDLOCK`／`HOLDLOCK` 与 `nextval(`／`setval(`／`pg_terminate_backend(`／`pg_read_file(`，命中返回 `page_invalid_arguments`；`pg_advisory_lock`、`pg_sleep`、用户自定义函数等其他副作用**未穷举**，按受信插件代码边界对待。
-- `query.read` 在**扫描层**绑定行预算（`maxRows+1`，用于区分恰好 maxRows 与超限）：支持行预算的驱动到上限即停止物化；只有 legacy 查询的驱动会先读完再由网关截断，不因此拒绝查询。`truncated` 由「行数超过 maxRows」「预算已截断」「驱动截断标记」任一决定；结果序列化仍受 256 KiB 网关上限约束。
-- **30s 超时**由网关计时：支持 context 的驱动（`QueryContexter`）可被中断；legacy 驱动无法中断，宿主会等驱动返回后再收尾，若此时已超时则返回 `page_internal`。页面桥自身另有 30s 本地超时，通常会先失败。
+- `query.read` 只接受单条只读语句（SELECT／WITH／SHOW／DESCRIBE／EXPLAIN），拒绝多语句、写入与可执行注释；在宿主现有审计路径（来源 `plugin_page`）中，必须使用驱动提供的**数据库强制只读事务**，不能仅依赖 SQL 分类。PostgreSQL 家族与 MySQL 已有专用执行方法；不支持只读事务的驱动拒绝调用，旧代理若没有 `query_read_only` RPC 也拒绝，绝不降级普通查询。更新宿主时需配套更新相关驱动代理。
+- **只读 ≠ 无副作用**：只读事务阻止数据库写入，但 SELECT 仍可能触发锁等待或外部函数副作用。额外拒绝 `FOR UPDATE`／`FOR NO KEY UPDATE`／`FOR SHARE`／`FOR KEY SHARE`／`LOCK IN SHARE MODE`／`UPDLOCK`／`HOLDLOCK` 与 `nextval(`／`setval(`／`pg_terminate_backend(`／`pg_read_file(`，命中返回 `page_invalid_arguments`；`pg_advisory_lock`、`pg_sleep`、用户自定义函数等其他副作用未穷举，仍需按受信插件代码边界对待。
+- `query.read` 在只读事务的**扫描层**绑定行预算（`maxRows+1`，用于区分恰好 maxRows 与超限），到预算即停止物化，查询结束始终回滚事务；结果序列化仍受 256 KiB 网关上限约束。
+- **30s 超时**由网关计时，执行与扫描均传播请求 context；代理使用专用 RPC 携带超时与预算。缺少安全执行能力时拒绝调用。页面桥自身另有 30s 本地超时。
 - 若未来某能力无法复用安全路径，应返回 `unsupported` 并归入阶段 2，**不得**降级为无审计直连。
 
 ### 2.4 能力扩展
