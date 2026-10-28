@@ -94,20 +94,22 @@ stdio JSON-RPC v1（一行一帧，stdout 只写协议）。所有命令返回�
 }
 ```
 
-返回 `data`：`connectionName/host/database/collection/readOnly/databases[]`。
+返回 `data`：`sessionId/connectionName/host/database/collection/readOnly/databases[]`。
+每次成功 connect 返回独立的 256 位随机 `sessionId`（64 位十六进制字符串），不会替换其他页面或窗口的客户端。
 10 秒内完成建连、ping 和数据库列表；失败返回 `connection_failed` 并释放客户端。
 
 ### `disconnect`
 
-关闭当前客户端；未连接时也返回成功。
+参数：`{ "sessionId": "<connect 返回的 ID>" }`。只关闭该会话并取消其在途请求；其他会话不受影响。
 
 ### `ping`
 
-返回 `{ "latencyMs": 3, "database": "app" }`；未连接返回 `not_connected`。
+参数：`{ "sessionId": "<connect 返回的 ID>" }`。
+返回 `{ "latencyMs": 3, "database": "app" }`。
 
 ### `run`
 
-参数：`{ "script": "...", "database": "app", "collection": "users", "maxRows": 200 }`。
+参数：`{ "sessionId": "<connect 返回的 ID>", "script": "...", "database": "app", "collection": "users", "maxRows": 200 }`。
 
 返回：
 
@@ -124,6 +126,17 @@ stdio JSON-RPC v1（一行一帧，stdout 只写协议）。所有命令返回�
   "timeoutMs": 30000
 }
 ```
+
+### 会话生命周期与协议兼容
+
+- `run` / `ping` / `disconnect` 必须显式传入 `sessionId`；缺失、未知、已关闭或已回收的 ID 返回 `not_connected`，绝不回退到其他连接；字段类型错误返回 `invalid_argument`。
+- 单进程最多 32 个会话（包含建连中和断开清理中），超限返回 `session_limit`；不驱逐仍活跃的新会话。
+- 页面/窗口在 `pagehide` / `beforeunload` 尽力发送 disconnect；连接响应在卸载后才返回时也会回收。宿主已经移除 iframe 桥时，该消息可能丢失。
+- 为回收丢失的卸载消息，每次 connect 最多回收一个空闲超过 30 分钟且没有在途请求的旧会话；锁外执行断开，最多占一个 5 秒清理预算，不启动后台 goroutine。被回收的旧页面再次执行会收到 `not_connected`，需重新打开连接；30 分钟内的遗留会话仍计入上限。
+- SDK 关闭时先 Abort 使所有 ID 失效并取消请求，再 Close 对所有客户端执行有界清理；迟到 connect 不会重新发布会话。
+- 工作台页和原生窗口均按 `{ok,data,error}` 解包；失败或缺少 sessionId 均不会进入 ready。
+- 这是后端命令的显式协议变更：已有调用方必须保存 connect 返回的 sessionId 并在后续命令传回。旧 UI 与新后端、新 UI 与旧后端均应失败关闭；发布/部署时必须将 UI、manifest 内联页和二进制一起更新。
+- 包内原有单客户端 `Shell` API 保持兼容，仅协议入口改用 `Sessions` 包层；只读策略仍由宿主注入及每个 Shell 的原有保护执行。
 
 ## JavaScript API
 
@@ -167,7 +180,7 @@ BSON 值在返回前转换为 JSON 安全值：`ObjectId` → 24 位十六进制
 | `find`/`aggregate` 行数 | 默认 200，最大 2000；`maxRows` 参数按此钳制 |
 | 集合名数量 | 1000（超出标记 `truncated`） |
 | `print` 输出 | 500 行，单行 4000 字符 |
-| 错误码 | `invalid_argument`、`not_connected`、`unsupported_connection`、`unsupported_transport`、`connection_failed`、`query_failed`、`read_only`、`script_error`、`syntax_error`、`timeout`、`internal` |
+| 错误码 | `invalid_argument`、`not_connected`、`unsupported_connection`、`unsupported_transport`、`connection_failed`、`query_failed`、`read_only`、`script_error`、`syntax_error`、`timeout`、`session_limit`、`internal` |
 
 宿主窗口桥单次调用上限是 1 MiB，因此即使行数合规，单个超大文档仍可能让响应超限；
 建议用 projection 或聚合收窄字段。
@@ -180,6 +193,8 @@ BSON 值在返回前转换为 JSON 安全值：`ObjectId` → 24 位十六进制
 cd plugins/mongo-shell
 CGO_ENABLED=0 go test ./...
 CGO_ENABLED=0 go vet ./...
+go test -race ./...
+node --test ui/page.test.mjs ui/window.test.mjs
 ```
 
 打包发布版（默认编译 Windows amd64、Linux amd64/arm64、macOS amd64/arm64 五个平台；

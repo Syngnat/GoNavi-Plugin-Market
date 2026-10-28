@@ -49,18 +49,44 @@
   const status = document.getElementById('status');
   const errorBox = document.getElementById('error');
   const resultBox = document.getElementById('result');
-  let connected = false;
+  let sessionId = '';
+  let disposed = false;
+  let running = false;
   const setStatus = (text) => { status.textContent = text; };
   const setError = (error) => {
     const message = error && (error.message || error.code) ? String(error.message || error.code) : String(error || '');
     errorBox.hidden = !message;
     errorBox.textContent = message;
   };
-  const call = (command, args) => window.gonavi.call('plugin.invoke', {
-    command,
-    arguments: args || {},
-    connectionId: launch.connectionId || '',
-  });
+  const call = async (command, args) => {
+    const payload = await window.gonavi.call('plugin.invoke', {
+      command,
+      arguments: args || {},
+      connectionId: launch.connectionId || '',
+    });
+    if (!payload || typeof payload !== 'object' || typeof payload.ok !== 'boolean') {
+      throw new Error('The plugin backend returned an invalid response.');
+    }
+    if (!payload.ok) {
+      const failure = payload.error || {};
+      const error = new Error(failure.message || failure.code || 'The command failed.');
+      error.code = failure.code || 'internal';
+      throw error;
+    }
+    if (!payload.data || typeof payload.data !== 'object') {
+      throw new Error('The plugin backend returned invalid data.');
+    }
+    return payload.data;
+  };
+  const release = (id) => call('disconnect', { sessionId: id }).catch(() => {});
+  const dispose = () => {
+    disposed = true;
+    const id = sessionId;
+    sessionId = '';
+    runButton.disabled = true;
+    dbSelect.disabled = true;
+    if (id) void release(id);
+  };
   const render = (data) => {
     resultBox.hidden = false;
     resultBox.textContent = '';
@@ -98,13 +124,21 @@
     setStatus('connecting');
     try {
       const data = await call('connect', {
+        connectionId: launch.connectionId || '',
         database: launch.database || '',
         collection: launch.collection || '',
         connectionName: launch.connectionName || 'MongoDB',
         environmentType: launch.environmentType || '',
         readOnly: launch.readOnly === true,
       });
-      connected = true;
+      if (typeof data.sessionId !== 'string' || !data.sessionId) {
+        throw new Error('The plugin backend did not return a sessionId.');
+      }
+      if (disposed) {
+        await release(data.sessionId);
+        return;
+      }
+      sessionId = data.sessionId;
       conn.textContent = data && data.host ? data.host : (launch.connectionName || 'MongoDB');
       if (data && Array.isArray(data.databases)) {
         dbSelect.textContent = '';
@@ -128,12 +162,14 @@
     }
   };
   const run = async () => {
-    if (!connected) return;
+    if (!sessionId || disposed || running) return;
+    running = true;
     runButton.disabled = true;
     setStatus('running');
     setError(null);
     try {
       const data = await call('run', {
+        sessionId,
         script: editor.value,
         database: dbSelect.value || '',
         collection: collection.value.trim(),
@@ -145,7 +181,8 @@
       setStatus('failed');
       setError(error);
     } finally {
-      runButton.disabled = false;
+      running = false;
+      runButton.disabled = disposed || !sessionId;
     }
   };
   runButton.addEventListener('click', run);
@@ -155,6 +192,8 @@
       void run();
     }
   });
+  window.addEventListener('pagehide', dispose);
+  window.addEventListener('beforeunload', dispose);
   conn.textContent = launch.connectionName || 'MongoDB';
   void connect();
 })();

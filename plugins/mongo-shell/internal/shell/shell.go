@@ -108,12 +108,16 @@ func (s *Shell) connect(ctx context.Context, args connectArgs) (connectData, err
 		return connectData{}, err
 	}
 	if err := client.Ping(connectCtx); err != nil {
-		_ = client.Disconnect(context.WithoutCancel(connectCtx))
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(connectCtx), disconnectTimeout)
+		_ = client.Disconnect(cleanupCtx)
+		cleanupCancel()
 		return connectData{}, wrapCodedError(codeConnectionFailed, "cannot reach the MongoDB server", err)
 	}
 	databases, err := client.ListDatabases(connectCtx)
 	if err != nil {
-		_ = client.Disconnect(context.WithoutCancel(connectCtx))
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(connectCtx), disconnectTimeout)
+		_ = client.Disconnect(cleanupCtx)
+		cleanupCancel()
 		return connectData{}, wrapCodedError(codeConnectionFailed, "cannot list databases: the MongoDB server rejected the request", err)
 	}
 	database := strings.TrimSpace(args.Database)

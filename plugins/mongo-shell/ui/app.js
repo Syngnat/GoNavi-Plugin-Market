@@ -50,6 +50,8 @@ const elements = {
 
 const state = {
   context: null,
+  sessionId: '',
+  disposed: false,
   connected: false,
   busy: false,
   database: '',
@@ -75,6 +77,7 @@ async function start() {
   elements.maxRows.value = String(state.maxRows);
   try {
     const context = await readLaunchContext();
+    if (state.disposed) return;
     state.context = context;
     state.database = context.database;
     state.collection = context.collection;
@@ -93,7 +96,7 @@ async function start() {
 }
 
 async function connect() {
-  if (!state.context || state.busy) {
+  if (!state.context || state.busy || state.disposed) {
     return false;
   }
   setBusy(true);
@@ -101,6 +104,14 @@ async function connect() {
   renderer.setStatus('connecting', 'Connecting…');
   try {
     const data = await invoke('connect', buildConnectArguments(state.context));
+    if (!data || typeof data.sessionId !== 'string' || !data.sessionId) {
+      throw new PluginCommandError('invalid_response', 'The backend did not return a sessionId.');
+    }
+    if (state.disposed) {
+      await releaseSession(data.sessionId);
+      return false;
+    }
+    state.sessionId = data.sessionId;
     state.database = data.database || state.database;
     state.readOnly = data.readOnly === true;
     setConnected(true);
@@ -134,7 +145,9 @@ async function disconnect() {
   }
   setBusy(true);
   try {
-    await invoke('disconnect', {});
+    const sessionId = state.sessionId;
+    state.sessionId = '';
+    if (sessionId) await invoke('disconnect', { sessionId });
   } catch (error) {
     renderer.showError(error);
   } finally {
@@ -150,11 +163,11 @@ async function disconnect() {
 }
 
 async function ping() {
-  if (!state.connected || state.busy) {
+  if (!state.connected || !state.sessionId || state.disposed || state.busy) {
     return;
   }
   try {
-    const data = await invoke('ping', {});
+    const data = await invoke('ping', { sessionId: state.sessionId });
     renderer.setStatus('connected', `Connected · ${data.latencyMs} ms`);
   } catch (error) {
     renderer.showError(error);
@@ -163,7 +176,7 @@ async function ping() {
 }
 
 async function run() {
-  if (!state.connected || state.busy) {
+  if (!state.connected || !state.sessionId || state.disposed || state.busy) {
     return;
   }
   const script = elements.editor.value;
@@ -178,6 +191,7 @@ async function run() {
   elements.outputMeta.textContent = '';
   try {
     const data = await invoke('run', {
+      sessionId: state.sessionId,
       script,
       database: state.database || undefined,
       collection: state.collection || undefined,
@@ -199,11 +213,12 @@ async function run() {
 }
 
 async function loadCollections() {
-  if (!state.connected) {
+  if (!state.connected || !state.sessionId || state.disposed) {
     return;
   }
   try {
     const data = await invoke('run', {
+      sessionId: state.sessionId,
       script: 'db.getCollectionNames()',
       database: state.database || undefined,
       maxRows: 1000,
@@ -287,5 +302,23 @@ function insertAtCursor(text) {
   editor.selectionEnd = start + text.length;
 }
 
+async function releaseSession(sessionId) {
+  try {
+    await invoke('disconnect', { sessionId });
+  } catch {
+    // Unload is best-effort; the backend also releases clients on process close.
+  }
+}
+
+function dispose() {
+  state.disposed = true;
+  const sessionId = state.sessionId;
+  state.sessionId = '';
+  setConnected(false);
+  if (sessionId) void releaseSession(sessionId);
+}
+
+window.addEventListener('pagehide', dispose);
+window.addEventListener('beforeunload', dispose);
 wireEvents();
 void start();

@@ -18,7 +18,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	runtime := shell.New()
+	runtime := shell.NewSessions()
 	runtime.Logger = func(ctx context.Context, level, message string) {
 		if host, ok := plugin.HostFromContext(ctx); ok {
 			_ = host.Log(ctx, level, message)
@@ -33,7 +33,9 @@ func main() {
 		},
 		OnClose: runtime.Abort,
 	})
-	if err := server.ServeStdio(ctx); err != nil {
+	err := server.ServeStdio(ctx)
+	runtime.Close(context.WithoutCancel(ctx))
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
