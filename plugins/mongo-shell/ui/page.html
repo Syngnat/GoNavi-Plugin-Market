@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MongoShell</title>
+<style>
+  :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  html, body { margin: 0; min-height: 100%; background: transparent; color: inherit; }
+  body { padding: 14px; box-sizing: border-box; }
+  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .bar strong { font-size: 15px; }
+  .muted { opacity: .65; font-size: 12px; }
+  select, input, textarea, button { font: inherit; }
+  select, input { min-height: 30px; padding: 4px 8px; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; background: transparent; color: inherit; }
+  textarea { width: 100%; min-height: 190px; box-sizing: border-box; padding: 10px; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; background: transparent; color: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; resize: vertical; }
+  button { padding: 5px 12px; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+  button.primary { border-color: #0f766e; background: #0f766e; color: #fff; }
+  button:disabled { opacity: .45; cursor: default; }
+  .status { margin-left: auto; font-size: 12px; }
+  .error { border: 1px solid #dc2626; border-radius: 6px; padding: 8px 10px; margin: 10px 0; color: #dc2626; white-space: pre-wrap; }
+  .result { margin-top: 12px; border: 1px solid rgba(127,127,127,.3); border-radius: 6px; padding: 10px; overflow: auto; max-height: 48vh; }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  th, td { border-bottom: 1px solid rgba(127,127,127,.25); padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <strong>MongoShell</strong>
+  <span id="conn" class="muted">connecting…</span>
+  <label class="muted">Database <select id="db" disabled><option value="">(none)</option></select></label>
+  <label class="muted">Collection <input id="collection" placeholder="optional" /></label>
+  <button id="run" class="primary" type="button" disabled>Run</button>
+  <span id="status" class="status">starting</span>
+</div>
+<div id="error" class="error" hidden></div>
+<textarea id="editor" spellcheck="false" aria-label="MongoShell JavaScript">db.getCollectionNames()</textarea>
+<div id="result" class="result" hidden></div>
+<script>
+(() => {
+  const launch = window.__gonaviLaunch || {};
+  const conn = document.getElementById('conn');
+  const dbSelect = document.getElementById('db');
+  const collection = document.getElementById('collection');
+  const editor = document.getElementById('editor');
+  const runButton = document.getElementById('run');
+  const status = document.getElementById('status');
+  const errorBox = document.getElementById('error');
+  const resultBox = document.getElementById('result');
+  let connected = false;
+  const setStatus = (text) => { status.textContent = text; };
+  const setError = (error) => {
+    const message = error && (error.message || error.code) ? String(error.message || error.code) : String(error || '');
+    errorBox.hidden = !message;
+    errorBox.textContent = message;
+  };
+  const call = (command, args) => window.gonavi.call('plugin.invoke', {
+    command,
+    arguments: args || {},
+    connectionId: launch.connectionId || '',
+  });
+  const render = (data) => {
+    resultBox.hidden = false;
+    resultBox.textContent = '';
+    if (data && data.table && Array.isArray(data.table.columns) && Array.isArray(data.table.rows)) {
+      const table = document.createElement('table');
+      const head = document.createElement('tr');
+      data.table.columns.forEach((column) => {
+        const th = document.createElement('th');
+        th.textContent = typeof column === 'string' ? column : String(column.name || '');
+        head.appendChild(th);
+      });
+      table.appendChild(head);
+      data.table.rows.forEach((row) => {
+        const tr = document.createElement('tr');
+        (Array.isArray(row) ? row : [row]).forEach((cell) => {
+          const td = document.createElement('td');
+          td.textContent = cell === null || cell === undefined ? '' : (typeof cell === 'object' ? JSON.stringify(cell) : String(cell));
+          tr.appendChild(td);
+        });
+        table.appendChild(tr);
+      });
+      resultBox.appendChild(table);
+      if (data.output && data.output.length) {
+        const pre = document.createElement('pre');
+        pre.textContent = data.output.join('\n');
+        resultBox.appendChild(pre);
+      }
+      return;
+    }
+    const pre = document.createElement('pre');
+    pre.textContent = JSON.stringify(data, null, 2);
+    resultBox.appendChild(pre);
+  };
+  const connect = async () => {
+    setStatus('connecting');
+    try {
+      const data = await call('connect', {
+        database: launch.database || '',
+        collection: launch.collection || '',
+        connectionName: launch.connectionName || 'MongoDB',
+        environmentType: launch.environmentType || '',
+        readOnly: launch.readOnly === true,
+      });
+      connected = true;
+      conn.textContent = data && data.host ? data.host : (launch.connectionName || 'MongoDB');
+      if (data && Array.isArray(data.databases)) {
+        dbSelect.textContent = '';
+        data.databases.forEach((item) => {
+          const name = typeof item === 'string' ? item : String(item && (item.name || item.database) || '');
+          if (!name) return;
+          const option = document.createElement('option');
+          option.value = name;
+          option.textContent = name;
+          dbSelect.appendChild(option);
+        });
+        if (data.database) dbSelect.value = data.database;
+      }
+      collection.value = launch.collection || '';
+      dbSelect.disabled = false;
+      runButton.disabled = false;
+      setStatus(data && data.readOnly ? 'read-only' : 'ready');
+    } catch (error) {
+      setStatus('not connected');
+      setError(error);
+    }
+  };
+  const run = async () => {
+    if (!connected) return;
+    runButton.disabled = true;
+    setStatus('running');
+    setError(null);
+    try {
+      const data = await call('run', {
+        script: editor.value,
+        database: dbSelect.value || '',
+        collection: collection.value.trim(),
+        maxRows: 200,
+      });
+      render(data);
+      setStatus('done');
+    } catch (error) {
+      setStatus('failed');
+      setError(error);
+    } finally {
+      runButton.disabled = false;
+    }
+  };
+  runButton.addEventListener('click', run);
+  editor.addEventListener('keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+      event.preventDefault();
+      void run();
+    }
+  });
+  conn.textContent = launch.connectionName || 'MongoDB';
+  void connect();
+})();
+</script>
+</body>
+</html>

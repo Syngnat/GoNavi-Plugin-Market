@@ -20,7 +20,17 @@ GoNavi 官方插件：在独立插件窗口中打开 MongoDB 的 JavaScript Shel
 | 资源边界 | 查询/聚合默认 200 行、最多 2000 行；集合名最多 1000 个；输出最多 500 行；命令 30 秒超时 |
 | Agent 技能 | `ai.skills` 附带 `mongo-shell-recipes` 只读参考文档（显式加载，不注入提示词） |
 
+## 工作台入口
+
+MongoShell 同时提供工作台标签页入口：
+
+- `contributes.pages` 声明 `shell` 页面，内容为内联 HTML（不加载外部资源）。
+- `contributes.connectionActions` 中的 `open-shell-tab` 使用 `target: { "type": "page", "page": "shell" }`，在连接/库/集合右键菜单打开工作台标签。
+- 页面通过 `plugin.invoke` 调用本插件已声明的 `connect`/`run` 命令；宿主注入连接配置，页面永远拿不到凭据。
+- 页面启动上下文来自 `window.__gonaviLaunch`，只含 connectionId、库、集合、只读标记等非敏感字段。
+
 ## 窗口入口
+
 
 - `window.entry`：`ui/index.html`
 - 入口动作：`connectionActions` → `open-shell`，`connectionTypes=["mongodb"]`，

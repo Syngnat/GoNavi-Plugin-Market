@@ -1,3 +1,13 @@
+# MongoShell 1.0.1
+
+- 新增工作台入口：连接/库/集合右键 **MongoShell (Workbench)** 打开工作台标签页。
+- 工作台页通过 `plugin.invoke` 调用本插件已声明的 `connect`/`run`；宿主注入连接配置，页面不接触凭据。
+- 保留独立窗口入口 **MongoShell**。
+- 五平台 ZIP：`gonavi-plugin-mongo-shell-1.0.1.zip`
+- 大小：38,093,767 bytes
+- SHA-256：`19152a69d4f1fe543c3e67dd6d6b6b0aabf0e49598ee0894c22d363f6491155c`
+- `minHostVersion` 仍为 1.2.0。
+
 # MongoShell 1.0.0 发布清单
 
 ## 产物

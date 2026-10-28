@@ -84,6 +84,7 @@ func (a *App) PluginPageCall(id, pageID, method, argumentsJSON string) connectio
 | `metadata.databases` | `host.metadata.read` | `{ connectionId }` | `[string]`，≤2000 项 |
 | `metadata.tables` | `host.metadata.read` | `{ connectionId, database }` | `[{ name, type? }]`，≤5000 项 |
 | `metadata.columns` | `host.metadata.read` | `{ connectionId, database, table }` | `[{ name, type, nullable? }]`，≤5000 项 |
+| `plugin.invoke` | `ui.pages` | `{ command, arguments?, connectionId? }` | 调用本插件 manifest 已声明的命令；带 `connectionId` 且命令声明 `config` 时由宿主注入连接配置，页面永远拿不到凭据 |
 | `query.read` | `host.query.read` | `{ connectionId, sql, maxRows? }` | `{ columns: [{name,type?}], rows: [[…]], truncated, elapsedMs }`；maxRows 1..1000，默认 100；扫描层行预算为 maxRows+1 |
 | `ui.notify` | 无（前端本地处理） | `{ message, type? }` | 无；在页面桥内直接展示 antd message |
 

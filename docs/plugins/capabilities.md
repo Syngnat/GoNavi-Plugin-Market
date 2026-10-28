@@ -10,6 +10,7 @@ GoNavi registers host capabilities explicitly. The page bridge (`PluginPageCall`
 |---|---|---|---|
 | `app.info` | — | page, window, backend | no |
 | `app.capabilities` | — | page, window, backend | no |
+| `plugin.invoke` | `ui.pages` | page, window, backend | varies |
 | `connections.list` | `host.connections.read` | page, window, backend | no |
 | `connections.capabilities` | `host.connections.read` | page, window, backend | no |
 | `connections.health` | `host.connections.read` | page, window, backend | no |

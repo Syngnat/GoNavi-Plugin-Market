@@ -3,20 +3,24 @@
   "apiVersion": 1,
   "id": "com.gonavi.mongo-shell",
   "name": "MongoShell",
-  "version": "1.0.0",
-  "description": "Interactive MongoDB JavaScript shell in a dedicated GoNavi window: connect with the saved connection, browse databases, and run bounded goja scripts with find, aggregate, insert, update, delete and runCommand.",
+  "version": "1.0.1",
+  "description": "Interactive MongoDB JavaScript shell in a dedicated GoNavi window or workbench tab: connect with the saved connection, browse databases, and run bounded goja scripts with find, aggregate, insert, update, delete and runCommand.",
   "author": "GoNavi",
   "license": "Apache-2.0",
   "minHostVersion": "1.2.0",
   "permissions": [
     "host.connections.credentials",
     "host.log",
-    "ai.skills"
+    "ai.skills",
+    "ui.pages",
+    "ui.html-panel"
   ],
   "permissionNotes": {
     "host.connections.credentials": "Reads the saved MongoDB configuration, including credentials, from the launch context. Credentials are used once and never returned.",
     "host.log": "Writes bounded connection diagnostics without credentials.",
-    "ai.skills": "Ships the mongo-shell-recipes reference skill document for explicit Agent loading."
+    "ai.skills": "Ships the mongo-shell-recipes reference skill document for explicit Agent loading.",
+    "ui.pages": "Opens the MongoShell page in a workbench tab.",
+    "ui.html-panel": "Renders the inline MongoShell workbench page."
   },
   "backend": {
     "default": {
@@ -135,6 +139,23 @@
         "target": {
           "type": "window"
         }
+      },
+      {
+        "id": "open-shell-tab",
+        "title": "MongoShell (Workbench)",
+        "description": "Open MongoShell in a workbench tab for this connection, database or collection.",
+        "connectionTypes": [
+          "mongodb"
+        ],
+        "scopes": [
+          "connection",
+          "database",
+          "collection"
+        ],
+        "target": {
+          "type": "page",
+          "page": "shell"
+        }
       }
     ],
     "skills": [
@@ -143,6 +164,15 @@
         "name": "MongoShell recipes",
         "description": "Reference for the bounded MongoShell JavaScript API: connection context, db/collection helpers, row limits, read-only behaviour and safe query patterns.",
         "entry": "skills/mongo-shell-recipes/SKILL.md"
+      }
+    ],
+    "pages": [
+      {
+        "id": "shell",
+        "title": "MongoShell",
+        "html": {
+          "source": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\" />\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n<title>MongoShell</title>\n<style>\n  :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif; }\n  html, body { margin: 0; min-height: 100%; background: transparent; color: inherit; }\n  body { padding: 14px; box-sizing: border-box; }\n  .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }\n  .bar strong { font-size: 15px; }\n  .muted { opacity: .65; font-size: 12px; }\n  select, input, textarea, button { font: inherit; }\n  select, input { min-height: 30px; padding: 4px 8px; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; background: transparent; color: inherit; }\n  textarea { width: 100%; min-height: 190px; box-sizing: border-box; padding: 10px; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; background: transparent; color: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; resize: vertical; }\n  button { padding: 5px 12px; border: 1px solid rgba(127,127,127,.35); border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }\n  button.primary { border-color: #0f766e; background: #0f766e; color: #fff; }\n  button:disabled { opacity: .45; cursor: default; }\n  .status { margin-left: auto; font-size: 12px; }\n  .error { border: 1px solid #dc2626; border-radius: 6px; padding: 8px 10px; margin: 10px 0; color: #dc2626; white-space: pre-wrap; }\n  .result { margin-top: 12px; border: 1px solid rgba(127,127,127,.3); border-radius: 6px; padding: 10px; overflow: auto; max-height: 48vh; }\n  pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }\n  table { border-collapse: collapse; width: 100%; font-size: 12px; }\n  th, td { border-bottom: 1px solid rgba(127,127,127,.25); padding: 4px 6px; text-align: left; vertical-align: top; }\n  th { font-weight: 600; }\n</style>\n</head>\n<body>\n<div class=\"bar\">\n  <strong>MongoShell</strong>\n  <span id=\"conn\" class=\"muted\">connecting…</span>\n  <label class=\"muted\">Database <select id=\"db\" disabled><option value=\"\">(none)</option></select></label>\n  <label class=\"muted\">Collection <input id=\"collection\" placeholder=\"optional\" /></label>\n  <button id=\"run\" class=\"primary\" type=\"button\" disabled>Run</button>\n  <span id=\"status\" class=\"status\">starting</span>\n</div>\n<div id=\"error\" class=\"error\" hidden></div>\n<textarea id=\"editor\" spellcheck=\"false\" aria-label=\"MongoShell JavaScript\">db.getCollectionNames()</textarea>\n<div id=\"result\" class=\"result\" hidden></div>\n<script>\n(() => {\n  const launch = window.__gonaviLaunch || {};\n  const conn = document.getElementById('conn');\n  const dbSelect = document.getElementById('db');\n  const collection = document.getElementById('collection');\n  const editor = document.getElementById('editor');\n  const runButton = document.getElementById('run');\n  const status = document.getElementById('status');\n  const errorBox = document.getElementById('error');\n  const resultBox = document.getElementById('result');\n  let connected = false;\n  const setStatus = (text) => { status.textContent = text; };\n  const setError = (error) => {\n    const message = error && (error.message || error.code) ? String(error.message || error.code) : String(error || '');\n    errorBox.hidden = !message;\n    errorBox.textContent = message;\n  };\n  const call = (command, args) => window.gonavi.call('plugin.invoke', {\n    command,\n    arguments: args || {},\n    connectionId: launch.connectionId || '',\n  });\n  const render = (data) => {\n    resultBox.hidden = false;\n    resultBox.textContent = '';\n    if (data && data.table && Array.isArray(data.table.columns) && Array.isArray(data.table.rows)) {\n      const table = document.createElement('table');\n      const head = document.createElement('tr');\n      data.table.columns.forEach((column) => {\n        const th = document.createElement('th');\n        th.textContent = typeof column === 'string' ? column : String(column.name || '');\n        head.appendChild(th);\n      });\n      table.appendChild(head);\n      data.table.rows.forEach((row) => {\n        const tr = document.createElement('tr');\n        (Array.isArray(row) ? row : [row]).forEach((cell) => {\n          const td = document.createElement('td');\n          td.textContent = cell === null || cell === undefined ? '' : (typeof cell === 'object' ? JSON.stringify(cell) : String(cell));\n          tr.appendChild(td);\n        });\n        table.appendChild(tr);\n      });\n      resultBox.appendChild(table);\n      if (data.output && data.output.length) {\n        const pre = document.createElement('pre');\n        pre.textContent = data.output.join('\\n');\n        resultBox.appendChild(pre);\n      }\n      return;\n    }\n    const pre = document.createElement('pre');\n    pre.textContent = JSON.stringify(data, null, 2);\n    resultBox.appendChild(pre);\n  };\n  const connect = async () => {\n    setStatus('connecting');\n    try {\n      const data = await call('connect', {\n        database: launch.database || '',\n        collection: launch.collection || '',\n        connectionName: launch.connectionName || 'MongoDB',\n        environmentType: launch.environmentType || '',\n        readOnly: launch.readOnly === true,\n      });\n      connected = true;\n      conn.textContent = data && data.host ? data.host : (launch.connectionName || 'MongoDB');\n      if (data && Array.isArray(data.databases)) {\n        dbSelect.textContent = '';\n        data.databases.forEach((item) => {\n          const name = typeof item === 'string' ? item : String(item && (item.name || item.database) || '');\n          if (!name) return;\n          const option = document.createElement('option');\n          option.value = name;\n          option.textContent = name;\n          dbSelect.appendChild(option);\n        });\n        if (data.database) dbSelect.value = data.database;\n      }\n      collection.value = launch.collection || '';\n      dbSelect.disabled = false;\n      runButton.disabled = false;\n      setStatus(data && data.readOnly ? 'read-only' : 'ready');\n    } catch (error) {\n      setStatus('not connected');\n      setError(error);\n    }\n  };\n  const run = async () => {\n    if (!connected) return;\n    runButton.disabled = true;\n    setStatus('running');\n    setError(null);\n    try {\n      const data = await call('run', {\n        script: editor.value,\n        database: dbSelect.value || '',\n        collection: collection.value.trim(),\n        maxRows: 200,\n      });\n      render(data);\n      setStatus('done');\n    } catch (error) {\n      setStatus('failed');\n      setError(error);\n    } finally {\n      runButton.disabled = false;\n    }\n  };\n  runButton.addEventListener('click', run);\n  editor.addEventListener('keydown', (event) => {\n    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {\n      event.preventDefault();\n      void run();\n    }\n  });\n  conn.textContent = launch.connectionName || 'MongoDB';\n  void connect();\n})();\n</script>\n</body>\n</html>\n"
+        }
       }
     ]
   }
