@@ -78,7 +78,7 @@ func run(ctx context.Context, opts options) error {
 	if err != nil {
 		return err
 	}
-	encoded, err := json.MarshalIndent(manifest, "", "  ")
+	encoded, err := marshalPackagedManifest(opts.manifest, manifest.Backend)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func buildManifest(ctx context.Context, opts options, output string) (*plugin.Ma
 }
 
 func buildOne(ctx context.Context, sourceDir string, t target, outputPath string) error {
-	command := exec.CommandContext(ctx, "go", "build", "-trimpath", "-o", outputPath, ".")
+	command := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags", "-s -w", "-o", outputPath, ".")
 	command.Dir = sourceDir
 	command.Env = append(os.Environ(),
 		"GOWORK=off", "CGO_ENABLED=0", "GOOS="+t.goos, "GOARCH="+t.goarch)
