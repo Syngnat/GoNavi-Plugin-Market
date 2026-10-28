@@ -1,6 +1,6 @@
 {
   "sourceId": "plugin-market-site",
-  "updatedAt": "2026-10-27T09:45:00Z",
+  "updatedAt": "2026-10-28T00:26:00Z",
   "items": [
     {
       "id": "com.gonavi.nginx-inspector",
@@ -74,11 +74,11 @@
     {
       "id": "com.gonavi.mongo-shell",
       "name": "MongoShell",
-      "description": "在独立窗口中连接已保存的 MongoDB，浏览数据库并用 goja 执行有界的 JavaScript Shell 脚本：find、aggregate、countDocuments、insert、update、delete 与 runCommand；只读连接会拒绝写操作。",
+      "description": "在独立窗口或工作台标签中连接已保存的 MongoDB，浏览数据库并用 goja 执行有界的 JavaScript Shell 脚本：find、aggregate、countDocuments、insert、update、delete 与 runCommand；只读连接会拒绝写操作。",
       "author": "GoNavi Project",
       "publisherId": "gonavi",
       "official": true,
-      "version": "1.0.0",
+      "version": "1.0.1",
       "category": "数据库",
       "minHostVersion": "1.2.0",
       "platforms": [
@@ -86,24 +86,25 @@
         "macos",
         "linux"
       ],
-      "updatedAt": "2026-10-27T09:45:00Z",
+      "updatedAt": "2026-10-28T00:26:00Z",
       "icon": "database",
-      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@mongo-shell-v1.0.0",
+      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@mongo-shell-v1.0.1",
       "repoUrl": "https://github.com/Syngnat/GoNavi-Plugin-Market",
-      "contentDigest": "ece4bbafdafa64ae5db2af655cb5dc47e9f17b1d456cafc79c53e2b3c77a127e",
+      "contentDigest": "6ac03fc540502fc7232f2528528d6b6fc5b863d3abcb81afe25a6aeede06586b",
       "license": "Apache-2.0",
       "artifact": {
-        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/mongo-shell-v1.0.0/gonavi-plugin-mongo-shell-1.0.0.zip",
-        "sha256": "f94dfd0f0dae303712f1482f1c1fb5ccde6e02e8b92b1d01fec983b745359413",
-        "sizeBytes": 38112128,
+        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/mongo-shell-v1.0.1/gonavi-plugin-mongo-shell-1.0.1.zip",
+        "sha256": "19152a69d4f1fe543c3e67dd6d6b6b0aabf0e49598ee0894c22d363f6491155c",
+        "sizeBytes": 38093767,
         "platform": "all",
-        "version": "1.0.0"
+        "version": "1.0.1"
       },
       "sourceId": "plugin-market-site",
       "features": [
-        "连接/库/集合右键直接打开 MongoShell，无需进入插件管理详情。",
-        "独立窗口运行 goja JavaScript Shell，支持查询、聚合与写入。",
+        "连接/库/集合右键直接打开 MongoShell 窗口或工作台标签。",
+        "goja JavaScript Shell，支持查询、聚合与写入。",
         "只读连接拒绝写入；行数上限 200/2000，命令超时 30 秒。",
+        "工作台页通过受控 plugin.invoke 复用 connect/run，页面不接触凭据。",
         "五平台原生 backend；窗口从宿主加载统一主题与设计令牌。"
       ],
       "permissions": [
