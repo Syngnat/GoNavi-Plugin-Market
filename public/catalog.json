@@ -1,6 +1,6 @@
 {
   "sourceId": "plugin-market-site",
-  "updatedAt": "2026-10-28T04:07:01Z",
+  "updatedAt": "2026-10-29T10:24:05Z",
   "items": [
     {
       "id": "com.gonavi.nginx-inspector",
@@ -129,6 +129,35 @@
           "granted": true
         }
       ]
+    },
+    {
+      "id": "com.gonavi.hualong-ai",
+      "name": "華龍算力",
+      "description": "華龍AI算力的 OpenAI 兼容供应商插件：Chat 请求以 SSE 流式转发到華龍算力网关，并提供账号面板（浏览器登录、余额与配额、API Key 新建/改名/改分组/删除、按每把密钥扫描可用模型）。",
+      "author": "GoNavi Project",
+      "publisherId": "gonavi",
+      "official": true,
+      "version": "1.1.0",
+      "category": "AI",
+      "minHostVersion": "1.1.5",
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "updatedAt": "2026-10-29T10:24:05Z",
+      "icon": "hub",
+      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@hualong-ai-provider-v1.1.0",
+      "repoUrl": "https://github.com/Syngnat/GoNavi-Plugin-Market",
+      "contentDigest": "279d4457846ca588f4948c0a2e426851b56a5fed20981b0ac090669e76b44463",
+      "license": "Apache-2.0",
+      "artifact": {
+        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/hualong-ai-provider-v1.1.0/gonavi-plugin-hualong-ai-1.1.0.zip",
+        "sha256": "ae04244d304ddd608e2f76ac2b24beb33a2b4ce68a167f7f467643c0501d1391",
+        "sizeBytes": 15867947,
+        "platform": "all",
+        "version": "1.1.0"
+      }
     }
   ]
 }
