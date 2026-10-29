@@ -20,10 +20,22 @@ const (
 	panelTimeout     = 8 * time.Second
 	panelMaxBytes    = 1 << 20
 	panelKeyPageSize = 50
-	// maxListedModels and maxModelIDBytes bound one gateway model scan.
-	maxListedModels = 512
-	maxModelIDBytes = 128
+	// maxListedModels, maxModelIDBytes, maxModelNameBytes and maxModelContextWindow
+	// bound one gateway model scan; anything outside the bounds is treated as absent
+	// rather than passed on to the host.
+	maxListedModels       = 512
+	maxModelIDBytes       = 128
+	maxModelNameBytes     = 120
+	maxModelContextWindow = 20_000_000
 )
+
+// panelModel is one entry of GET /v1/models. Gateways that only publish ids leave
+// Name and ContextWindow empty; the host fills them from the models.dev catalog.
+type panelModel struct {
+	ID            string
+	Name          string
+	ContextWindow int
+}
 
 // panelAccount is GET /api/v1/auth/me -> data.
 type panelAccount struct {
@@ -189,15 +201,22 @@ func (c *panelClient) createKey(ctx context.Context, accessToken, name string, g
 }
 
 // models lists the gateway models a single key can reach. Group membership
-// decides the set, so the caller scans one key at a time.
-func (c *panelClient) models(ctx context.Context, accessToken string) ([]string, error) {
+// decides the set, so the caller scans one key at a time. Name and context window
+// are passed through when the gateway publishes them, because the gateway knows
+// its own routing better than any public catalog.
+func (c *panelClient) models(ctx context.Context, accessToken string) ([]panelModel, error) {
 	raw, err := c.get(ctx, "/v1/models", accessToken)
 	if err != nil {
 		return nil, err
 	}
 	var payload struct {
 		Data []struct {
-			ID string `json:"id"`
+			ID               string `json:"id"`
+			Name             string `json:"name"`
+			DisplayName      string `json:"display_name"`
+			ContextLength    int    `json:"context_length"`
+			ContextWindow    int    `json:"context_window"`
+			MaxContextLength int    `json:"max_context_length"`
 		} `json:"data"`
 	}
 	if !utf8.Valid(raw) || json.Unmarshal(raw, &payload) != nil {
@@ -206,13 +225,39 @@ func (c *panelClient) models(ctx context.Context, accessToken string) ([]string,
 	if len(payload.Data) > maxListedModels {
 		return nil, coded("invalid_response", messageInvalidResponse)
 	}
-	ids := make([]string, 0, len(payload.Data))
+	models := make([]panelModel, 0, len(payload.Data))
 	for _, item := range payload.Data {
-		if id := strings.TrimSpace(item.ID); id != "" && len(id) <= maxModelIDBytes {
-			ids = append(ids, id)
+		id := strings.TrimSpace(item.ID)
+		if id == "" || len(id) > maxModelIDBytes {
+			continue
+		}
+		models = append(models, panelModel{
+			ID:            id,
+			Name:          firstModelName(item.Name, item.DisplayName),
+			ContextWindow: firstModelContext(item.ContextLength, item.ContextWindow, item.MaxContextLength),
+		})
+	}
+	return models, nil
+}
+
+// firstModelName 取网关给的展示名；超长或空白视为没给。
+func firstModelName(candidates ...string) string {
+	for _, candidate := range candidates {
+		if name := strings.TrimSpace(candidate); name != "" && len(name) <= maxModelNameBytes {
+			return name
 		}
 	}
-	return ids, nil
+	return ""
+}
+
+// firstModelContext 取网关声明的上下文窗口；非正数或超出上限视为没给。
+func firstModelContext(candidates ...int) int {
+	for _, candidate := range candidates {
+		if candidate > 0 && candidate <= maxModelContextWindow {
+			return candidate
+		}
+	}
+	return 0
 }
 
 func (c *panelClient) updateKey(ctx context.Context, accessToken string, id int64, name string, groupID *int64) (panelKey, error) {

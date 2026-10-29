@@ -3,7 +3,7 @@
   "apiVersion": 1,
   "id": "com.gonavi.hualong-ai",
   "name": "華龍算力",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "華龍AI算力的 OpenAI 兼容供应商插件：把 Chat 请求以流式方式转发到華龍算力网关，并提供账号面板（登录、余额、API Key 增删改与按密钥扫描可用模型）。",
   "author": "GoNavi",
   "license": "Apache-2.0",

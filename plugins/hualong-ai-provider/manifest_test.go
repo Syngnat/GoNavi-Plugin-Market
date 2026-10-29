@@ -34,7 +34,7 @@ func TestManifestParsesAndMatchesExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if manifest.ID != "com.gonavi.hualong-ai" || manifest.Name != providerName || manifest.Version != "1.1.0" {
+	if manifest.ID != "com.gonavi.hualong-ai" || manifest.Name != providerName || manifest.Version != "1.2.0" {
 		t.Fatal("incorrect identity")
 	}
 	if manifest.Author != "GoNavi" || manifest.License != "Apache-2.0" || manifest.APIVersion != 1 || manifest.SchemaVersion != 1 {

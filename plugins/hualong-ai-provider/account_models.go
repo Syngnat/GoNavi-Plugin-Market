@@ -12,8 +12,12 @@ import (
 const modelScanConcurrency = 4
 
 type modelItem struct {
-	ID     string  `json:"id"`
-	KeyIDs []int64 `json:"keyIds,omitempty"`
+	ID string `json:"id"`
+	// Name and ContextWindow are the gateway's own metadata when it publishes any;
+	// the host falls back to the models.dev catalog when they are missing.
+	Name          string  `json:"name,omitempty"`
+	ContextWindow int     `json:"contextWindow,omitempty"`
+	KeyIDs        []int64 `json:"keyIds,omitempty"`
 }
 
 type modelListResult struct {
@@ -24,9 +28,9 @@ type modelListResult struct {
 }
 
 type keyModelScan struct {
-	keyID int64
-	ids   []string
-	fail  bool
+	keyID  int64
+	models []panelModel
+	fail   bool
 }
 
 // listModels asks the gateway once per API key and merges every reachable model,
@@ -55,12 +59,20 @@ func (s *accountService) listModels(ctx context.Context, _ json.RawMessage) (any
 			failed++
 			continue
 		}
-		for _, id := range scan.ids {
-			item, ok := merged[id]
+		for _, model := range scan.models {
+			item, ok := merged[model.ID]
 			if !ok {
-				item = &modelItem{ID: id}
-				merged[id] = item
-				order = append(order, id)
+				item = &modelItem{ID: model.ID}
+				merged[model.ID] = item
+				order = append(order, model.ID)
+			}
+			// 名称取第一个非空，窗口取最大值：同一模型被不同分组收录时以更大的为准，
+			// 与宿主 models.dev 目录的合并口径一致。
+			if item.Name == "" {
+				item.Name = model.Name
+			}
+			if model.ContextWindow > item.ContextWindow {
+				item.ContextWindow = model.ContextWindow
 			}
 			item.KeyIDs = append(item.KeyIDs, scan.keyID)
 		}
@@ -91,12 +103,12 @@ func (s *accountService) scanKeyModels(ctx context.Context, accessToken string, 
 			defer wg.Done()
 			slots <- struct{}{}
 			defer func() { <-slots }()
-			ids, err := s.panel.models(ctx, keyValue)
+			models, err := s.panel.models(ctx, keyValue)
 			if err != nil {
 				scans[slot].fail = true
 				return
 			}
-			scans[slot].ids = ids
+			scans[slot].models = models
 		}(index, key.ID, key.Key)
 	}
 	wg.Wait()

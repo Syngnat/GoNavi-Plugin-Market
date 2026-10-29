@@ -45,7 +45,7 @@
 | `account.createKey` | 新建 API Key，参数 `{name, groupId?}`，返回新建后的 Key 项 |
 | `account.updateKey` | 更新 Key 的名称或分组，参数 `{id, name, groupId?}`；`groupId` 传 0 表示清空分组 |
 | `account.deleteKey` | 删除一把 Key，参数 `{id}` |
-| `account.listModels` | 用账号下每一把 Key 各查询一次 `GET /v1/models`，聚合去重后返回模型 id（不同分组可见模型不同）；单把失败不影响整体，另返回 `failedKeys` |
+| `account.listModels` | 用账号下每一把 Key 各查询一次 `GET /v1/models`，聚合去重后返回模型（`id` / `keyIds`，网关给了就带上 `name` 与 `contextWindow`；不同分组可见模型不同）；单把失败不影响整体，另返回 `failedKeys` |
 | `account.logout` | 清本地账号存储并关闭本插件启动的 Chrome |
 
 运行时细节：
@@ -55,7 +55,7 @@
 - 调试端口随机分配，记录在 `$GONAVI_PLUGIN_DATA/session.json`；复用时先探测 `/json/version` 是否存活
 - 令牌只写 `$GONAVI_PLUGIN_DATA/account.json`（权限 `0600`），任何日志、错误消息与返回值都不含令牌原文
 - 新建 Key：`POST /api/v1/keys`，请求体 `{name, group_id?}`；改名/改分组：`PUT /api/v1/keys/{id}`；删除：`DELETE /api/v1/keys/{id}`；分组：`GET /api/v1/groups/available`
-- 模型扫描：`GET /v1/models` 以一把 Key 作 Bearer，按分组返回该 Key 可见的模型
+- 模型扫描：`GET /v1/models` 以一把 Key 作 Bearer，按分组返回该 Key 可见的模型；网关响应里的 `name` / `display_name` 与 `context_length` / `context_window` / `max_context_length` 会一并带出（超出边界视为没给），宿主缺元数据时用 models.dev 公共目录补齐
 - 访问令牌按 `token_expires_at` 判断，进入 90 秒余量后先用刷新令牌续期：`POST /api/v1/auth/refresh`，请求体 `{"refresh_token":"…"}`，响应 `data` 含 `access_token` / `refresh_token` / `expires_in`
 
 ## 构建与打包
@@ -68,7 +68,7 @@ go test ./plugins/hualong-ai-provider/
 go run ./cmd/buildtool \
   -manifest plugins/hualong-ai-provider/gonavi.plugin.json \
   -output plugin-dist/hualong-ai-provider \
-  -zip plugin-dist/gonavi-plugin-hualong-ai-1.1.0.zip
+  -zip plugin-dist/gonavi-plugin-hualong-ai-1.2.0.zip
 ```
 
 `-output` 指向的目录必须事先不存在。
