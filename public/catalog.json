@@ -1,6 +1,6 @@
 {
   "sourceId": "plugin-market-site",
-  "updatedAt": "2026-10-29T10:24:05Z",
+  "updatedAt": "2026-10-29T23:56:33Z",
   "items": [
     {
       "id": "com.gonavi.nginx-inspector",
@@ -137,7 +137,7 @@
       "author": "GoNavi Project",
       "publisherId": "gonavi",
       "official": true,
-      "version": "1.1.0",
+      "version": "1.2.0",
       "category": "AI",
       "minHostVersion": "1.1.5",
       "platforms": [
@@ -145,18 +145,18 @@
         "macos",
         "linux"
       ],
-      "updatedAt": "2026-10-29T10:24:05Z",
+      "updatedAt": "2026-10-29T23:56:33Z",
       "icon": "hub",
-      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@hualong-ai-provider-v1.1.0",
+      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@hualong-ai-provider-v1.2.0",
       "repoUrl": "https://github.com/Syngnat/GoNavi-Plugin-Market",
-      "contentDigest": "279d4457846ca588f4948c0a2e426851b56a5fed20981b0ac090669e76b44463",
+      "contentDigest": "05eeba305ebf1afe5ae7493858449fd49c90353eca56806d55a3086df766f341",
       "license": "Apache-2.0",
       "artifact": {
-        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/hualong-ai-provider-v1.1.0/gonavi-plugin-hualong-ai-1.1.0.zip",
-        "sha256": "ae04244d304ddd608e2f76ac2b24beb33a2b4ce68a167f7f467643c0501d1391",
-        "sizeBytes": 15867947,
+        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/hualong-ai-provider-v1.2.0/gonavi-plugin-hualong-ai-1.2.0.zip",
+        "sha256": "587a4b76e3800650f64631bd0f4bddfdcf994848b16b7144208b28e6f346a1be",
+        "sizeBytes": 15865451,
         "platform": "all",
-        "version": "1.1.0"
+        "version": "1.2.0"
       }
     }
   ]
