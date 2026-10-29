@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>華龍算力 账号</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="gonavi-plugin-root">
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">華</span>
+        <div class="brand-text">
+          <strong>華龍算力 账号</strong>
+          <span id="brand-sub" class="brand-sub">正在读取账号状态…</span>
+        </div>
+      </div>
+      <div class="topbar-meta">
+        <span id="status" class="status status-busy" role="status" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="status-text">连接中…</span>
+        </span>
+        <button id="refresh-button" class="button button-quiet" type="button" hidden>刷新</button>
+        <button id="logout-button" class="button button-quiet" type="button" hidden>退出登录</button>
+      </div>
+    </header>
+
+    <div id="error" class="error-banner" role="alert" hidden>
+      <div class="error-copy">
+        <span id="error-code" class="error-code"></span>
+        <span id="error-message" class="error-message"></span>
+      </div>
+      <button id="retry-button" class="button button-quiet" type="button">重试</button>
+    </div>
+
+    <main class="workspace">
+      <section id="signed-out" class="panel panel-center" hidden>
+        <h1 class="panel-title">登录華龍算力账号</h1>
+        <p class="panel-copy">
+          点击下面的按钮会打开一个独立的 Chrome 窗口完成登录。插件使用自己的浏览器资料目录，
+          不会读取你日常浏览器的数据。
+        </p>
+        <button id="login-button" class="button button-primary button-large" type="button">打开浏览器登录</button>
+        <p id="login-hint" class="hint" hidden>已打开浏览器，正在等待登录完成（最多等待 5 分钟）…</p>
+      </section>
+
+      <section id="signed-in" class="panel" hidden>
+        <div class="account-head">
+          <div class="account-identity">
+            <span id="account-email" class="account-email">—</span>
+            <span id="account-meta" class="account-meta">—</span>
+          </div>
+          <span id="account-chip" class="chip">—</span>
+        </div>
+
+        <div class="balance-grid">
+          <article class="balance-card balance-card-primary">
+            <span class="balance-label">可用余额</span>
+            <span id="balance-value" class="balance-value">—</span>
+          </article>
+          <article class="balance-card">
+            <span class="balance-label">冻结余额</span>
+            <span id="frozen-value" class="balance-value-sm">—</span>
+          </article>
+          <article class="balance-card">
+            <span class="balance-label">累计充值</span>
+            <span id="recharged-value" class="balance-value-sm">—</span>
+          </article>
+          <article class="balance-card">
+            <span class="balance-label">并发上限</span>
+            <span id="concurrency-value" class="balance-value-sm">—</span>
+          </article>
+        </div>
+
+        <section class="keys" aria-label="API Key 列表">
+          <header class="section-head">
+            <h2 class="section-title">API Key</h2>
+            <span id="keys-meta" class="section-meta">—</span>
+          </header>
+          <div id="keys-error" class="inline-error" role="alert" hidden>
+            <span id="keys-error-message"></span>
+            <button id="keys-retry" class="button button-quiet" type="button">重试</button>
+          </div>
+          <div id="keys-empty" class="empty-state" hidden>这个账号还没有 API Key。</div>
+          <div class="table-wrap">
+            <table id="keys-table" class="keys-table" hidden>
+              <thead>
+                <tr>
+                  <th scope="col">名称</th>
+                  <th scope="col">分组</th>
+                  <th scope="col">状态</th>
+                  <th scope="col">额度 / 已用</th>
+                  <th scope="col">最近使用</th>
+                  <th scope="col">Key</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody id="keys-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <span id="footer-user" class="footer-item">—</span>
+      <span class="footer-spacer"></span>
+      <span id="footer-updated" class="footer-item">—</span>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

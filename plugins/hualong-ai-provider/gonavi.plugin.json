@@ -1,0 +1,300 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 1,
+  "id": "com.gonavi.hualong-ai",
+  "name": "華龍算力",
+  "version": "1.1.0",
+  "description": "華龍AI算力的 OpenAI 兼容供应商插件：把 Chat 请求以流式方式转发到華龍算力网关，并提供账号面板（登录、余额、API Key 增删改与按密钥扫描可用模型）。",
+  "author": "GoNavi",
+  "license": "Apache-2.0",
+  "permissions": [
+    "ai.providers"
+  ],
+  "backend": {
+    "default": {
+      "executable": "bin/plugin",
+      "runtime": "native"
+    }
+  },
+  "window": {
+    "entry": "ui/index.html",
+    "title": "華龍算力 账号",
+    "width": 760,
+    "height": 760
+  },
+  "contributes": {
+    "commands": [
+      {
+        "id": "provider",
+        "title": "華龍算力 供应商传输",
+        "effect": "read",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "protocolVersion",
+            "operation",
+            "providerId",
+            "requestId"
+          ],
+          "properties": {
+            "protocolVersion": {
+              "type": "integer",
+              "const": 1
+            },
+            "operation": {
+              "type": "string",
+              "enum": [
+                "start",
+                "pull",
+                "cancel"
+              ]
+            },
+            "providerId": {
+              "type": "string",
+              "const": "hualong"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43
+            },
+            "config": {
+              "type": "object"
+            },
+            "request": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "account.login",
+        "title": "華龍算力 打开登录浏览器",
+        "effect": "write",
+        "description": "启动（或复用）独立的 Chrome 窗口打开華龍面板登录页，立即返回，不等待登录完成。",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "account.poll",
+        "title": "華龍算力 读取登录令牌",
+        "effect": "read",
+        "description": "通过 CDP 读取面板 localStorage；已登录则落盘并返回 ready，否则返回 pending。",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "account.status",
+        "title": "華龍算力 账号余额",
+        "effect": "read",
+        "description": "返回账号余额快照；访问令牌过期时用刷新令牌续期。",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "account.keys",
+        "title": "華龍算力 API Key 列表",
+        "effect": "read",
+        "description": "返回当前账号的 API Key 列表。",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "account.groups",
+        "title": "華龍算力 密钥分组",
+        "effect": "read",
+        "description": "返回当前账号可选用的密钥分组。",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "account.listModels",
+        "title": "華龍算力 扫描可用模型",
+        "effect": "read",
+        "description": "用当前账号下每一把 API Key 各查询一次网关模型列表，返回合并去重后的模型 id。",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "account.createKey",
+        "title": "華龍算力 新建 API Key",
+        "effect": "write",
+        "description": "在当前账号下新建一把 API Key。",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "groupId": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "account.updateKey",
+        "title": "華龍算力 更新 API Key",
+        "effect": "write",
+        "description": "更新当前账号下一把 API Key 的名称或分组。",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "id",
+            "name"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "groupId": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "account.deleteKey",
+        "title": "華龍算力 删除 API Key",
+        "effect": "write",
+        "description": "删除当前账号下的一把 API Key。",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      {
+        "id": "account.logout",
+        "title": "華龍算力 退出登录",
+        "effect": "write",
+        "description": "清空本地账号存储并关闭本插件启动的 Chrome。",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false
+        }
+      }
+    ],
+    "aiProviders": [
+      {
+        "id": "hualong",
+        "name": "華龍算力",
+        "command": "provider",
+        "icon": "icons/provider.png",
+        "defaultBaseUrl": "https://api.hualong.online/v1",
+        "models": [
+          {
+            "id": "deepseek-v4-pro",
+            "name": "DeepSeek V4 Pro",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          },
+          {
+            "id": "deepseek-v4-flash",
+            "name": "DeepSeek V4 Flash",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          },
+          {
+            "id": "deepseek-v4.1-flash",
+            "name": "DeepSeek V4.1 Flash",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          },
+          {
+            "id": "glm-5.3",
+            "name": "GLM 5.3",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          },
+          {
+            "id": "glm-5.3-flash",
+            "name": "GLM 5.3 Flash",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          },
+          {
+            "id": "kimi-k3",
+            "name": "Kimi K3",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          },
+          {
+            "id": "minimax-m3",
+            "name": "MiniMax M3",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          },
+          {
+            "id": "glm-5v-turbo",
+            "name": "GLM 5V Turbo",
+            "contextWindow": 128000,
+            "maxOutputTokens": 8192
+          },
+          {
+            "id": "kimi-k2.6",
+            "name": "Kimi K2.6",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          },
+          {
+            "id": "kimi-k2.7",
+            "name": "Kimi K2.7",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          },
+          {
+            "id": "kimi-k3.1-pro",
+            "name": "Kimi K3.1 Pro",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          },
+          {
+            "id": "minimax-m3.1-flash",
+            "name": "MiniMax M3.1 Flash",
+            "contextWindow": 128000,
+            "maxOutputTokens": 16384
+          }
+        ],
+        "supportsTools": true,
+        "supportsImages": false
+      }
+    ]
+  }
+}
