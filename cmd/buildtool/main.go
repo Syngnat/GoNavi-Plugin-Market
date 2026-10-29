@@ -9,6 +9,7 @@ import (
 	"archive/zip"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -137,8 +138,8 @@ func buildManifest(ctx context.Context, opts options, output string) (*plugin.Ma
 		return nil, fmt.Errorf("no platforms selected")
 	}
 	manifest.Backend = &plugin.Backend{Platforms: platforms}
-	for _, dir := range []string{"ui", "skills"} {
-		if err := copyDir(filepath.Join(sourceDir, dir), filepath.Join(output, dir)); err != nil {
+	for _, dir := range []string{"ui", "skills", "icons"} {
+		if err := copyOptionalDir(filepath.Join(sourceDir, dir), filepath.Join(output, dir)); err != nil {
 			return nil, fmt.Errorf("copy %s: %w", dir, err)
 		}
 	}
@@ -160,6 +161,22 @@ func buildOne(ctx context.Context, sourceDir string, t target, outputPath string
 		return fmt.Errorf("build %s: %w", t.key(), err)
 	}
 	return nil
+}
+
+// copyOptionalDir skips a runtime asset directory the package does not ship, such as
+// icons on a plugin that declares none. Every other failure stays fatal.
+func copyOptionalDir(source, destination string) error {
+	info, err := os.Stat(source)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s is not a directory", source)
+	}
+	return copyDir(source, destination)
 }
 
 func copyDir(source, destination string) error {
