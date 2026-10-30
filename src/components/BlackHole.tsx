@@ -50,8 +50,8 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY }: BlackHoleProp
       <img
         className="galaxy-black-hole-canvas"
         src="/galaxy/black-hole.png"
-        width={512}
-        height={512}
+        width={960}
+        height={540}
         alt=""
         decoding="async"
         draggable={false}
