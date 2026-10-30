@@ -51,7 +51,7 @@ const fragmentShader = /* glsl */ `
   float fbm(vec2 p) {
     float value = 0.0;
     float amplitude = 0.5;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 4; i++) {
       value += amplitude * noise(p);
       p = rotate2d(0.63) * p * 2.03 + 17.1;
       amplitude *= 0.52;
@@ -59,74 +59,111 @@ const fragmentShader = /* glsl */ `
     return value;
   }
 
+  vec3 diskSample(vec3 q, vec3 rayDir, float time) {
+    float r = length(q.xz);
+    float theta = atan(q.z, q.x);
+    float spin = theta * 3.1 + log(max(r, 0.01)) * 5.4 + time * 0.38;
+    float turbulence = fbm(vec2(spin, r * 5.2 - time * 0.14));
+    float filaments = fbm(vec2(spin * 2.4 + 8.0, r * 11.0 + time * 0.06));
+    float texture = 0.34 + 0.64 * turbulence + 0.23 * filaments;
+
+    // Temperature falls outward; the inner edge is nearly white-hot.
+    float heat = pow(clamp(1.0 - (r - 3.0) / 6.0, 0.0, 1.0), 2.15);
+    vec3 ember = vec3(0.28, 0.032, 0.006);
+    vec3 copper = vec3(1.0, 0.27, 0.028);
+    vec3 whiteHot = vec3(1.0, 0.93, 0.76);
+    vec3 color = mix(ember, copper, smoothstep(0.0, 0.70, heat));
+    color = mix(color, whiteHot, smoothstep(0.62, 1.0, heat));
+
+    // Relativistic beaming: the approaching side is brighter and bluer-white.
+    vec3 tangent = normalize(vec3(-q.z, 0.0, q.x));
+    float mu = clamp(dot(normalize(rayDir), tangent), -1.0, 1.0);
+    float boost = clamp(pow(1.0 / max(0.28, 1.0 - 0.48 * mu), 2.2), 0.35, 3.4);
+    color = mix(color, whiteHot, min(0.45, (boost - 1.0) * 0.22));
+    color *= boost;
+
+    float band = smoothstep(3.0, 3.55, r) * (1.0 - smoothstep(8.15, 9.0, r));
+    float alpha = band * (0.44 + 0.40 * texture);
+    // A narrow dark lane and bright rim prevent the disk from reading as a solid blob.
+    alpha *= 1.0 - 0.55 * smoothstep(0.58, 0.82, fbm(vec2(spin * 1.4, r * 7.0)));
+    return vec4(color, clamp(alpha, 0.0, 0.92));
+  }
+
   void main() {
-    vec2 p = vUv * 2.0 - 1.0;
-    p.x *= uResolution.x / max(uResolution.y, 1.0);
-    float time = uTime;
-    float radius = length(p);
-    float angle = atan(p.y, p.x);
+    vec2 screen = vUv * 2.0 - 1.0;
+    screen.x *= uResolution.x / max(uResolution.y, 1.0);
 
-    // Thin, tilted accretion disk. The extra vertical scale turns the ring
-    // into the flattened ellipse seen from a low inclination.
-    vec2 diskP = rotate2d(-0.24) * p;
-    diskP.y *= 2.15;
-    float diskRadius = length(diskP);
-    float diskAngle = atan(diskP.y, diskP.x);
-    float inner = 0.32;
-    float outer = 1.02;
-    float band = smoothstep(inner, inner + 0.045, diskRadius) *
-                 (1.0 - smoothstep(outer - 0.19, outer, diskRadius));
+    vec3 ro = vec3(0.0, 0.72, 14.0);
+    vec3 target = vec3(0.0);
+    vec3 forward = normalize(target - ro);
+    vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), forward));
+    vec3 up = cross(forward, right);
+    vec3 rd = normalize(screen.x * right + screen.y * up + 1.2 * forward);
 
-    // Turbulent spiral structure; the phase moves so the disk visibly flows.
-    float spiral = diskAngle * 2.6 + time * 0.34 + log(max(diskRadius, 0.001)) * 4.2;
-    float turbulence = fbm(vec2(spiral, diskRadius * 9.0 - time * 0.18));
-    float filaments = fbm(vec2(spiral * 2.2 + 13.0, diskRadius * 18.0 + time * 0.08));
-    float diskTexture = 0.38 + 0.68 * turbulence + 0.24 * filaments;
+    vec3 p = ro;
+    vec3 v = rd;
+    vec3 angularMomentum = cross(p, v);
+    float h2 = dot(angularMomentum, angularMomentum);
+    bool captured = false;
+    float diskDistance = 1e9;
+    vec3 diskColor = vec3(0.0);
+    float diskAlpha = 0.0;
 
-    // Relativistic beaming: the approaching side is brighter and whiter.
-    float doppler = 0.54 + 0.92 * pow(max(0.0, cos(diskAngle + 0.72)), 2.6);
-    float disk = band * diskTexture * doppler;
+    // Integrate a null geodesic in the Schwarzschild metric. The acceleration
+    // term bends the ray around the mass; the first disk-plane crossing is the
+    // visible front of the accretion disk, while later crossings form the
+    // lensed arcs above and below the shadow.
+    for (int i = 0; i < 128; i++) {
+      float r = length(p);
+      if (r < 1.0) {
+        captured = true;
+        break;
+      }
+      if (r > 26.0 && dot(p, v) > 0.0) {
+        break;
+      }
 
-    // Hot inner rim and the thin photon ring around the shadow.
-    float innerRim = exp(-pow((diskRadius - inner) * 34.0, 2.0)) * doppler;
-    float photonRing = exp(-pow((radius - 0.209) * 92.0, 2.0));
-    float photonHalo = exp(-pow((radius - 0.222) * 15.0, 2.0)) * 0.15;
-    float lensedArc = smoothstep(0.225, 0.26, radius) *
-                      (1.0 - smoothstep(0.47, 0.62, radius)) *
-                      smoothstep(0.01, 0.12, -p.y) *
-                      (0.55 + 0.45 * fbm(vec2(angle * 5.0 + time * 0.22, radius * 8.0)));
+      float dt = 0.075 + min(r, 5.0) * 0.012;
+      vec3 nextP = p + v * dt;
 
-    vec3 ember = vec3(0.40, 0.055, 0.012);
-    vec3 copper = vec3(1.0, 0.30, 0.038);
-    vec3 whiteHot = vec3(1.0, 0.94, 0.78);
-    float heat = smoothstep(outer, inner, diskRadius);
-    vec3 diskColor = mix(ember, copper, heat);
-    diskColor = mix(diskColor, whiteHot, pow(1.0 - smoothstep(inner, 0.58, diskRadius), 2.8));
+      if (p.y * nextP.y < 0.0) {
+        float t = -p.y / v.y;
+        if (t > 0.0 && t < dt) {
+          vec3 hit = p + v * t;
+          float radius = length(hit.xz);
+          if (radius > 2.85 && radius < 9.0 && t < diskDistance) {
+            vec4 sampleDisk = diskSample(hit, v, uTime);
+            diskDistance = t;
+            diskColor = sampleDisk.rgb;
+            diskAlpha = sampleDisk.a;
+          }
+        }
+      }
 
-    float alpha = max(disk * 0.72, innerRim * 0.55);
-    alpha = max(alpha, photonRing * 0.64 + photonHalo * 0.30);
-    alpha = max(alpha, lensedArc * 0.48);
-    vec3 color = diskColor * max(disk, innerRim * 1.1);
-    color += whiteHot * (photonRing * 0.95 + photonHalo * 0.30);
-    color += copper * lensedArc * 0.42;
+      vec3 accel = -1.5 * h2 * p / pow(max(dot(p, p), 0.0001), 2.5);
+      v += accel * dt;
+      p = nextP;
+    }
 
-    // Event horizon: an opaque shadow, with a fine warm rim outside it.
-    float shadow = 1.0 - smoothstep(0.185, 0.201, radius);
-    float rim = exp(-pow((radius - 0.204) * 72.0, 2.0));
-    color = mix(color, vec3(0.0), shadow);
-    alpha = max(alpha, shadow);
-    alpha = max(alpha, rim * 0.30);
-    color += whiteHot * rim * 0.34;
+    vec3 color = vec3(0.0);
+    float alpha = 0.0;
+    if (diskDistance < 1e8) {
+      color = diskColor;
+      alpha = diskAlpha;
+    }
+    if (captured) {
+      alpha = 1.0;
+      color = mix(vec3(0.0), color, diskAlpha);
+    }
 
-    // Soft outer corona so the black hole sits naturally on the star field.
-    float corona = exp(-pow((radius - 0.42) * 3.4, 2.0)) * 0.055;
-    alpha = max(alpha, corona);
-    color += copper * corona * 0.5;
+    // A restrained halo around the shadow, not a painted ring.
+    float screenRadius = length(screen);
+    float halo = exp(-pow((screenRadius - 0.205) * 18.0, 2.0)) * 0.10;
+    alpha = max(alpha, halo * 0.45);
+    color += vec3(1.0, 0.42, 0.10) * halo * 0.45;
 
-    // Alpha edges and a tiny grain keep the disk from looking like a flat ring.
-    alpha *= smoothstep(1.06, 0.74, radius) + shadow + rim;
     alpha = clamp(alpha, 0.0, 1.0);
-    color *= 1.0 + (hash21(gl_FragCoord.xy + time) - 0.5) * 0.035;
+    color *= 1.0 + (hash21(gl_FragCoord.xy + uTime) - 0.5) * 0.03;
     gl_FragColor = vec4(color, alpha);
   }
 `;
