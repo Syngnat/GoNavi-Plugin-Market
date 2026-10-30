@@ -9,8 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	plugin "github.com/Syngnat/GoNavi/sdk/go"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/commands"
+	plugin "github.com/Syngnat/GoNavi/sdk/go"
 )
 
 func main() {

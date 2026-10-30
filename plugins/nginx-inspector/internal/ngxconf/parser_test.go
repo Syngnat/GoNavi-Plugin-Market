@@ -85,7 +85,7 @@ denied 'it\'s "quoted"';
 
 func TestParseErrors(t *testing.T) {
 	cases := map[string]string{
-		"unterminated quote": `log_format 'abc;`,
+		"unterminated quote":  `log_format 'abc;`,
 		"unbalanced brace":    "http { server { } } }",
 		"block without name":  "{ }",
 		"unexpected end":      "http {",

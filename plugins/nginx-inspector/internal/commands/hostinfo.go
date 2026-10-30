@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	plugin "github.com/Syngnat/GoNavi/sdk/go"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/rpcerr"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/sshx"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/store"
+	plugin "github.com/Syngnat/GoNavi/sdk/go"
 )
 
 // HostInfo is the discovered nginx installation of one remote machine.

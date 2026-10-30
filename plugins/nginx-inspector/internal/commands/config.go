@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	plugin "github.com/Syngnat/GoNavi/sdk/go"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/ngxconf"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/rpcerr"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/sshx"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/store"
+	plugin "github.com/Syngnat/GoNavi/sdk/go"
 )
 
 // Loader bounds keep every response inside the one MiB protocol frame and

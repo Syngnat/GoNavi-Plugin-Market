@@ -81,10 +81,10 @@ func countOf(entries []CountEntry, value string) int {
 
 func TestSplitAddress(t *testing.T) {
 	cases := []struct {
-		in      string
-		host    string
-		port    int
-		ok      bool
+		in   string
+		host string
+		port int
+		ok   bool
 	}{
 		{"127.0.0.1:8080", "127.0.0.1", 8080, true},
 		{"backend.internal:80", "backend.internal", 80, true},

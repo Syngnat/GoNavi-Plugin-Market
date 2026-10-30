@@ -9,10 +9,10 @@ import (
 	"regexp"
 	"sync"
 
-	plugin "github.com/Syngnat/GoNavi/sdk/go"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/rpcerr"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/sshx"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/store"
+	plugin "github.com/Syngnat/GoNavi/sdk/go"
 )
 
 // Runtime owns shared state: locale, profile store and SSH pool.
