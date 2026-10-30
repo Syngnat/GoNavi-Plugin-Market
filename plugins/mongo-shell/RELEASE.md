@@ -1,3 +1,17 @@
+# MongoShell 1.0.3
+
+- 界面按「Precision Database Canvas」重做：扁平白底、1px 发丝线、8px 圆角、等宽数据列，窗口与工作台页同一套令牌。
+- 结果集边界：达到 Max rows 显示截断提示条，零行时保留表头并给出「未命中」说明，无列文档单独提示。
+- 引导态：不是从连接右键打开时隐藏工具栏与工作区，改为居中说明入口。
+- 完整状态覆盖：连接中 / 执行中（状态胶囊脉冲、Run 转 spinner、旧结果保留并淡化）/ 失败（红色状态 + 错误条 + 虚线空态）/ 只读 / 断开，Output 抽屉可折叠。
+- 界面接入宿主语言：读取宿主注入的 `window.gonaviHostPrefs.locale`，支持 zh-CN / zh-TW / en-US / ja-JP / de-DE / ru-RU，缺省回退英文。
+- 静态文案（工具栏、面板标题、页脚）走 `data-i18n` 标记统一替换；运行状态与错误横幅改走同一词典。
+- `invalid_context`、`empty_script`、`bridge_unavailable` 等自抛错误改为本地化说明，不再直接把英文抛给用户。
+- 未从连接右键打开时会提示改用连接菜单，而不是只显示「launch context did not include…」。
+- 五平台 ZIP：`gonavi-plugin-mongo-shell-1.0.3.zip`；最低宿主版本仍为 1.2.0。
+- 传输大小：38,149,346 bytes；SHA-256：`54b547a42cc9506cf7ca28ce195230fb233b8162853f1ecf26146e35e9ec93ed`。
+- 回归：窗口/工作台页脚本测试（`ui/page.test.mjs`、`ui/window.test.mjs`）与后端 `go test ./...` 全绿。
+
 # MongoShell 1.0.2
 
 - 修复多窗口／工作台标签页共享连接：每次 connect 返回独立 sessionId，run／ping／disconnect 按会话路由，保留各自只读策略。

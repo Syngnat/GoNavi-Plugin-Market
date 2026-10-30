@@ -12,6 +12,7 @@ import {
   suggestScript,
 } from './bridge.js';
 import { createRenderer } from './render.js';
+import { applyStaticText, applyHostTheme, t, useHostLocale } from './i18n.js';
 
 const elements = {
   app: document.querySelector('.app'),
@@ -37,6 +38,16 @@ const elements = {
   resultMeta: document.getElementById('result-meta'),
   tableWrap: document.getElementById('table-wrap'),
   tableEmpty: document.getElementById('table-empty'),
+  tableEmptyText: document.querySelector('#table-empty [data-i18n="result.empty"]'),
+  runLabel: document.querySelector('#run-button .run-label'),
+  runSpinner: document.querySelector('#run-button .spinner'),
+  staleStrip: document.getElementById('result-stale'),
+  truncatedStrip: document.getElementById('result-truncated'),
+  truncatedText: document.getElementById('result-truncated-text'),
+  guidance: document.getElementById('guidance'),
+  toolbar: document.getElementById('toolbar'),
+  workspace: document.getElementById('workspace'),
+  outputToggle: document.getElementById('output-toggle'),
   resultTable: document.getElementById('result-table'),
   resultHead: document.getElementById('result-head'),
   resultBody: document.getElementById('result-body'),
@@ -91,7 +102,9 @@ async function start() {
   } catch (error) {
     setConnected(false);
     renderer.showError(error);
-    renderer.setStatus('error', 'Unavailable');
+    renderer.setStatus('error', t('status.unavailable'));
+    // 没有连接上下文时不再摆一个用不了的工具栏，直接给出入口说明。
+    renderer.setGuidance(['invalid_context', 'missing_credentials', 'bridge_unavailable'].includes(error && error.code));
   }
 }
 
@@ -101,7 +114,7 @@ async function connect() {
   }
   setBusy(true);
   renderer.clearError();
-  renderer.setStatus('connecting', 'Connecting…');
+  renderer.setStatus('connecting', t('status.connecting'));
   try {
     const data = await invoke('connect', buildConnectArguments(state.context));
     if (!data || typeof data.sessionId !== 'string' || !data.sessionId) {
@@ -126,13 +139,13 @@ async function connect() {
     renderer.setDatabases(data.databases, state.database);
     renderer.setCurrentDatabase(state.database);
     renderer.setScope(state.database, state.collection);
-    renderer.setStatus('connected', data.readOnly ? 'Connected · read-only' : 'Connected');
+    renderer.setStatus('connected', data.readOnly ? t('status.connected_readonly') : t('status.connected'));
     await loadCollections();
     return true;
   } catch (error) {
     setConnected(false);
     renderer.showError(error);
-    renderer.setStatus('error', 'Connection failed');
+    renderer.setStatus('error', t('status.connection_failed'));
     return false;
   } finally {
     setBusy(false);
@@ -153,7 +166,7 @@ async function disconnect() {
   } finally {
     setBusy(false);
     setConnected(false);
-    renderer.setStatus('disconnected', 'Disconnected');
+    renderer.setStatus('disconnected', t('status.disconnected'));
     renderer.setCollections([]);
     renderer.setDatabases([], '');
     renderer.setCurrentDatabase('');
@@ -168,10 +181,10 @@ async function ping() {
   }
   try {
     const data = await invoke('ping', { sessionId: state.sessionId });
-    renderer.setStatus('connected', `Connected · ${data.latencyMs} ms`);
+    renderer.setStatus('connected', t('status.connected_latency', { ms: data.latencyMs }));
   } catch (error) {
     renderer.showError(error);
-    renderer.setStatus('error', 'Ping failed');
+    renderer.setStatus('error', t('status.ping_failed'));
   }
 }
 
@@ -181,13 +194,13 @@ async function run() {
   }
   const script = elements.editor.value;
   if (!script.trim()) {
-    renderer.showError(new PluginCommandError('empty_script', 'Write a script before running it.'));
+    renderer.showError(new PluginCommandError('empty_script', t('error.empty_script')));
     elements.editor.focus();
     return;
   }
   setBusy(true);
   renderer.clearError();
-  renderer.setStatus('running', 'Running…');
+  renderer.setStatus('running', t('status.running'));
   elements.outputMeta.textContent = '';
   try {
     const data = await invoke('run', {
@@ -203,10 +216,10 @@ async function run() {
     renderer.renderTable(data.table);
     renderer.renderOutput(data);
     renderer.setResultMeta(data);
-    renderer.setStatus('connected', data.readOnly ? 'Connected · read-only' : 'Connected');
+    renderer.setStatus('connected', data.readOnly ? t('status.connected_readonly') : t('status.connected'));
   } catch (error) {
     renderer.showError(error);
-    renderer.setStatus('error', 'Run failed');
+    renderer.setStatus('error', t('status.run_failed'));
   } finally {
     setBusy(false);
   }
@@ -249,6 +262,12 @@ function syncSuggestedScript() {
 }
 
 function wireEvents() {
+  if (elements.outputToggle) {
+    elements.outputToggle.addEventListener('click', () => {
+      const collapsed = elements.app.classList.toggle('output-collapsed');
+      elements.outputToggle.setAttribute('aria-expanded', String(!collapsed));
+    });
+  }
   elements.runButton.addEventListener('click', () => { void run(); });
   elements.clearButton.addEventListener('click', () => renderer.clearResults());
   elements.pingButton.addEventListener('click', () => { void ping(); });
@@ -320,5 +339,8 @@ function dispose() {
 
 window.addEventListener('pagehide', dispose);
 window.addEventListener('beforeunload', dispose);
+useHostLocale();
+applyStaticText();
+applyHostTheme();
 wireEvents();
 void start();

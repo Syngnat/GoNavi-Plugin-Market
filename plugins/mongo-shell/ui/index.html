@@ -17,18 +17,18 @@
         <span class="brand-mark" aria-hidden="true">M</span>
         <div class="brand-text">
           <strong>MongoShell</strong>
-          <span id="connection-name" class="brand-sub">Loading connection…</span>
+          <span id="connection-name" class="brand-sub" data-i18n="brand.loading">Loading connection…</span>
         </div>
       </div>
       <div class="topbar-meta">
         <span id="environment" class="chip chip-muted" hidden></span>
-        <span id="readonly-chip" class="chip" hidden>Read-only</span>
+        <span id="readonly-chip" class="chip" hidden data-i18n="chip.readonly">Read-only</span>
         <span id="status" class="status status-connecting" role="status" aria-live="polite">
           <span class="status-dot" aria-hidden="true"></span>
-          <span id="status-text">Starting…</span>
+          <span id="status-text" data-i18n="status.starting">Starting…</span>
         </span>
-        <button id="ping-button" class="button button-quiet" type="button" disabled>Ping</button>
-        <button id="connect-button" class="button button-quiet" type="button" disabled>Disconnect</button>
+        <button id="ping-button" class="button button-quiet" type="button" disabled data-i18n="action.ping">Ping</button>
+        <button id="connect-button" class="button button-quiet" type="button" disabled data-i18n="action.disconnect">Disconnect</button>
       </div>
     </header>
 
@@ -37,39 +37,40 @@
         <span id="error-code" class="error-code"></span>
         <span id="error-message" class="error-message"></span>
       </div>
-      <button id="error-dismiss" class="button button-quiet" type="button">Dismiss</button>
+      <button id="error-dismiss" class="button button-quiet" type="button" data-i18n="action.dismiss">Dismiss</button>
     </div>
 
-    <section class="toolbar" aria-label="Query controls">
+    <section id="toolbar" class="toolbar" aria-label="Query controls">
       <label class="field">
-        <span class="field-label">Database</span>
+        <span class="field-label" data-i18n="field.database">Database</span>
         <select id="database-select" class="control" disabled>
           <option value="">(none)</option>
         </select>
       </label>
       <label class="field field-grow">
-        <span class="field-label">Collection</span>
+        <span class="field-label" data-i18n="field.collection">Collection</span>
         <input id="collection-input" class="control" type="text" list="collection-options"
-          placeholder="optional collection" spellcheck="false" autocomplete="off" disabled />
+          placeholder="optional collection" data-i18n-placeholder="field.collection_placeholder" spellcheck="false" autocomplete="off" disabled />
         <datalist id="collection-options"></datalist>
       </label>
       <label class="field field-narrow">
-        <span class="field-label">Max rows</span>
+        <span class="field-label" data-i18n="field.max_rows">Max rows</span>
         <input id="max-rows" class="control" type="number" min="1" max="2000" step="1" value="200" />
       </label>
       <div class="toolbar-actions">
-        <button id="clear-button" class="button button-quiet" type="button">Clear</button>
+        <button id="clear-button" class="button button-quiet" type="button" data-i18n="action.clear">Clear</button>
         <button id="run-button" class="button button-primary" type="button" disabled>
-          Run
+          <span class="spinner" aria-hidden="true" hidden></span>
+          <span class="run-label" data-i18n="action.run">Run</span>
           <kbd>⌘/Ctrl ↵</kbd>
         </button>
       </div>
     </section>
 
-    <main class="workspace">
+    <main id="workspace" class="workspace">
       <section class="pane editor-pane" aria-label="Script editor">
         <header class="pane-header">
-          <span class="pane-title">Script</span>
+          <span class="pane-title" data-i18n="pane.script">Script</span>
           <span id="editor-scope" class="pane-meta"></span>
         </header>
         <textarea id="editor" class="editor" spellcheck="false" wrap="off"
@@ -78,28 +79,56 @@
 
       <section class="pane result-pane" aria-label="Results">
         <header class="pane-header">
-          <span class="pane-title">Result</span>
-          <span id="result-meta" class="pane-meta">No query yet</span>
+          <span class="pane-title" data-i18n="pane.result">Result</span>
+          <span id="result-meta" class="pane-meta" data-i18n="result.none">No query yet</span>
         </header>
+        <div id="result-truncated" class="truncated-strip" hidden>
+          <span class="truncated-icon" aria-hidden="true">!</span>
+          <span id="result-truncated-text" data-i18n="result.truncated">Showing the first rows the limit allows.</span>
+        </div>
+        <div id="result-stale" class="stale-strip" hidden>
+          <span class="stale-icon" aria-hidden="true">⟲</span>
+          <span data-i18n="result.previous">Previous result stays visible while the next script runs.</span>
+        </div>
         <div id="table-wrap" class="table-wrap">
-          <div class="empty-state" id="table-empty">Run a script to see documents here.</div>
+          <div class="empty-state" id="table-empty">
+            <svg class="empty-glyph" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4">
+              <ellipse cx="12" cy="6" rx="7" ry="2.6" />
+              <path d="M5 6v6c0 1.44 3.13 2.6 7 2.6s7-1.16 7-2.6V6" />
+              <path d="M5 12v6c0 1.44 3.13 2.6 7 2.6s7-1.16 7-2.6v-6" />
+            </svg>
+            <strong data-i18n="result.empty_title">No result</strong>
+            <span data-i18n="result.empty">Run a script to see documents here.</span>
+          </div>
           <table id="result-table" class="result-table" hidden>
             <thead id="result-head"></thead>
             <tbody id="result-body"></tbody>
           </table>
         </div>
         <header class="pane-header pane-header-split">
-          <span class="pane-title">Output</span>
+          <button id="output-toggle" class="pane-toggle" type="button" aria-expanded="true">
+            <span class="pane-caret" aria-hidden="true">▾</span>
+            <span class="pane-title" data-i18n="pane.output">Output</span>
+          </button>
           <span id="output-meta" class="pane-meta"></span>
         </header>
         <pre id="output" class="output" aria-live="polite"></pre>
       </section>
     </main>
 
+    <section id="guidance" class="guidance" hidden>
+      <svg class="guidance-glyph" viewBox="0 0 24 24" width="48" height="48" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4">
+        <ellipse cx="12" cy="6" rx="7" ry="2.6" />
+        <path d="M5 6v12c0 1.44 3.13 2.6 7 2.6s7-1.16 7-2.6V6" />
+      </svg>
+      <strong data-i18n="guidance.title">Open MongoShell from a connection</strong>
+      <p data-i18n="guidance.body">In the GoNavi sidebar, right-click a MongoDB connection and choose MongoShell, or MongoShell (Workbench) to open it in a tab.</p>
+    </section>
+
     <footer class="statusbar">
       <span id="footer-host" class="footer-item">—</span>
       <span id="footer-database" class="footer-item">Database: —</span>
-      <span id="footer-readonly" class="footer-item">Writes enabled</span>
+      <span id="footer-readonly" class="footer-item" data-i18n="footer.writes_enabled">Writes enabled</span>
       <span class="footer-spacer"></span>
       <span id="footer-elapsed" class="footer-item">—</span>
     </footer>

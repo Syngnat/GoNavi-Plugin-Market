@@ -14,7 +14,7 @@ class Element {
   focus() {}
 }
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
-const sources = ['bridge.js','render.js','app.js'].map(name => readFileSync(new URL(name,import.meta.url),'utf8')
+const sources = ['i18n.js','bridge.js','render.js','app.js'].map(name => readFileSync(new URL(name,import.meta.url),'utf8')
   // Run the actual module bodies in an isolated browser global, stripping only
   // module linkage. No command, state, lifecycle or renderer code is replaced.
   .replace(/^import\s*\{[\s\S]*?\}\s*from\s*'[^']+';\s*/gm,'')

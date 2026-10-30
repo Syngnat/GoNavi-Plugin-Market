@@ -2,8 +2,18 @@
  * textContent; nothing here interprets HTML. */
 
 import { formatCell, toDisplay } from './bridge.js';
+import { errorText, t } from './i18n.js';
 
 export function createRenderer(elements) {
+  // 空态是一段图形 + 标题 + 说明，只有说明这段会被状态文案替换。
+  const setEmptyText = (text) => {
+    if (elements.tableEmptyText) {
+      elements.tableEmptyText.textContent = text;
+      return;
+    }
+    if (elements.tableEmpty) elements.tableEmpty.textContent = text;
+  };
+
   const setStatus = (state, text) => {
     elements.status.classList.remove('status-connecting', 'status-running', 'status-connected', 'status-disconnected', 'status-error');
     elements.status.classList.add(`status-${state}`);
@@ -16,10 +26,10 @@ export function createRenderer(elements) {
     elements.connectButton.disabled = busy;
     elements.editor.readOnly = busy;
     elements.app.classList.toggle('is-busy', busy);
-    elements.runButton.textContent = busy ? 'Running…' : 'Run';
-    if (!busy) {
-      elements.runButton.appendChild(shortcutHint());
-    }
+    // The run button keeps its spinner slot and keycap; only the label text swaps.
+    if (elements.runLabel) elements.runLabel.textContent = busy ? t('status.running') : t('action.run');
+    if (elements.runSpinner) elements.runSpinner.hidden = !busy;
+    if (elements.staleStrip) elements.staleStrip.hidden = !busy;
   };
 
   const setConnected = (connected) => {
@@ -27,14 +37,14 @@ export function createRenderer(elements) {
     elements.pingButton.dataset.connected = String(connected);
     elements.runButton.disabled = !connected;
     elements.pingButton.disabled = !connected;
-    elements.connectButton.textContent = connected ? 'Disconnect' : 'Connect';
+    elements.connectButton.textContent = connected ? t('action.disconnect') : t('action.connect');
     elements.databaseSelect.disabled = !connected;
     elements.collectionInput.disabled = !connected;
   };
 
   const showError = (error) => {
     elements.errorCode.textContent = error && error.code ? error.code : 'error';
-    elements.errorMessage.textContent = error && error.message ? error.message : String(error);
+    elements.errorMessage.textContent = errorText(error);
     elements.error.hidden = false;
   };
 
@@ -54,7 +64,7 @@ export function createRenderer(elements) {
     }
     elements.readonlyChip.hidden = !connection.readOnly;
     elements.footerHost.textContent = connection.host || '—';
-    elements.footerReadonly.textContent = connection.readOnly ? 'Read-only connection' : 'Writes enabled';
+    elements.footerReadonly.textContent = connection.readOnly ? t('footer.readonly') : t('footer.writes_enabled');
     elements.footerReadonly.classList.toggle('footer-danger', connection.readOnly);
     elements.editorScope.textContent = scopeLabel(connection);
   };
@@ -76,11 +86,11 @@ export function createRenderer(elements) {
     if (selected) {
       elements.databaseSelect.value = selected;
     }
-    elements.footerDatabase.textContent = `Database: ${elements.databaseSelect.value || '—'}`;
+    elements.footerDatabase.textContent = t('footer.database', { name: elements.databaseSelect.value || '—' });
   };
 
   const setCurrentDatabase = (name) => {
-    elements.footerDatabase.textContent = `Database: ${name || '—'}`;
+    elements.footerDatabase.textContent = t('footer.database', { name: name || '—' });
     if (name) {
       elements.databaseSelect.value = name;
     }
@@ -113,7 +123,7 @@ export function createRenderer(elements) {
     if (columns.length === 0) {
       elements.resultTable.hidden = true;
       elements.tableEmpty.hidden = false;
-      elements.tableEmpty.textContent = table ? `${rows.length} document(s), no columns` : 'Run a script to see documents here.';
+      setEmptyText(table ? t('result.no_columns', { count: rows.length }) : t('result.empty'));
       return;
     }
     const headRow = document.createElement('tr');
@@ -144,9 +154,36 @@ export function createRenderer(elements) {
       }
       body.appendChild(rowElement);
     }
+    // 有列但零行：表头照常显示，空行提示放在表体里，保持列结构可读。
+    if (rows.length === 0) {
+      const emptyRow = document.createElement('tr');
+      emptyRow.className = 'result-empty-row';
+      const cell = document.createElement('td');
+      cell.colSpan = columns.length;
+      cell.textContent = t('result.matched_none');
+      emptyRow.appendChild(cell);
+      body.appendChild(emptyRow);
+    }
     elements.resultBody.appendChild(body);
     elements.resultTable.hidden = false;
     elements.tableEmpty.hidden = true;
+  };
+
+  // 达到 Max rows 时说明为什么少了行，而不是让用户以为数据就这么多。
+  const setTruncatedNotice = (table, rows, maxRows) => {
+    if (!elements.truncatedStrip) return;
+    const truncated = Boolean(table && table.truncated);
+    elements.truncatedStrip.hidden = !truncated;
+    if (truncated && elements.truncatedText) {
+      elements.truncatedText.textContent = t('result.truncated', { rows, max: maxRows });
+    }
+  };
+
+  const setGuidance = (visible) => {
+    if (!elements.guidance) return;
+    elements.guidance.hidden = !visible;
+    elements.toolbar?.toggleAttribute('hidden', visible);
+    elements.workspace?.toggleAttribute('hidden', visible);
   };
 
   const renderOutput = (data) => {
@@ -168,6 +205,7 @@ export function createRenderer(elements) {
     }
     elements.resultMeta.textContent = parts.join(' · ');
     elements.resultMeta.classList.toggle('meta-warn', Boolean(table && table.truncated));
+    setTruncatedNotice(table, rows, data.maxRows);
     elements.footerElapsed.textContent = `${data.elapsedMs} ms`;
   };
 
@@ -176,16 +214,18 @@ export function createRenderer(elements) {
     elements.outputMeta.textContent = '';
     elements.resultMeta.textContent = 'No query yet';
     elements.resultMeta.classList.remove('meta-warn');
+    if (elements.truncatedStrip) elements.truncatedStrip.hidden = true;
     elements.footerElapsed.textContent = '—';
     elements.resultHead.textContent = '';
     elements.resultBody.textContent = '';
     elements.resultTable.hidden = true;
     elements.tableEmpty.hidden = false;
-    elements.tableEmpty.textContent = 'Run a script to see documents here.';
+    setEmptyText(t('result.empty'));
   };
 
   return {
     setStatus,
+    setGuidance,
     setBusy,
     setConnected,
     showError,
@@ -207,12 +247,6 @@ function option(value, label) {
   element.value = value;
   element.textContent = label;
   return element;
-}
-
-function shortcutHint() {
-  const hint = document.createElement('kbd');
-  hint.textContent = '⌘/Ctrl ↵';
-  return hint;
 }
 
 function scopeLabel(connection) {

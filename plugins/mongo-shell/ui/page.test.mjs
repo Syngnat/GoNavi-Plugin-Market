@@ -4,7 +4,8 @@ import vm from 'node:vm';
 import test from 'node:test';
 
 const html = readFileSync(new URL('./page.html', import.meta.url), 'utf8');
-const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+// 页面里有两个脚本块：先注入的轻量词典，再是页面逻辑；测试按顺序依次执行。
+const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
 class Element {
   constructor() { this.textContent = ''; this.value = ''; this.hidden = true; this.disabled = true; this.children = []; this.listeners = {}; }
   appendChild(child) { this.children.push(child); }
@@ -20,7 +21,8 @@ function page(connectionId, invoke) {
     gonavi: {call: (method, args) => { assert.equal(method,'plugin.invoke'); return invoke(args); }},
     addEventListener: (name, callback) => { events[name] = callback; },
   };
-  vm.runInNewContext(script, {window,document:{getElementById:id=>ids[id],createElement:()=>new Element()},console});
+  const sandbox = {window,document:{getElementById:id=>ids[id],createElement:()=>new Element()},console,navigator:{language:'en-US'}};
+  for (const block of scripts) vm.runInNewContext(block, sandbox);
   return {ids, events};
 }
 

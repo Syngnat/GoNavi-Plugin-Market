@@ -25,15 +25,55 @@
   th, td { border-bottom: 1px solid rgba(127,127,127,.25); padding: 4px 6px; text-align: left; vertical-align: top; }
   th { font-weight: 600; }
 </style>
+  <script>
+    // 工作台页是内嵌 iframe：宿主通过 gonavi:host-preferences 注入 locale，
+    // 这里只做最小词典，未识别的语言一律回退英文。
+    (function () {
+      const table = {
+        'zh-CN': { database: '数据库', collection: '集合', optional: '可选', run: '运行', starting: '启动中', connecting: '连接中', ready: '就绪', readOnly: '只读', notConnected: '未连接', running: '执行中', done: '完成', failed: '失败' },
+        'zh-TW': { database: '資料庫', collection: '集合', optional: '選填', run: '執行', starting: '啟動中', connecting: '連線中', ready: '就緒', readOnly: '唯讀', notConnected: '未連線', running: '執行中', done: '完成', failed: '失敗' },
+        'ja-JP': { database: 'データベース', collection: 'コレクション', optional: '任意', run: '実行', starting: '起動中', connecting: '接続中', ready: '準備完了', readOnly: '読み取り専用', notConnected: '未接続', running: '実行中', done: '完了', failed: '失敗' },
+        'de-DE': { database: 'Datenbank', collection: 'Collection', optional: 'optional', run: 'Ausführen', starting: 'Startet', connecting: 'Verbinden', ready: 'Bereit', readOnly: 'Schreibgeschützt', notConnected: 'Nicht verbunden', running: 'Läuft', done: 'Fertig', failed: 'Fehlgeschlagen' },
+        'ru-RU': { database: 'База данных', collection: 'Коллекция', optional: 'необязательно', run: 'Выполнить', starting: 'Запуск', connecting: 'Подключение', ready: 'Готово', readOnly: 'Только чтение', notConnected: 'Нет подключения', running: 'Выполняется', done: 'Готово', failed: 'Ошибка' },
+        'en-US': { database: 'Database', collection: 'Collection', optional: 'optional', run: 'Run', starting: 'starting', connecting: 'connecting', ready: 'ready', readOnly: 'read-only', notConnected: 'not connected', running: 'running', done: 'done', failed: 'failed' },
+      };
+      const resolve = () => {
+        const prefs = window.gonaviHostPrefs;
+        const raw = prefs && typeof prefs.locale === 'string' ? prefs.locale : ((typeof navigator !== 'undefined' && navigator.language) || 'en-US');
+        if (table[raw]) return raw;
+        const lower = String(raw).toLowerCase();
+        if (lower.indexOf('zh') === 0) return lower.indexOf('tw') > -1 || lower.indexOf('hk') > -1 ? 'zh-TW' : 'zh-CN';
+        const base = lower.split('-')[0];
+        for (const key of Object.keys(table)) { if (key.toLowerCase().indexOf(base + '-') === 0) return key; }
+        return 'en-US';
+      };
+      window.__gonaviPageText = (key) => {
+        const locale = resolve();
+        const dict = table[locale] || table['en-US'];
+        return dict[key] || table['en-US'][key] || key;
+      };
+      const apply = () => {
+        for (const node of document.querySelectorAll('[data-i18n]')) node.textContent = window.__gonaviPageText(node.dataset.i18n);
+        for (const node of document.querySelectorAll('[data-i18n-placeholder]')) node.setAttribute('placeholder', window.__gonaviPageText(node.dataset.i18nPlaceholder));
+      };
+      if (typeof window.addEventListener === 'function') {
+        window.addEventListener('message', (event) => {
+          const data = event && event.data;
+          if (data && data.type === 'gonavi:host-preferences') apply();
+        });
+      }
+      if (typeof document.addEventListener === 'function') document.addEventListener('DOMContentLoaded', apply);
+    }());
+  </script>
 </head>
 <body>
 <div class="bar">
   <strong>MongoShell</strong>
   <span id="conn" class="muted">connecting…</span>
-  <label class="muted">Database <select id="db" disabled><option value="">(none)</option></select></label>
-  <label class="muted">Collection <input id="collection" placeholder="optional" /></label>
-  <button id="run" class="primary" type="button" disabled>Run</button>
-  <span id="status" class="status">starting</span>
+  <label class="muted"><span data-i18n="database">Database</span> <select id="db" disabled><option value="">(none)</option></select></label>
+  <label class="muted"><span data-i18n="collection">Collection</span> <input id="collection" placeholder="optional" data-i18n-placeholder="optional" /></label>
+  <button id="run" class="primary" type="button" disabled data-i18n="run">Run</button>
+  <span id="status" class="status" data-i18n="starting">starting</span>
 </div>
 <div id="error" class="error" hidden></div>
 <textarea id="editor" spellcheck="false" aria-label="MongoShell JavaScript">db.getCollectionNames()</textarea>
@@ -121,7 +161,7 @@
     resultBox.appendChild(pre);
   };
   const connect = async () => {
-    setStatus('connecting');
+    setStatus(window.__gonaviPageText('connecting'));
     try {
       const data = await call('connect', {
         connectionId: launch.connectionId || '',
@@ -155,9 +195,9 @@
       collection.value = launch.collection || '';
       dbSelect.disabled = false;
       runButton.disabled = false;
-      setStatus(data && data.readOnly ? 'read-only' : 'ready');
+      setStatus(window.__gonaviPageText(data && data.readOnly ? 'readOnly' : 'ready'));
     } catch (error) {
-      setStatus('not connected');
+      setStatus(window.__gonaviPageText('notConnected'));
       setError(error);
     }
   };
@@ -165,7 +205,7 @@
     if (!sessionId || disposed || running) return;
     running = true;
     runButton.disabled = true;
-    setStatus('running');
+    setStatus(window.__gonaviPageText('running'));
     setError(null);
     try {
       const data = await call('run', {
@@ -176,9 +216,9 @@
         maxRows: 200,
       });
       render(data);
-      setStatus('done');
+      setStatus(window.__gonaviPageText('done'));
     } catch (error) {
-      setStatus('failed');
+      setStatus(window.__gonaviPageText('failed'));
       setError(error);
     } finally {
       running = false;
