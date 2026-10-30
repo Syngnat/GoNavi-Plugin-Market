@@ -1,8 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { PluginItem } from '../api/types';
-const BlackHole = lazy(() => import('./BlackHole').then((module) => ({ default: module.BlackHole })));
 import { InstallButton } from './InstallButton';
+import { BlackHole } from './BlackHole';
 
 export type GalaxyCategory = '全部' | '数据源' | 'AI 供应商' | '导出器' | '技能' | '面板' | '命令' | '运维' | '其他';
 
@@ -883,14 +883,12 @@ export function PluginGalaxy({
       </svg>
 
       <div className="galaxy-nodes" aria-label="插件对象">
-        <Suspense fallback={null}>
-          <BlackHole
-            hostRef={observatoryRef}
-            worldRef={worldRef}
-            centerX={WORLD.cx}
-            centerY={WORLD.cy}
-          />
-        </Suspense>
+        <BlackHole
+          hostRef={observatoryRef}
+          worldRef={worldRef}
+          centerX={WORLD.cx}
+          centerY={WORLD.cy}
+        />
         {nodes.map((node, index) => {
           const visible = pluginMatches(node.item, activeCategory, query);
           return (
