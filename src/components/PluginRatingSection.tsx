@@ -676,9 +676,6 @@ export function PluginRatingSection({
                           >
                             取消
                           </button>
-                          <span className={`text-xs ${replyBodyBytes > 4000 ? 'text-red-600' : 'text-muted'}`}>
-                            {replyBodyBytes}/4000 字节
-                          </span>
                         </div>
                       </div>
                     )}

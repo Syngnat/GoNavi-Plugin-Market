@@ -64,6 +64,10 @@ export GONAVI_MARKET_DATABASE_URL='postgres://...'
 |---|---|---|
 | GET | `/api/v1/plugins?category=&q=&sort=updated\|rating\|downloads&cursor=` | 目录分页，返回 `CatalogPage` |
 | GET | `/api/v1/plugins/{id}` | 插件详情，返回 `Item`（含 artifact.sha256） |
+| GET | `/api/v1/plugins/{id}/ratings` | 顶层评价及嵌套回复 |
+| POST | `/api/v1/plugins/{id}/ratings` | 登录用户发布评价，可多条（需 CSRF） |
+| PUT/DELETE | `/api/v1/plugins/{id}/ratings/{ratingId}` | 修改/删除自己的评价（需 CSRF） |
+| POST/DELETE | `/api/v1/plugins/{id}/ratings/{ratingId}/replies[/{replyId}]` | 发布/删除回复（需 CSRF） |
 | GET | `/api/v1/auth/web/session` | 网站登录态；返回 `authenticated/account/csrfToken` |
 | GET | `/api/v1/auth/web/start?returnTo=/publish` | 发起 GitHub 登录，303 到 GitHub |
 | POST | `/api/v1/auth/web/logout` | 退出（需 `X-GoNavi-CSRF`） |

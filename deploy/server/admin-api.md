@@ -98,13 +98,14 @@ Approval/rejection requires pending_review; yank requires published. Repeated or
 
 ## Ratings and reports
 
-- GET /plugins/{id}/ratings lists visible ratings.
-- PUT /plugins/{id}/rating accepts {"stars":1..5,"body":"text","version":"1.0.0"}. Omit version to rate the newest published version. Body is limited to 4,000 UTF-8 bytes. The service derives userId from the authenticated session (website cookie or operator bearer token) and forbids author self-rating.
-- DELETE /plugins/{id}/rating deletes only the caller's rating.
+- GET /plugins/{id}/ratings lists visible top-level reviews. Each review carries an `id`; its optional `replies` array contains one-level replies. Replies have `parentId` and `stars:0` and never contribute to the aggregate.
+- POST /plugins/{id}/ratings creates a review with {"stars":1..5,"body":"text","version":"1.0.0"}. Omit version to use the newest published version. Body is limited to 4,000 UTF-8 bytes. One account may create multiple reviews. The service derives `userId` from the authenticated session (website cookie or operator bearer token) and forbids author self-rating.
+- PUT /plugins/{id}/ratings/{ratingId} edits the caller's top-level review; DELETE /plugins/{id}/ratings/{ratingId} deletes it. The older plugin-scoped PUT/DELETE /plugins/{id}/rating routes remain for compatibility.
+- POST /plugins/{id}/ratings/{ratingId}/replies accepts {"body":"..."} and creates a reply. DELETE /plugins/{id}/ratings/{ratingId}/replies/{replyId} deletes the caller's own reply.
 - POST /reports accepts {"pluginId":"example.viewer","reason":"..."}; reports are stored for operator triage. A report dashboard/list API is not yet supplied.
-- POST /admin/plugins/{id}/ratings/{userId}/hide accepts {"reason":"..."}. This administrator-only operation hides the rating and records an audit event atomically.
+- POST /admin/plugins/{id}/ratings/{userId}/hide accepts {"reason":"..."}. This administrator-only operation hides all of that user's reviews and replies on the plugin and records an audit event atomically.
 
-A hidden rating stays hidden when its author edits it or deletes and recreates it. Deletion clears the review body/version and leaves a non-public tombstone to preserve moderation. Visible aggregates are computed from the authoritative rating table rather than denormalized counters that can drift.
+Hidden content stays hidden when edited, and new content from the same user/plugin inherits the hidden state. Deletion clears the review body/version and leaves a non-public tombstone to preserve moderation. Visible aggregates are computed from visible top-level reviews only, not replies or denormalized counters.
 
 ## Public download contract
 
