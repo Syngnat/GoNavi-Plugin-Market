@@ -581,6 +581,10 @@ export function PluginGalaxy({
           element.style.left = `${projected.x}px`;
           element.style.top = `${projected.y}px`;
           element.style.setProperty('--body-scale', body);
+          // Keep the black hole and planet bodies in one visual layer: planets
+          // on the near side of the orbit pass over the disk, while planets
+          // behind the center are occluded by the shadow.
+          element.style.zIndex = live.y >= WORLD.cy ? '4' : '1';
           element.classList.toggle('label-left', live.x < WORLD.cx);
         }
       }
@@ -873,14 +877,13 @@ export function PluginGalaxy({
         </g>
       </svg>
 
-      <BlackHole
-        hostRef={observatoryRef}
-        worldRef={worldRef}
-        centerX={WORLD.cx}
-        centerY={WORLD.cy}
-      />
-
       <div className="galaxy-nodes" aria-label="插件对象">
+        <BlackHole
+          hostRef={observatoryRef}
+          worldRef={worldRef}
+          centerX={WORLD.cx}
+          centerY={WORLD.cy}
+        />
         {nodes.map((node, index) => {
           const visible = pluginMatches(node.item, activeCategory, query);
           return (
