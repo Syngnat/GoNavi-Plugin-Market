@@ -578,8 +578,7 @@ export function PluginGalaxy({
           if (!element) continue;
           const live = orbitPoint(node, now, rig.reduced);
           const projected = projectNode(live.x, live.y, camera, rect);
-          element.style.left = `${projected.x}px`;
-          element.style.top = `${projected.y}px`;
+          element.style.transform = `translate3d(${projected.x.toFixed(2)}px, ${projected.y.toFixed(2)}px, 0) translate(-50%, -50%)`;
           element.style.setProperty('--body-scale', body);
           // Keep the black hole and planet bodies in one visual layer: planets
           // on the near side of the orbit pass over the disk, while planets
@@ -613,7 +612,7 @@ export function PluginGalaxy({
       last = now;
       const rig = rigRef.current;
       if (!rig.reduced && rig.mode !== 'idle' && rig.mode !== 'drag') stepRig(rig, dt, now);
-      const interval = rig.reduced ? 100 : 1000 / 30;
+      const interval = rig.reduced ? 100 : 1000 / 24;
       if (now - lastPaint >= interval) {
         paint(now);
         lastPaint = now;

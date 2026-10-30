@@ -26,9 +26,8 @@ body {
 
 .market-home-shell > header {
   border-color: rgba(164, 195, 197, 0.16);
-  background: rgba(5, 10, 13, 0.9);
+  background: rgba(5, 10, 13, 0.97);
   color: #eef2ed;
-  backdrop-filter: blur(18px);
 }
 
 /* The right-side account/publish group ends on the inspector's left edge on
@@ -197,7 +196,6 @@ body {
 .galaxy-grain {
   opacity: 0.12;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
-  mix-blend-mode: soft-light;
 }
 
 .galaxy-map {
@@ -235,7 +233,6 @@ body {
     rgba(255, 90, 20, 0.08) 48%,
     transparent 72%
   );
-  filter: blur(7px);
   content: '';
 }
 
@@ -578,7 +575,6 @@ body {
   text-align: left;
   pointer-events: none;
   opacity: 0;
-  backdrop-filter: blur(7px);
   transition: opacity 200ms ease, border-color 180ms ease, background 180ms ease;
 }
 
@@ -966,9 +962,8 @@ body {
   margin-top: 26px;
   border: 1px solid rgba(159, 195, 195, 0.24);
   border-left-color: #77d8c6;
-  background: rgba(7, 17, 22, 0.84);
+  background: rgba(7, 17, 22, 0.95);
   box-shadow: 0 16px 50px rgba(0, 0, 0, 0.25), inset 0 1px rgba(255, 255, 255, 0.025);
-  backdrop-filter: blur(16px);
 }
 
 .galaxy-search:focus-within {
@@ -1142,7 +1137,6 @@ body {
   border: 1px solid rgba(168, 201, 202, 0.2);
   background: linear-gradient(140deg, rgba(18, 37, 43, 0.58), rgba(6, 15, 20, 0.91)), rgba(9, 22, 28, 0.82);
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.38), inset 0 1px rgba(255, 255, 255, 0.035);
-  backdrop-filter: blur(20px);
 }
 
 .galaxy-inspector::before {
@@ -1411,7 +1405,6 @@ body {
   grid-template-columns: repeat(3, 35px);
   border: 1px solid rgba(164, 195, 197, 0.16);
   background: rgba(7, 17, 22, 0.86);
-  backdrop-filter: blur(14px);
 }
 
 .galaxy-zoom button {
@@ -1451,7 +1444,6 @@ body {
   border: 1px solid rgba(164, 195, 197, 0.16);
   background: linear-gradient(140deg, rgba(15, 33, 39, 0.92), rgba(5, 13, 17, 0.97));
   box-shadow: 0 38px 100px rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(18px);
 }
 
 .galaxy-observatory.is-list-mode .galaxy-list-panel {
@@ -1642,7 +1634,6 @@ body {
   font-family: var(--font-code);
   font-size: calc(8px + var(--gx-type-bump));
   letter-spacing: 0.09em;
-  backdrop-filter: blur(12px);
 }
 
 .galaxy-status > div,
@@ -1731,7 +1722,6 @@ body {
   background: rgba(6, 16, 21, 0.88);
   text-align: center;
   transform: translate(-50%, -50%);
-  backdrop-filter: blur(12px);
 }
 
 .galaxy-empty strong {
