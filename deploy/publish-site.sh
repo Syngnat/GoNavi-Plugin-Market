@@ -7,7 +7,11 @@
 #
 # Usage:
 #   deploy/publish-site.sh [--ref origin/main] [--host BeroHost-6h16-DE]
+#                          [--port 22] [--remote-root /srv/gonavi-plugin-market]
 #                          [--keep 5] [--dry-run] [--skip-verify]
+#
+# Host may be an ssh alias or user@host (CI passes the latter). Port defaults to
+# the alias' own port when --port is omitted; SSH_KEY selects an identity file.
 set -euo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -16,6 +20,7 @@ REF=origin/main
 KEEP=5
 DRY_RUN=0
 SKIP_VERIFY=0
+PORT=""
 REMOTE_ROOT=/srv/gonavi-plugin-market
 
 while [ $# -gt 0 ]; do
@@ -23,6 +28,8 @@ while [ $# -gt 0 ]; do
     --ref) REF=$2; shift 2 ;;
     --host) HOST=$2; shift 2 ;;
     --keep) KEEP=$2; shift 2 ;;
+    --port) PORT=$2; shift 2 ;;
+    --remote-root) REMOTE_ROOT=$2; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     --skip-verify) SKIP_VERIFY=1; shift ;;
     -h|--help) sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
@@ -31,6 +38,17 @@ while [ $# -gt 0 ]; do
 done
 
 log() { printf '%s\n' "==> $*"; }
+
+SSH_ARGS=(-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
+SCP_ARGS=(-q -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20)
+if [ -n "${SSH_KEY:-}" ]; then
+  SSH_ARGS+=(-i "$SSH_KEY" -o IdentitiesOnly=yes)
+  SCP_ARGS+=(-i "$SSH_KEY" -o IdentitiesOnly=yes)
+fi
+if [ -n "$PORT" ]; then
+  SSH_ARGS+=(-p "$PORT")
+  SCP_ARGS+=(-P "$PORT")
+fi
 
 cd "$REPO_ROOT"
 git rev-parse --verify "$REF" >/dev/null 2>&1 || { echo "ref not found: $REF" >&2; exit 1; }
@@ -84,10 +102,10 @@ if [ "$DRY_RUN" = "1" ]; then
 fi
 
 log "upload to $HOST"
-scp -q -o BatchMode=yes "$TARBALL" "$HOST:/root/plugin-market-staging.tar.gz"
+scp "${SCP_ARGS[@]}" "$TARBALL" "$HOST:/root/plugin-market-staging.tar.gz"
 
 log "remote verify, unpack and switch current -> $TAG"
-ssh -o BatchMode=yes "$HOST" "set -euo pipefail
+ssh "${SSH_ARGS[@]}" "$HOST" "set -euo pipefail
   echo '$SHA256  /root/plugin-market-staging.tar.gz' | sha256sum -c - >/dev/null
   mkdir -p $REMOTE_ROOT/releases/$TAG
   tar -xzf /root/plugin-market-staging.tar.gz -C $REMOTE_ROOT/releases/$TAG
@@ -107,7 +125,7 @@ if [ "$SKIP_VERIFY" = "1" ]; then
 fi
 
 log "verify origin"
-ssh -o BatchMode=yes "$HOST" 'bash -s' < "$REPO_ROOT/deploy/verify-origin.sh"
+ssh "${SSH_ARGS[@]}" "$HOST" 'bash -s' < "$REPO_ROOT/deploy/verify-origin.sh"
 
 log "verify public catalog"
 LIVE=$(curl -fsS https://plugin.gonavi.org/catalog.json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(" ".join(f"{i[\"id\"]}={i[\"version\"]}" for i in d.get("items",[])[:4]))')

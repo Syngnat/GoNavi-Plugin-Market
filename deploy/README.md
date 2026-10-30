@@ -14,6 +14,21 @@ DNS 为 Cloudflare DNS-only（灰云直连），公网入口 `https://plugin.gon
 :80   ACME HTTP-01（/var/www/letsencrypt webroot）+ 301 → https
 ```
 
+## 推送即发布（CI）
+
+`.github/workflows/deploy-site.yml` 在 `main` 有站点相关改动时自动调用
+`deploy/publish-site.sh`（也可在 Actions 页面手动 `Run workflow`）。仓库 secrets：
+
+| Secret | 含义 |
+|---|---|
+| `DEPLOY_HOST` | 服务器 IP / 域名 |
+| `DEPLOY_USER` | SSH 用户（root） |
+| `DEPLOY_PORT` | SSH 端口 |
+| `DEPLOY_SSH_KEY` | 部署私钥（对应公钥在 `/root/.ssh/authorized_keys`） |
+| `DEPLOY_KNOWN_HOSTS` | 主机指纹，避免首次连接被拦 |
+
+本地手工发布仍可直接跑脚本（走 `~/.ssh/config` 的别名，无需上述 secrets）。
+
 ## 一键发布（推荐）
 
 ```bash
