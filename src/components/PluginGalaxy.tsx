@@ -889,7 +889,6 @@ export function PluginGalaxy({
             worldRef={worldRef}
             centerX={WORLD.cx}
             centerY={WORLD.cy}
-            active={view === 'map'}
           />
         </Suspense>
         {nodes.map((node, index) => {

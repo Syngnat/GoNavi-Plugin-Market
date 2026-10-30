@@ -10,8 +10,7 @@ import {
   WebGLRenderer,
 } from 'three';
 
-const RENDER_SIZE = 256;
-const TARGET_FPS = 20;
+const RENDER_SIZE = 512;
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -52,7 +51,7 @@ const fragmentShader = /* glsl */ `
   float fbm(vec2 p) {
     float value = 0.0;
     float amplitude = 0.5;
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
       value += amplitude * noise(p);
       p = rotate2d(0.63) * p * 2.03 + 17.1;
       amplitude *= 0.52;
@@ -67,8 +66,6 @@ const fragmentShader = /* glsl */ `
     float radius = length(p);
     float angle = atan(p.y, p.x);
 
-    // Thin, tilted accretion disk. The extra vertical scale turns the ring
-    // into the flattened ellipse seen from a low inclination.
     vec2 diskP = rotate2d(-0.24) * p;
     diskP.y *= 2.15;
     float diskRadius = length(diskP);
@@ -78,17 +75,13 @@ const fragmentShader = /* glsl */ `
     float band = smoothstep(inner, inner + 0.045, diskRadius) *
                  (1.0 - smoothstep(outer - 0.19, outer, diskRadius));
 
-    // Turbulent spiral structure; the phase moves so the disk visibly flows.
     float spiral = diskAngle * 2.6 + time * 0.34 + log(max(diskRadius, 0.001)) * 4.2;
     float turbulence = fbm(vec2(spiral, diskRadius * 9.0 - time * 0.18));
     float diskTexture = 0.42 + 0.82 * turbulence;
-
-    // Relativistic beaming: the approaching side is brighter and whiter.
     float doppler = 0.60 + 0.62 * pow(max(0.0, cos(diskAngle + 0.72)), 2.8);
     float dust = smoothstep(0.54, 0.78, fbm(vec2(spiral * 0.8 + 4.0, diskRadius * 5.0 - time * 0.06)));
     float disk = band * diskTexture * doppler * (1.0 - dust * 0.42);
 
-    // Hot inner rim and the thin photon ring around the shadow.
     float innerRim = exp(-pow((diskRadius - inner) * 34.0, 2.0)) * doppler;
     float ringWarp = 0.0045 * sin(angle * 7.0 + time * 0.16) + 0.0025 * sin(angle * 13.0 - time * 0.11);
     float photonRing = exp(-pow((radius - (0.208 + ringWarp)) * 118.0, 2.0));
@@ -106,12 +99,11 @@ const fragmentShader = /* glsl */ `
 
     float alpha = max(disk * 0.66, innerRim * 0.48);
     alpha = max(alpha, photonRing * 0.46 + photonHalo * 0.22);
-    alpha = max(alpha, lensedArc * 0.34);
+    alpha = max(alpha, lensedArc * 0.50);
     vec3 color = diskColor * max(disk, innerRim * 1.05);
     color += whiteHot * (photonRing * 0.72 + photonHalo * 0.22);
-    color += copper * lensedArc * 0.36;
+    color += copper * lensedArc * 0.50;
 
-    // Event horizon: an opaque shadow, with a fine warm rim outside it.
     float shadow = 1.0 - smoothstep(0.185, 0.199, radius);
     float rim = exp(-pow((radius - 0.203) * 82.0, 2.0));
     color = mix(color, vec3(0.0), shadow);
@@ -119,12 +111,15 @@ const fragmentShader = /* glsl */ `
     alpha = max(alpha, rim * 0.22);
     color += whiteHot * rim * 0.25;
 
-    // Soft outer corona so the black hole sits naturally on the star field.
+    float frontSide = smoothstep(-0.018, 0.055, p.y);
+    float frontDisk = disk * frontSide * 0.78;
+    color = mix(color, diskColor, clamp(frontDisk, 0.0, 0.82));
+    alpha = max(alpha, frontDisk);
+
     float corona = exp(-pow((radius - 0.42) * 3.4, 2.0)) * 0.055;
     alpha = max(alpha, corona);
     color += copper * corona * 0.5;
 
-    // Alpha edges and a tiny grain keep the disk from looking like a flat ring.
     alpha *= smoothstep(1.06, 0.74, radius) + shadow + rim;
     alpha = clamp(alpha, 0.0, 1.0);
     color *= 1.0 + (hash21(gl_FragCoord.xy + time) - 0.5) * 0.035;
@@ -137,18 +132,15 @@ export interface BlackHoleProps {
   worldRef: RefObject<SVGGElement | null>;
   centerX: number;
   centerY: number;
-  active?: boolean;
 }
 
 /**
- * A WebGL black hole rendered over the SVG star map. Its CSS transform is
- * synced to the map camera every frame, so pan/zoom carry it with the world
- * without making plugin nodes depend on WebGL.
+ * Renders one high-quality frame to a transparent PNG and disposes WebGL.
+ * The star map keeps its camera transform; the static layer only follows it
+ * when the SVG camera actually changes. This avoids a continuous GPU/CPU load.
  */
-export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }: BlackHoleProps) {
+export function BlackHole({ hostRef, worldRef, centerX, centerY }: BlackHoleProps) {
   const frameRef = useRef<HTMLDivElement>(null);
-  const activeRef = useRef(active);
-  activeRef.current = active;
 
   useEffect(() => {
     const overlay = frameRef.current;
@@ -157,7 +149,12 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }
 
     let renderer: WebGLRenderer;
     try {
-      renderer = new WebGLRenderer({ alpha: true, antialias: false, powerPreference: 'high-performance' });
+      renderer = new WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: 'high-performance',
+        preserveDrawingBuffer: true,
+      });
     } catch {
       overlay.classList.add('is-webgl-unavailable');
       return;
@@ -170,100 +167,54 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }
       transparent: true,
       depthWrite: false,
       uniforms: {
-        uTime: { value: 0 },
+        uTime: { value: 8 },
         uResolution: { value: new Vector2(RENDER_SIZE, RENDER_SIZE) },
       },
       vertexShader,
       fragmentShader,
     });
-    const mesh = new Mesh(geometry, material);
-    scene.add(mesh);
+    scene.add(new Mesh(geometry, material));
     renderer.outputColorSpace = SRGBColorSpace;
     renderer.setClearColor(0x000000, 0);
     renderer.setPixelRatio(1);
     renderer.setSize(RENDER_SIZE, RENDER_SIZE, false);
-    overlay.prepend(renderer.domElement);
-    renderer.domElement.className = 'galaxy-black-hole-canvas';
+    renderer.render(scene, camera);
 
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let frame = 0;
-    let lastDraw = 0;
-    const started = performance.now();
-    let visible = true;
-    let onScreen = true;
-    let nearCenter = false;
-    const observer = typeof IntersectionObserver === 'undefined'
-      ? null
-      : new IntersectionObserver(
-          (entries) => {
-            onScreen = entries[0]?.isIntersecting ?? true;
-          },
-          { threshold: 0 },
-        );
-    observer?.observe(host);
+    const snapshot = renderer.domElement.toDataURL('image/png');
+    const image = document.createElement('img');
+    image.className = 'galaxy-black-hole-canvas';
+    image.alt = '';
+    image.decoding = 'async';
+    image.src = snapshot;
+    overlay.prepend(image);
 
     let lastPlacement = '';
     const syncPosition = (force = false) => {
       const world = worldRef.current;
-      if (!world || !host) return;
+      if (!world) return;
       const matrix = world.getScreenCTM();
       if (!matrix) return;
       const point = new DOMPoint(centerX, centerY).matrixTransform(matrix);
       const rect = host.getBoundingClientRect();
       const scale = Math.max(0.35, Math.min(2.6, matrix.a));
-      const placement = `${(point.x - rect.left).toFixed(2)}:${(point.y - rect.top).toFixed(2)}:${scale.toFixed(4)}`;
+      const placement = `${(point.x - rect.left).toFixed(1)}:${(point.y - rect.top).toFixed(1)}:${scale.toFixed(3)}`;
       if (!force && placement === lastPlacement) return;
       lastPlacement = placement;
       overlay.style.transform = `translate3d(${(point.x - rect.left).toFixed(2)}px, ${(point.y - rect.top).toFixed(2)}px, 0) translate(-50%, -50%) scale(${scale.toFixed(4)})`;
     };
 
-    const render = (now: number) => {
-      frame = requestAnimationFrame(render);
-      if (!visible || !onScreen || !activeRef.current) return;
-      if (!nearCenter || reduced.matches) return;
-      if (now - lastDraw < 1000 / TARGET_FPS) return;
-      lastDraw = now;
-      syncPosition();
-      material.uniforms.uTime.value = (now - started) / 1000;
-      renderer.render(scene, camera);
-    };
-
-    const onVisibility = () => {
-      visible = document.visibilityState === 'visible';
-    };
-    const onPointerMove = (event: PointerEvent) => {
-      const matrix = worldRef.current?.getScreenCTM();
-      if (!matrix) {
-        nearCenter = false;
-        return;
-      }
-      const point = new DOMPoint(centerX, centerY).matrixTransform(matrix);
-      const rect = host.getBoundingClientRect();
-      const dx = event.clientX - (rect.left + point.x - rect.left);
-      const dy = event.clientY - (rect.top + point.y - rect.top);
-      nearCenter = dx * dx + dy * dy < 280 * 280;
-    };
-    const onPointerLeave = () => { nearCenter = false; };
-    document.addEventListener('visibilitychange', onVisibility);
-    host.addEventListener('pointermove', onPointerMove, { passive: true });
-    host.addEventListener('pointerleave', onPointerLeave, { passive: true });
     const cameraObserver = new MutationObserver(() => syncPosition());
-    if (worldRef.current) cameraObserver.observe(worldRef.current, { attributes: true, attributeFilter: ['transform'] });
+    if (worldRef.current) {
+      cameraObserver.observe(worldRef.current, { attributes: true, attributeFilter: ['transform'] });
+    }
     syncPosition(true);
-    renderer.render(scene, camera);
-    render(performance.now());
 
     return () => {
-      cancelAnimationFrame(frame);
-      observer?.disconnect();
       cameraObserver.disconnect();
-      document.removeEventListener('visibilitychange', onVisibility);
-      host.removeEventListener('pointermove', onPointerMove);
-      host.removeEventListener('pointerleave', onPointerLeave);
+      image.remove();
       geometry.dispose();
       material.dispose();
       renderer.dispose();
-      renderer.domElement.remove();
     };
   }, [centerX, centerY, hostRef, worldRef]);
 
