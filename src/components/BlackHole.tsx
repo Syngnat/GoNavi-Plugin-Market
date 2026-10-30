@@ -83,18 +83,19 @@ const fragmentShader = /* glsl */ `
     color *= boost;
 
     float band = smoothstep(3.0, 3.55, r) * (1.0 - smoothstep(8.15, 9.0, r));
-    float alpha = band * (0.44 + 0.40 * texture);
+    float alpha = band * (0.58 + 0.38 * texture);
     // A narrow dark lane and bright rim prevent the disk from reading as a solid blob.
-    alpha *= 1.0 - 0.55 * smoothstep(0.58, 0.82, fbm(vec2(spin * 1.4, r * 7.0)));
-    return vec4(color, clamp(alpha, 0.0, 0.92));
+    alpha *= 1.0 - 0.42 * smoothstep(0.58, 0.82, fbm(vec2(spin * 1.4, r * 7.0)));
+    color *= 1.25;
+    return vec4(color, clamp(alpha, 0.0, 0.96));
   }
 
   void main() {
     vec2 screen = vUv * 2.0 - 1.0;
     screen.x *= uResolution.x / max(uResolution.y, 1.0);
 
-    vec3 ro = vec3(0.0, 0.72, 14.0);
-    vec3 target = vec3(0.0);
+    vec3 ro = vec3(0.0, 2.35, 14.0);
+    vec3 target = vec3(0.0, 0.0, 0.0);
     vec3 forward = normalize(target - ro);
     vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), forward));
     vec3 up = cross(forward, right);
