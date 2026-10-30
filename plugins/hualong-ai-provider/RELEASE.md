@@ -32,6 +32,21 @@
 
 3. 下载 Release 资产复核 SHA-256，再更新 `public/catalog.json` 的对应条目。
 
+## 服务端目录（桌面端市场）
+
+站点条目只是静态兜底；桌面端读的是市场服务端 `/api/v1/plugins`。1.2.0 是華龍第一次进服务端目录：
+
+```sh
+# 在 Bero 源站上，用 operator 连接串 + 工件目录环境跑官方导入（会走完整校验/发布流水线）
+sudo -u ... /srv/gonavi-plugin-market/server/gonavi-market-server \
+  -publish-official /path/gonavi-plugin-hualong-ai-1.2.0.zip -official-reviewer <admin-github-id>
+```
+
+- 前置：服务端清单校验 `internal/market/artifact_ai_provider.go` 必须认得 `defaultBaseUrl`
+  （`ba828b7` 补上；此前带该字段的包在发布预检即被拒），也就是说服务端二进制要 ≥ 该提交。
+- 发布后核对：`GET /api/v1/plugins?q=hualong` 返回 1.2.0 且 `official: true`，工件直链
+  `/api/v1/artifacts/<sha256>` 下载后 SHA-256 与 Release 一致。
+
 ## 注意
 
 - 打包必须使用市场仓根 `cmd/buildtool`。清单声明了 `contributes.aiProviders[].icon`
