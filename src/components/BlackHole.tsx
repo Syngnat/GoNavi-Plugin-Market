@@ -10,8 +10,8 @@ import {
   WebGLRenderer,
 } from 'three';
 
-const RENDER_SIZE = 360;
-const TARGET_FPS = 30;
+const RENDER_SIZE = 256;
+const TARGET_FPS = 20;
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -22,7 +22,7 @@ const vertexShader = /* glsl */ `
 `;
 
 const fragmentShader = /* glsl */ `
-  precision highp float;
+  precision mediump float;
   uniform float uTime;
   uniform vec2 uResolution;
   varying vec2 vUv;
@@ -52,7 +52,7 @@ const fragmentShader = /* glsl */ `
   float fbm(vec2 p) {
     float value = 0.0;
     float amplitude = 0.5;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
       value += amplitude * noise(p);
       p = rotate2d(0.63) * p * 2.03 + 17.1;
       amplitude *= 0.52;
@@ -157,7 +157,7 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }
 
     let renderer: WebGLRenderer;
     try {
-      renderer = new WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' });
+      renderer = new WebGLRenderer({ alpha: true, antialias: false, powerPreference: 'high-performance' });
     } catch {
       overlay.classList.add('is-webgl-unavailable');
       return;
