@@ -32,13 +32,11 @@ MongoShell 同时提供工作台标签页入口：
 ## 窗口入口
 
 
-- `window.entry`：`ui/index.html`
+- `contributes.pages.shell`：`ui/page.html`（内联进清单，仅工作台标签使用）
 - 入口动作：`connectionActions` → `open-shell`，`connectionTypes=["mongodb"]`，
   `scopes=["connection","database","collection"]`，`target.type="window"`
 - 窗口 UI 只通过 `window.gonaviPlugin.invoke` 调后端；不访问 `window.go`、Wails 绑定、
   宿主 store 或网络。
-- `ui/index.html` 按宿主契约声明宿主样式与 import map：
-
   ```html
   <link rel="stylesheet" href="/__gonavi/plugin-window/ui/style.css" />
   <script type="importmap">
