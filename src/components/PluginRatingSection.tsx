@@ -62,7 +62,8 @@ export function PluginRatingSection({
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [writeError, setWriteError] = useState('');
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'mine'>('all');
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const starsLabelId = useId();
   const bodyId = useId();
@@ -88,7 +89,8 @@ export function PluginRatingSection({
     setBody('');
     setFeedback('');
     setWriteError('');
-    setConfirmDelete(false);
+    setFilter('all');
+    setPendingDelete(null);
     setPage(1);
   }, [pluginId, account?.id]);
 
@@ -103,12 +105,16 @@ export function PluginRatingSection({
     setBody(mine.body);
   }, [mine?.userId, mine?.updatedAt, mine?.stars, mine?.body]);
 
-  const totalPages = Math.max(1, Math.ceil(ratings.length / PAGE_SIZE));
+  const filteredRatings = useMemo(
+    () => (filter === 'mine' ? ratings.filter((rating) => rating.userId === account?.id) : ratings),
+    [account?.id, filter, ratings],
+  );
+  const totalPages = Math.max(1, Math.ceil(filteredRatings.length / PAGE_SIZE));
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  const visibleRatings = ratings.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visibleRatings = filteredRatings.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const distribution = useMemo(
     () =>
       [...STAR_VALUES].reverse().map((star) => {
@@ -144,7 +150,7 @@ export function PluginRatingSection({
     setBusy(true);
     setWriteError('');
     setFeedback('');
-    setConfirmDelete(false);
+    setPendingDelete(null);
     try {
       await savePluginRating(pluginId, { stars, body: body.trim(), version }, csrf);
       setFeedback(mine ? '评价已更新。' : '评价已发布。');
@@ -157,13 +163,13 @@ export function PluginRatingSection({
     }
   };
 
-  const remove = async () => {
-    if (!account || !csrf) {
+  const removeRating = async (userId: string) => {
+    if (!account || !csrf || account.id !== userId) {
       setWriteError('请先登录插件市场再操作。');
       return;
     }
-    if (!confirmDelete) {
-      setConfirmDelete(true);
+    if (pendingDelete !== userId) {
+      setPendingDelete(userId);
       return;
     }
     setBusy(true);
@@ -174,7 +180,7 @@ export function PluginRatingSection({
       setFeedback('评价已删除。');
       setStars(5);
       setBody('');
-      setConfirmDelete(false);
+      setPendingDelete(null);
       await load();
       await onChanged();
     } catch (error) {
@@ -281,36 +287,6 @@ export function PluginRatingSection({
               {bodyBytes}/4000 字节
             </span>
             <div className="flex flex-wrap items-center gap-2">
-              {mine &&
-                (confirmDelete ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={remove}
-                      disabled={busy}
-                      className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
-                    >
-                      确认删除
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDelete(false)}
-                      disabled={busy}
-                      className="rounded-lg border border-hairline px-3 py-2 text-sm text-muted hover:text-ink disabled:opacity-60"
-                    >
-                      取消
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={remove}
-                    disabled={busy}
-                    className="rounded-lg border border-hairline px-3 py-2 text-sm text-muted hover:border-red-300 hover:text-red-700 disabled:opacity-60"
-                  >
-                    删除评价
-                  </button>
-                ))}
               <button
                 type="submit"
                 disabled={busy || bodyBytes > 4000 || stars < 1}
@@ -334,6 +310,44 @@ export function PluginRatingSection({
       )}
 
       <div className="mt-7 border-t border-hairline pt-5">
+        {account && (
+          <div
+            role="tablist"
+            aria-label="筛选评价"
+            className="mb-4 inline-flex rounded-lg border border-hairline bg-paper/60 p-1"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filter === 'all'}
+              onClick={() => {
+                setFilter('all');
+                setPage(1);
+                setPendingDelete(null);
+              }}
+              className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                filter === 'all' ? 'bg-card text-ink shadow-sm' : 'text-muted hover:text-ink'
+              }`}
+            >
+              全部评价 ({ratings.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filter === 'mine'}
+              onClick={() => {
+                setFilter('mine');
+                setPage(1);
+                setPendingDelete(null);
+              }}
+              className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                filter === 'mine' ? 'bg-card text-ink shadow-sm' : 'text-muted hover:text-ink'
+              }`}
+            >
+              我的评价 ({mine ? 1 : 0})
+            </button>
+          </div>
+        )}
         {loading ? (
           <p className="text-sm text-muted">正在加载评价…</p>
         ) : loadError ? (
@@ -343,38 +357,79 @@ export function PluginRatingSection({
               重试
             </button>
           </div>
-        ) : ratings.length === 0 ? (
-          <p className="text-sm text-muted">还没有评价，成为第一个打分的人。</p>
+        ) : filteredRatings.length === 0 ? (
+          <p className="text-sm text-muted">
+            {filter === 'mine' ? '你还没有评价。' : '还没有评价，成为第一个打分的人。'}
+          </p>
         ) : (
           <>
             <div className="space-y-4">
-              {visibleRatings.map((rating) => (
-                <article
-                  key={`${rating.userId}-${rating.updatedAt}`}
-                  className="border-b border-hairline pb-4 last:border-0 last:pb-0"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                    <span className="font-medium break-all">
-                      {account?.id === rating.userId ? '你' : `用户 ${rating.userId}`}
-                    </span>
-                    <span className="text-copper text-xs tracking-wide" aria-label={`${rating.stars} 星`}>
-                      {'★'.repeat(rating.stars)}
-                      <span className="text-muted/30">{'☆'.repeat(5 - rating.stars)}</span>
-                    </span>
-                  </div>
-                  <div className="mt-1 text-xs text-muted">
-                    {rating.version || '未标注版本'} · {relativeTime(rating.updatedAt)}
-                  </div>
-                  {rating.body && (
-                    <p className="mt-2 text-sm text-muted whitespace-pre-wrap break-words">{rating.body}</p>
-                  )}
-                </article>
-              ))}
+              {visibleRatings.map((rating) => {
+                const isMine = account?.id === rating.userId;
+                return (
+                  <article
+                    key={`${rating.userId}-${rating.updatedAt}`}
+                    className="border-b border-hairline pb-4 last:border-0 last:pb-0"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <span className="font-medium break-all">
+                        {isMine ? '你' : `用户 ${rating.userId}`}
+                      </span>
+                      <span className="text-copper text-xs tracking-wide" aria-label={`${rating.stars} 星`}>
+                        {'★'.repeat(rating.stars)}
+                        <span className="text-muted/30">{'☆'.repeat(5 - rating.stars)}</span>
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted">
+                      {rating.version || '未标注版本'} · {relativeTime(rating.updatedAt)}
+                    </div>
+                    {rating.body && (
+                      <p className="mt-2 text-sm text-muted whitespace-pre-wrap break-words">{rating.body}</p>
+                    )}
+                    {isMine && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        {pendingDelete === rating.userId ? (
+                          <>
+                            <span className="text-muted">删除这条评价？</span>
+                            <button
+                              type="button"
+                              onClick={() => void removeRating(rating.userId)}
+                              disabled={busy}
+                              className="rounded border border-red-300 px-2 py-1 font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                            >
+                              确认删除
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPendingDelete(null)}
+                              disabled={busy}
+                              className="rounded border border-hairline px-2 py-1 text-muted hover:text-ink disabled:opacity-60"
+                            >
+                              取消
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setPendingDelete(rating.userId)}
+                            disabled={busy}
+                            className="rounded border border-hairline px-2 py-1 text-muted hover:border-red-300 hover:text-red-700 disabled:opacity-60"
+                          >
+                            删除我的评价
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
             <div className="mt-5 flex items-center justify-between gap-3 text-xs text-muted">
               <span>
-                共 {ratings.length} 条可见评价
-                {count > ratings.length ? `，显示最近 ${ratings.length} 条` : ''}
+                共 {filteredRatings.length} 条{filter === 'mine' ? '我的评价' : '可见评价'}
+                {filter === 'all' && count > ratings.length
+                  ? `，显示最近 ${ratings.length} 条`
+                  : ''}
               </span>
               {totalPages > 1 && (
                 <div className="flex items-center gap-2">
