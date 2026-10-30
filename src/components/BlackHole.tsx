@@ -72,51 +72,51 @@ const fragmentShader = /* glsl */ `
     diskP.y *= 2.15;
     float diskRadius = length(diskP);
     float diskAngle = atan(diskP.y, diskP.x);
-    float inner = 0.30;
+    float inner = 0.32;
     float outer = 1.02;
-    float band = smoothstep(inner, inner + 0.055, diskRadius) *
-                 (1.0 - smoothstep(outer - 0.15, outer, diskRadius));
+    float band = smoothstep(inner, inner + 0.045, diskRadius) *
+                 (1.0 - smoothstep(outer - 0.19, outer, diskRadius));
 
     // Turbulent spiral structure; the phase moves so the disk visibly flows.
     float spiral = diskAngle * 2.6 + time * 0.34 + log(max(diskRadius, 0.001)) * 4.2;
     float turbulence = fbm(vec2(spiral, diskRadius * 9.0 - time * 0.18));
     float filaments = fbm(vec2(spiral * 2.2 + 13.0, diskRadius * 18.0 + time * 0.08));
-    float diskTexture = 0.48 + 0.58 * turbulence + 0.2 * filaments;
+    float diskTexture = 0.38 + 0.68 * turbulence + 0.24 * filaments;
 
     // Relativistic beaming: the approaching side is brighter and whiter.
-    float doppler = 0.48 + 1.35 * pow(max(0.0, cos(diskAngle + 0.72)), 2.4);
+    float doppler = 0.54 + 0.92 * pow(max(0.0, cos(diskAngle + 0.72)), 2.6);
     float disk = band * diskTexture * doppler;
 
     // Hot inner rim and the thin photon ring around the shadow.
-    float innerRim = exp(-pow((diskRadius - inner) * 24.0, 2.0)) * doppler;
-    float photonRing = exp(-pow((radius - 0.218) * 34.0, 2.0));
-    float photonHalo = exp(-pow((radius - 0.225) * 8.0, 2.0)) * 0.22;
-    float lensedArc = smoothstep(0.24, 0.30, radius) *
-                      (1.0 - smoothstep(0.60, 0.78, radius)) *
-                      smoothstep(0.02, 0.22, -p.y) *
-                      (0.30 + 0.7 * fbm(vec2(angle * 5.0 + time * 0.22, radius * 8.0)));
+    float innerRim = exp(-pow((diskRadius - inner) * 34.0, 2.0)) * doppler;
+    float photonRing = exp(-pow((radius - 0.209) * 92.0, 2.0));
+    float photonHalo = exp(-pow((radius - 0.222) * 15.0, 2.0)) * 0.15;
+    float lensedArc = smoothstep(0.225, 0.26, radius) *
+                      (1.0 - smoothstep(0.47, 0.62, radius)) *
+                      smoothstep(0.01, 0.12, -p.y) *
+                      (0.55 + 0.45 * fbm(vec2(angle * 5.0 + time * 0.22, radius * 8.0)));
 
-    vec3 ember = vec3(0.44, 0.075, 0.018);
-    vec3 copper = vec3(1.0, 0.34, 0.055);
-    vec3 whiteHot = vec3(1.0, 0.92, 0.72);
+    vec3 ember = vec3(0.40, 0.055, 0.012);
+    vec3 copper = vec3(1.0, 0.30, 0.038);
+    vec3 whiteHot = vec3(1.0, 0.94, 0.78);
     float heat = smoothstep(outer, inner, diskRadius);
     vec3 diskColor = mix(ember, copper, heat);
-    diskColor = mix(diskColor, whiteHot, pow(1.0 - smoothstep(inner, 0.64, diskRadius), 2.4));
+    diskColor = mix(diskColor, whiteHot, pow(1.0 - smoothstep(inner, 0.58, diskRadius), 2.8));
 
-    float alpha = max(disk * 0.92, innerRim * 0.90);
-    alpha = max(alpha, photonRing * 0.92 + photonHalo);
-    alpha = max(alpha, lensedArc * 0.34);
-    vec3 color = diskColor * max(disk, innerRim * 1.35);
-    color += whiteHot * (photonRing * 1.25 + photonHalo * 0.35);
-    color += copper * lensedArc * 0.30;
+    float alpha = max(disk * 0.72, innerRim * 0.55);
+    alpha = max(alpha, photonRing * 0.64 + photonHalo * 0.30);
+    alpha = max(alpha, lensedArc * 0.48);
+    vec3 color = diskColor * max(disk, innerRim * 1.1);
+    color += whiteHot * (photonRing * 0.95 + photonHalo * 0.30);
+    color += copper * lensedArc * 0.42;
 
-    // Event horizon: an opaque shadow, with a faint warm rim outside it.
-    float shadow = 1.0 - smoothstep(0.185, 0.202, radius);
-    float rim = exp(-pow((radius - 0.205) * 54.0, 2.0));
+    // Event horizon: an opaque shadow, with a fine warm rim outside it.
+    float shadow = 1.0 - smoothstep(0.185, 0.201, radius);
+    float rim = exp(-pow((radius - 0.204) * 72.0, 2.0));
     color = mix(color, vec3(0.0), shadow);
     alpha = max(alpha, shadow);
-    alpha = max(alpha, rim * 0.48);
-    color += whiteHot * rim * 0.55;
+    alpha = max(alpha, rim * 0.30);
+    color += whiteHot * rim * 0.34;
 
     // Soft outer corona so the black hole sits naturally on the star field.
     float corona = exp(-pow((radius - 0.42) * 3.4, 2.0)) * 0.055;
