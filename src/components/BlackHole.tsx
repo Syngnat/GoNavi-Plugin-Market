@@ -59,7 +59,7 @@ const fragmentShader = /* glsl */ `
     return value;
   }
 
-  vec3 diskSample(vec3 q, vec3 rayDir, float time) {
+  vec4 diskSample(vec3 q, vec3 rayDir, float time) {
     float r = length(q.xz);
     float theta = atan(q.z, q.x);
     float spin = theta * 3.1 + log(max(r, 0.01)) * 5.4 + time * 0.38;
