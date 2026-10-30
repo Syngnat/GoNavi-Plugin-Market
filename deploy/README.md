@@ -14,6 +14,24 @@ DNS 为 Cloudflare DNS-only（灰云直连），公网入口 `https://plugin.gon
 :80   ACME HTTP-01（/var/www/letsencrypt webroot）+ 301 → https
 ```
 
+## 一键发布（推荐）
+
+```bash
+deploy/publish-site.sh                    # 构建 origin/main 并发布
+deploy/publish-site.sh --dry-run          # 只构建打包，不连服务器
+deploy/publish-site.sh --ref <ref>        # 指定提交/分支
+deploy/publish-site.sh --keep 10          # 保留最近 10 个 release（默认 5）
+deploy/publish-site.sh --skip-verify      # 跳过源站与线上目录校验
+```
+
+脚本行为：在临时 worktree 里从**已提交的 ref** 构建（本地未提交改动不会上线）→
+打包 `dist` 并算 SHA-256 → 上传 `/root/plugin-market-staging.tar.gz` 远端校验 →
+解包到 `releases/site-<sha>-<ts>/` → 原子切换 `current` → 按 `--keep` 清理旧版本 →
+跑 `verify-origin.sh` 与线上 `catalog.json` 比对。远端根目录固定
+`/srv/gonavi-plugin-market`，主机默认 `BeroHost-6h16-DE`。
+
+回滚：`ssh BeroHost-6h16-DE 'ln -sfn /srv/gonavi-plugin-market/releases/<旧tag> /srv/gonavi-plugin-market/current.tmp && mv -Tf /srv/gonavi-plugin-market/current.tmp /srv/gonavi-plugin-market/current'`。
+
 ## 发布步骤
 
 1. 本地构建并打包（记录 tag 与 SHA-256）：
