@@ -188,9 +188,11 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     let frame = 0;
     let lastDraw = 0;
+    let lastSync = 0;
     const started = performance.now();
     let visible = true;
     let onScreen = true;
+    let nearCenter = false;
     const observer = typeof IntersectionObserver === 'undefined'
       ? null
       : new IntersectionObserver(
@@ -215,25 +217,45 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }
     const render = (now: number) => {
       frame = requestAnimationFrame(render);
       if (!visible || !onScreen || !activeRef.current) return;
-      const fps = reduced.matches ? 12 : TARGET_FPS;
-      if (now - lastDraw < 1000 / fps) return;
-      lastDraw = now;
-      const elapsed = reduced.matches ? 8.0 : (now - started) / 1000;
-      material.uniforms.uTime.value = elapsed;
+      if (now - lastSync < 1000 / 30) return;
+      lastSync = now;
       syncPosition();
+      if (!nearCenter || reduced.matches) return;
+      if (now - lastDraw < 1000 / TARGET_FPS) return;
+      lastDraw = now;
+      material.uniforms.uTime.value = (now - started) / 1000;
       renderer.render(scene, camera);
     };
 
     const onVisibility = () => {
       visible = document.visibilityState === 'visible';
     };
+    const onPointerMove = (event: PointerEvent) => {
+      const matrix = worldRef.current?.getScreenCTM();
+      if (!matrix) {
+        nearCenter = false;
+        return;
+      }
+      const point = new DOMPoint(centerX, centerY).matrixTransform(matrix);
+      const rect = host.getBoundingClientRect();
+      const dx = event.clientX - (rect.left + point.x - rect.left);
+      const dy = event.clientY - (rect.top + point.y - rect.top);
+      nearCenter = dx * dx + dy * dy < 280 * 280;
+    };
+    const onPointerLeave = () => { nearCenter = false; };
     document.addEventListener('visibilitychange', onVisibility);
+    host.addEventListener('pointermove', onPointerMove, { passive: true });
+    host.addEventListener('pointerleave', onPointerLeave, { passive: true });
+    syncPosition();
+    renderer.render(scene, camera);
     render(performance.now());
 
     return () => {
       cancelAnimationFrame(frame);
       observer?.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
+      host.removeEventListener('pointermove', onPointerMove);
+      host.removeEventListener('pointerleave', onPointerLeave);
       geometry.dispose();
       material.dispose();
       renderer.dispose();
