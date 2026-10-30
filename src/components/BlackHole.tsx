@@ -106,10 +106,10 @@ const fragmentShader = /* glsl */ `
 
     float alpha = max(disk * 0.66, innerRim * 0.48);
     alpha = max(alpha, photonRing * 0.46 + photonHalo * 0.22);
-    alpha = max(alpha, lensedArc * 0.50);
+    alpha = max(alpha, lensedArc * 0.34);
     vec3 color = diskColor * max(disk, innerRim * 1.05);
     color += whiteHot * (photonRing * 0.72 + photonHalo * 0.22);
-    color += copper * lensedArc * 0.50;
+    color += copper * lensedArc * 0.36;
 
     // Event horizon: an opaque shadow, with a fine warm rim outside it.
     float shadow = 1.0 - smoothstep(0.185, 0.199, radius);
@@ -118,29 +118,6 @@ const fragmentShader = /* glsl */ `
     alpha = max(alpha, shadow);
     alpha = max(alpha, rim * 0.22);
     color += whiteHot * rim * 0.25;
-
-    // The near side of the disk passes in front of the horizon; without this
-    // the hole reads as a flat black sticker with a halo behind it.
-    float frontBand = smoothstep(0.12, 0.17, diskRadius) * (1.0 - smoothstep(0.92, 1.04, diskRadius));
-    float frontTexture = 0.52 + 0.48 * fbm(vec2(spiral * 1.3, diskRadius * 12.0 - time * 0.12));
-    float frontDisk = frontBand * smoothstep(-0.025, 0.065, p.y) * frontTexture * 0.72;
-    color = mix(color, diskColor, clamp(frontDisk, 0.0, 0.72));
-    alpha = max(alpha, frontDisk);
-
-    // A second, thin upper image of the far side; this is the lensed arc that
-    // makes the disk wrap over the shadow instead of ending at its edge.
-    float upperArc = exp(-pow((diskRadius - 0.255 + 0.018 * cos(angle * 3.0)) * 18.0, 2.0)) *
-                     smoothstep(0.02, 0.15, -p.y) *
-                     smoothstep(0.22, 0.32, radius) *
-                     (0.35 + 0.65 * fbm(vec2(spiral * 0.7, radius * 7.0 - time * 0.08)));
-    color += copper * upperArc * 0.38;
-    alpha = max(alpha, upperArc * 0.34);
-
-    // Sparse lensed star glints around the Einstein ring.
-    float starCell = hash21(floor(vec2(angle * 28.0, radius * 34.0)));
-    float glint = step(0.992, starCell) * exp(-pow((radius - 0.46) * 9.0, 2.0));
-    color += whiteHot * glint * 0.45;
-    alpha = max(alpha, glint * 0.35);
 
     // Soft outer corona so the black hole sits naturally on the star field.
     float corona = exp(-pow((radius - 0.42) * 3.4, 2.0)) * 0.055;
