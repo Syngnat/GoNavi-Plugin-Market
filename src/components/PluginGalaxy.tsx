@@ -858,10 +858,10 @@ export function PluginGalaxy({
         >
           <image
             href="/galaxy/gargantua-map.webp"
-            x={0}
-            y={0}
-            width={1440}
-            height={900}
+            x={-462}
+            y={-327}
+            width={2400}
+            height={1500}
             preserveAspectRatio="xMidYMid slice"
             pointerEvents="none"
             aria-hidden="true"
