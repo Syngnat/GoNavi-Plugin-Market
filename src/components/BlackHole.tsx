@@ -10,7 +10,8 @@ import {
   WebGLRenderer,
 } from 'three';
 
-const BASE_SIZE = 480;
+const RENDER_SIZE = 360;
+const TARGET_FPS = 30;
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -51,7 +52,7 @@ const fragmentShader = /* glsl */ `
   float fbm(vec2 p) {
     float value = 0.0;
     float amplitude = 0.5;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 3; i++) {
       value += amplitude * noise(p);
       p = rotate2d(0.63) * p * 2.03 + 17.1;
       amplitude *= 0.52;
@@ -80,8 +81,7 @@ const fragmentShader = /* glsl */ `
     // Turbulent spiral structure; the phase moves so the disk visibly flows.
     float spiral = diskAngle * 2.6 + time * 0.34 + log(max(diskRadius, 0.001)) * 4.2;
     float turbulence = fbm(vec2(spiral, diskRadius * 9.0 - time * 0.18));
-    float filaments = fbm(vec2(spiral * 2.2 + 13.0, diskRadius * 18.0 + time * 0.08));
-    float diskTexture = 0.38 + 0.68 * turbulence + 0.24 * filaments;
+    float diskTexture = 0.42 + 0.82 * turbulence;
 
     // Relativistic beaming: the approaching side is brighter and whiter.
     float doppler = 0.60 + 0.62 * pow(max(0.0, cos(diskAngle + 0.72)), 2.8);
@@ -137,6 +137,7 @@ export interface BlackHoleProps {
   worldRef: RefObject<SVGGElement | null>;
   centerX: number;
   centerY: number;
+  active?: boolean;
 }
 
 /**
@@ -144,8 +145,10 @@ export interface BlackHoleProps {
  * synced to the map camera every frame, so pan/zoom carry it with the world
  * without making plugin nodes depend on WebGL.
  */
-export function BlackHole({ hostRef, worldRef, centerX, centerY }: BlackHoleProps) {
+export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }: BlackHoleProps) {
   const frameRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef(active);
+  activeRef.current = active;
 
   useEffect(() => {
     const overlay = frameRef.current;
@@ -168,7 +171,7 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY }: BlackHoleProp
       depthWrite: false,
       uniforms: {
         uTime: { value: 0 },
-        uResolution: { value: new Vector2(BASE_SIZE, BASE_SIZE) },
+        uResolution: { value: new Vector2(RENDER_SIZE, RENDER_SIZE) },
       },
       vertexShader,
       fragmentShader,
@@ -177,15 +180,26 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY }: BlackHoleProp
     scene.add(mesh);
     renderer.outputColorSpace = SRGBColorSpace;
     renderer.setClearColor(0x000000, 0);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(BASE_SIZE, BASE_SIZE, false);
+    renderer.setPixelRatio(1);
+    renderer.setSize(RENDER_SIZE, RENDER_SIZE, false);
     overlay.prepend(renderer.domElement);
     renderer.domElement.className = 'galaxy-black-hole-canvas';
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     let frame = 0;
+    let lastDraw = 0;
     const started = performance.now();
     let visible = true;
+    let onScreen = true;
+    const observer = typeof IntersectionObserver === 'undefined'
+      ? null
+      : new IntersectionObserver(
+          (entries) => {
+            onScreen = entries[0]?.isIntersecting ?? true;
+          },
+          { threshold: 0 },
+        );
+    observer?.observe(host);
 
     const syncPosition = () => {
       const world = worldRef.current;
@@ -199,15 +213,15 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY }: BlackHoleProp
     };
 
     const render = (now: number) => {
-      if (!visible) {
-        frame = requestAnimationFrame(render);
-        return;
-      }
+      frame = requestAnimationFrame(render);
+      if (!visible || !onScreen || !activeRef.current) return;
+      const fps = reduced.matches ? 12 : TARGET_FPS;
+      if (now - lastDraw < 1000 / fps) return;
+      lastDraw = now;
       const elapsed = reduced.matches ? 8.0 : (now - started) / 1000;
       material.uniforms.uTime.value = elapsed;
       syncPosition();
       renderer.render(scene, camera);
-      frame = requestAnimationFrame(render);
     };
 
     const onVisibility = () => {
@@ -218,6 +232,7 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY }: BlackHoleProp
 
     return () => {
       cancelAnimationFrame(frame);
+      observer?.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
       geometry.dispose();
       material.dispose();

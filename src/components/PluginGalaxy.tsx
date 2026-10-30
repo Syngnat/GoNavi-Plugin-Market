@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { PluginItem } from '../api/types';
-import { BlackHole } from './BlackHole';
+const BlackHole = lazy(() => import('./BlackHole').then((module) => ({ default: module.BlackHole })));
 import { InstallButton } from './InstallButton';
 
 export type GalaxyCategory = '全部' | '数据源' | 'AI 供应商' | '导出器' | '技能' | '面板' | '命令' | '运维' | '其他';
@@ -604,14 +604,20 @@ export function PluginGalaxy({
     root?.addEventListener('wheel', handleWheel, { passive: false });
 
     let last = performance.now();
+    let lastPaint = 0;
     let frame = 0;
     const loop = (now: number) => {
+      frame = requestAnimationFrame(loop);
+      if (document.visibilityState === 'hidden') return;
       const dt = Math.min(0.034, (now - last) / 1000);
       last = now;
       const rig = rigRef.current;
       if (!rig.reduced && rig.mode !== 'idle' && rig.mode !== 'drag') stepRig(rig, dt, now);
-      paint(now);
-      frame = requestAnimationFrame(loop);
+      const interval = rig.reduced ? 100 : 1000 / 30;
+      if (now - lastPaint >= interval) {
+        paint(now);
+        lastPaint = now;
+      }
     };
     paint(performance.now());
     frame = requestAnimationFrame(loop);
@@ -878,12 +884,15 @@ export function PluginGalaxy({
       </svg>
 
       <div className="galaxy-nodes" aria-label="插件对象">
-        <BlackHole
-          hostRef={observatoryRef}
-          worldRef={worldRef}
-          centerX={WORLD.cx}
-          centerY={WORLD.cy}
-        />
+        <Suspense fallback={null}>
+          <BlackHole
+            hostRef={observatoryRef}
+            worldRef={worldRef}
+            centerX={WORLD.cx}
+            centerY={WORLD.cy}
+            active={view === 'map'}
+          />
+        </Suspense>
         {nodes.map((node, index) => {
           const visible = pluginMatches(node.item, activeCategory, query);
           return (

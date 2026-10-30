@@ -219,6 +219,7 @@ body {
   width: 480px;
   height: 480px;
   pointer-events: none;
+  contain: layout paint;
   transform-origin: center;
   will-change: transform;
 }
@@ -244,7 +245,6 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 0 22px rgba(255, 107, 31, 0.16));
 }
 
 .galaxy-black-hole-caption {
