@@ -44,6 +44,8 @@ A package may declare up to **8 providers**, each with **1–32 static models**.
 
 The host reads the bounded file without starting the plugin, verifies the image type from its bytes, and returns a data URL in the provider catalog. The AI settings provider list and saved provider rows then show the brand logo. Missing, oversized, linked or non-raster files are omitted and the UI falls back to the provider's first letter. Inline base64 icons in the manifest are not supported; ship the file in the package.
 
+A provider-only icon also becomes the installed-plugin logo when the manifest declares no top-level `icon`. The top-level field follows the same raster, size and packaged-file rules; see the [SDK icon section](<sdk.md#plugin-and-ai-provider-icons>).
+
 Provider commands are reserved. Generic plugin invocation, ordinary Agent tools and plugin UI/window command menus cannot call them—even if the package also requests `ai.tools`. The host routes model operations through its private generation/digest-bound API. A model's tool-call suggestion does not execute a tool or bypass approvals.
 
 ## Build, inspect and configure

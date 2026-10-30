@@ -47,9 +47,14 @@ func (index *artifactIndex) validateManifest(ctx context.Context) (ValidatedPack
 			return ValidatedPackage{}, fmt.Errorf("invalid window title or dimensions")
 		}
 	}
+	if manifest.Icon != "" {
+		if err := index.referenceIcon(manifest.Icon); err != nil {
+			return ValidatedPackage{}, fmt.Errorf("plugin icon: %w", err)
+		}
+	}
 	for _, provider := range manifest.Contributes.AIProviders {
 		if provider.Icon != "" {
-			if err := index.reference(provider.Icon); err != nil {
+			if err := index.referenceIcon(provider.Icon); err != nil {
 				return ValidatedPackage{}, fmt.Errorf("ai provider icon: %w", err)
 			}
 		}
@@ -79,6 +84,9 @@ func validateArtifactMetadata(manifest artifactManifest) error {
 	}
 	if manifest.MinHostVersion != "" && !validArtifactVersion(manifest.MinHostVersion) {
 		return fmt.Errorf("invalid minimum host version")
+	}
+	if manifest.Icon != "" && !validArtifactIconPath(manifest.Icon) {
+		return fmt.Errorf("invalid plugin icon")
 	}
 	if manifest.Permissions == nil || len(manifest.Permissions) > 64 || len(manifest.Requires) > 64 {
 		return fmt.Errorf("permissions array is required; at most 64 permissions or dependencies")

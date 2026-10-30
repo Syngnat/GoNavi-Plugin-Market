@@ -86,9 +86,9 @@ Each contribution type has one SDK entry point. Use it instead of writing the JS
 | Manifest shapes | `Backend`, `Requirement`, `Panel` |
 | Exporter payload | `ExporterChunkRows`, `EncodeExporterChunkRequest`, `ExporterChunkResult`, `ExporterMaxEnvelopeBytes` and the cell kinds `ExporterBoolean`, `ExporterNumber`, `ExporterString`, `ExporterJSON`, `ExporterNull`, `ExporterMissing`, `ExporterBinary` |
 
-### AI provider icons
+### Plugin and AI provider icons
 
-An AI provider may set `icon` to a package-relative `.png`, `.jpg`, `.jpeg`, `.webp` or `.gif` file at most 64 KiB. Include the file in the package; inspection rejects a declared but missing icon. The host reads it without starting the plugin and shows it in the AI settings provider list. SVG is not accepted, and inline base64 icons belong in the provider catalog only as the host-produced data URL, not in the manifest.
+The optional top-level `icon` names the logo the host shows on the installed-plugin card; the optional `contributes.aiProviders[].icon` names the logo shown in the AI settings provider list, and a plugin without a top-level icon falls back to its first provider icon. Both are package-relative `.png`, `.jpg`, `.jpeg`, `.webp` or `.gif` files of at most 64 KiB, and the path itself stays within 256 bytes. Include the file in the package: `gonavi plugin check`, `gonavi plugin install --digest` and marketplace inspection reject a declared but missing, non-raster or oversized icon. The host reads the bounded file without starting the plugin and verifies the image type from its bytes. SVG is not accepted because icons render in the main window, and inline base64 icons belong in the provider catalog only as the host-produced data URL, not in the manifest.
 
 ### AI provider images
 

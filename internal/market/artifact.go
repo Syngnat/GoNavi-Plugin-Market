@@ -110,6 +110,8 @@ type artifactPath struct {
 	name      string
 	directory bool
 	explicit  bool
+	// size 是归档头声明的未压缩字节数；目录与隐式父目录保持 0。
+	size int64
 }
 
 type artifactIndex struct {
@@ -187,7 +189,7 @@ func (index *artifactIndex) add(name string, directory bool, size int64) error {
 	if previous, found := index.paths[key]; found && (previous.explicit || !directory || previous.name != name) {
 		return fmt.Errorf("duplicate or conflicting artifact path")
 	}
-	index.paths[key] = artifactPath{name: name, directory: directory, explicit: true}
+	index.paths[key] = artifactPath{name: name, directory: directory, explicit: true, size: size}
 	if len(index.paths) > maxArtifactPaths {
 		return fmt.Errorf("artifact exceeds total path limit")
 	}

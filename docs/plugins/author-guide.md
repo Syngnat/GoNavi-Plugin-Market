@@ -123,6 +123,8 @@ icons/<清单声明的品牌图标>
 LICENSE
 ```
 
+品牌图标可选：顶层 `icon` 决定已安装插件卡片的 Logo，`contributes.aiProviders[].icon` 决定 AI 供应商列表的图标。两者都是包内相对的 PNG/JPEG/WebP/GIF，单个文件不超过 64 KiB；声明了就必须打进包里，SVG 和缺失文件都会被 `check` 与市场检查拒绝。
+
 实际文件名和相对路径必须与 `backend.platforms`、`contributes` 和 `window` 中的声明逐项一致。示例打包器单次构建一个平台；发布多平台包时，需要分别构建并把各平台产物放进同一个归档。不要打包：
 
 - `.git`、构建缓存、测试数据库、密钥、口令和本地配置；
