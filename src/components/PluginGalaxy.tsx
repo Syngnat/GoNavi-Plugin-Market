@@ -856,16 +856,6 @@ export function PluginGalaxy({
           data-zoom-level="normal"
           transform={cameraTransform(DEFAULT_CAMERA)}
         >
-          <image
-            href="/galaxy/gargantua-map.webp"
-            x={-462}
-            y={-327}
-            width={2400}
-            height={1500}
-            preserveAspectRatio="xMidYMid slice"
-            pointerEvents="none"
-            aria-hidden="true"
-          />
           <circle cx={WORLD.cx} cy={WORLD.cy} r="620" fill="url(#galaxyHalo)" />
           <g className="galaxy-axis" aria-hidden="true" transform={`rotate(-11 ${WORLD.cx} ${WORLD.cy})`}>
             <ellipse className="orbit-wash" cx={WORLD.cx} cy={WORLD.cy} rx={OUTER_ORBIT.rx} ry={OUTER_ORBIT.ry} fill="url(#orbitWash)" />
@@ -882,15 +872,16 @@ export function PluginGalaxy({
             <text x="735" y="748">SOUTH / SKILL</text>
             <text x="322" y="430" textAnchor="end">WEST / OPS</text>
           </g>
-          <text
-            className="galaxy-core-caption"
-            x={WORLD.cx}
-            y={WORLD.cy + 285}
-            textAnchor="middle"
-            aria-hidden="true"
-          >
-            GONAVI
-          </text>
+          <g className="galaxy-core" transform={`translate(${WORLD.cx} ${WORLD.cy})`}>
+            <circle className="core-corona" r="230" fill="url(#coreCorona)" />
+            <circle className="core-halo" r="96" fill="url(#galaxySweep)" />
+            <circle className="core-ring" r="58" />
+            <circle className="core-ring reverse" r="40" />
+            <circle className="core-body" r="22" />
+            <circle className="core-inner" r="16" fill="url(#galaxyCore)" />
+            <circle className="core-hot" r="5.5" />
+            <text className="core-caption" y="46">GONAVI</text>
+          </g>
 
           <g className="galaxy-coordinates" aria-hidden="true">
             <text x="118" y="118">X 012.4 / Y 086.1</text>

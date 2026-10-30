@@ -214,14 +214,6 @@ body {
   cursor: grabbing !important;
 }
 
-.galaxy-core-caption {
-  fill: #f0b181;
-  font-family: var(--font-code);
-  font-size: calc(9px + var(--gx-type-bump));
-  font-weight: 500;
-  letter-spacing: 0.22em;
-}
-
 .galaxy-map text {
   user-select: none;
   pointer-events: none;
