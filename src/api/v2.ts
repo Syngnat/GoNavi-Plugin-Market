@@ -1,6 +1,7 @@
 import type {
   ListPage,
   PackageInspection,
+  PluginRating,
   PublisherPlugin,
   ReleaseInspection,
   SourceUpdateResult,
@@ -185,6 +186,48 @@ export function webLoginUrl(returnTo: string): string {
 
 export async function logoutWebSession(csrf: string): Promise<void> {
   await requestJson<{ revoked: boolean }>('/auth/web/logout', { method: 'POST', csrf });
+}
+
+// ---- 插件评分 ----
+
+export interface RatingInput {
+  stars: number;
+  body: string;
+  version?: string;
+}
+
+/** 公开读取可见评价；服务端最多返回最近 100 条。 */
+export async function fetchPluginRatings(
+  pluginId: string,
+  signal?: AbortSignal,
+): Promise<PluginRating[]> {
+  const ratings = await requestJson<PluginRating[]>(
+    `/plugins/${encodeURIComponent(pluginId)}/ratings`,
+    { signal },
+  );
+  return Array.isArray(ratings) ? ratings : [];
+}
+
+/** 登录用户新增或更新自己的评分；作者自评由服务端拒绝。 */
+export function savePluginRating(
+  pluginId: string,
+  input: RatingInput,
+  csrf: string,
+): Promise<PluginRating> {
+  return requestJson<PluginRating>(`/plugins/${encodeURIComponent(pluginId)}/rating`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+    csrf,
+  });
+}
+
+/** 删除当前登录用户自己的评分。 */
+export function deletePluginRating(pluginId: string, csrf: string): Promise<{ deleted: boolean }> {
+  return requestJson<{ deleted: boolean }>(`/plugins/${encodeURIComponent(pluginId)}/rating`, {
+    method: 'DELETE',
+    csrf,
+  });
 }
 
 // ---- 发布者接口 ----

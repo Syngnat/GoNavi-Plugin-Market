@@ -65,6 +65,16 @@ export interface PluginReview {
   body: string;
 }
 
+/** 市场服务公开返回的一条真实评分；userId 由服务端会话派生，不接受客户端伪造。 */
+export interface PluginRating {
+  userId: string;
+  pluginId: string;
+  stars: number;
+  body: string;
+  version: string;
+  updatedAt: string;
+}
+
 // ---- 网站账号与发布闭环（v2）----
 // 契约见 docs/v2-api.md；字段与 GoNavi market 服务的 /api/v1/auth/web 与 /api/v1/publisher 保持一致。
 

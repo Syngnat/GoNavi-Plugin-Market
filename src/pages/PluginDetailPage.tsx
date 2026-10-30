@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { InstallButton } from '../components/InstallButton';
+import { PluginRatingSection } from '../components/PluginRatingSection';
 import { fetchPluginDetail, NotFoundError } from '../api/client';
 import type { PluginDetail } from '../api/types';
 import { formatBytes, formatCount, relativeTime } from '../lib/format';
@@ -35,6 +36,14 @@ export function PluginDetailPage() {
     return () => {
       alive = false;
     };
+  }, [id]);
+
+  const refreshDetail = useCallback(async () => {
+    try {
+      setDetail(await fetchPluginDetail(id));
+    } catch {
+      // 评分成功后详情刷新失败时保留当前内容，避免整页回退成错误态。
+    }
   }, [id]);
 
   if (state === 'loading') {
@@ -193,42 +202,14 @@ export function PluginDetailPage() {
             </div>
           </section>
 
-          {detail.reviews && detail.reviews.length > 0 && (
-            <section className="bg-card rounded-xl border border-hairline shadow-sm p-8">
-              <div className="flex items-end justify-between mb-5">
-                <h2 className="font-headline font-bold text-lg">评价</h2>
-                <div className="text-right">
-                  <div className="text-2xl font-headline font-bold leading-none">
-                    {detail.ratingAverage !== undefined ? detail.ratingAverage.toFixed(1) : '—'}
-                  </div>
-                  <div className="text-xs text-muted mt-1">{detail.ratingCount} 条评价</div>
-                </div>
-              </div>
-              {detail.ratingDistribution && detail.ratingDistribution.length === 5 && (
-                <div className="space-y-2 mb-6">
-                  {detail.ratingDistribution.map((percent, index) => (
-                    <div key={index} className="flex items-center gap-3 text-xs text-muted">
-                      <span className="w-4 text-right">{5 - index}</span>
-                      <div className="flex-1 h-1.5 rounded-full bg-paper overflow-hidden">
-                        <div className="h-full bg-copper" style={{ width: `${percent}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="space-y-4 border-t border-hairline pt-5">
-                {detail.reviews.map((review) => (
-                  <div key={review.author}>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{review.author}</span>
-                      <span className="text-copper text-xs tracking-wide">{'★'.repeat(review.stars)}</span>
-                    </div>
-                    <p className="text-sm text-muted mt-1">{review.body}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+          <PluginRatingSection
+            pluginId={detail.id}
+            version={detail.version}
+            publisherId={detail.publisherId}
+            ratingAverage={detail.ratingAverage}
+            ratingCount={detail.ratingCount}
+            onChanged={refreshDetail}
+          />
         </div>
 
         <aside className="lg:col-span-5 lg:sticky lg:top-24 space-y-6">
