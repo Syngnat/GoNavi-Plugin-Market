@@ -8,7 +8,8 @@ export interface BlackHoleProps {
 }
 
 /**
- * The black hole is a pre-rendered transparent frame. Keeping it as an image
+ * The black hole is a pre-rendered transparent frame derived from the MIT
+ * Gargantua raytracer (github.com/Sun-sh902/Gargantua), composited offline. Keeping it as an image
  * avoids a permanent WebGL context and shader compilation on the star map,
  * while the SVG camera still moves it with the world.
  */
