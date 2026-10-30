@@ -1,6 +1,6 @@
 # Black hole artwork attribution
 
-`black-hole.webp` is cropped, alpha-masked and resized from the hero frame of
+`gargantua-map.webp` is Composited (soft-masked black hole) over the site nebula from the hero frame of
 [Sun-sh902/Gargantua](https://github.com/Sun-sh902/Gargantua), a Schwarzschild
 black-hole raytracer released under the MIT License.
 

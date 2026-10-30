@@ -209,67 +209,17 @@ body {
   user-select: none;
 }
 
-.galaxy-black-hole {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 2;
-  width: 640px;
-  height: 360px;
-  pointer-events: none;
-  transform-origin: center;
+.galaxy-observatory.is-panning,
+.galaxy-observatory.is-panning * {
+  cursor: grabbing !important;
 }
 
-.galaxy-black-hole::before {
-  position: absolute;
-  inset: 27%;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    #000 0 34%,
-    rgba(255, 128, 49, 0.2) 35%,
-    rgba(255, 90, 20, 0.08) 48%,
-    transparent 72%
-  );
-  content: '';
-}
-
-.galaxy-black-hole-canvas {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.galaxy-black-hole-caption {
-  position: absolute;
-  z-index: 2;
-  right: 0;
-  bottom: 4%;
-  left: 0;
-  color: #f0b181;
+.galaxy-core-caption {
+  fill: #f0b181;
   font-family: var(--font-code);
   font-size: calc(9px + var(--gx-type-bump));
   font-weight: 500;
   letter-spacing: 0.22em;
-  text-align: center;
-  text-shadow: 0 0 14px rgba(255, 116, 35, 0.5);
-}
-
-.galaxy-black-hole.is-webgl-unavailable::before {
-  inset: 32%;
-  background: radial-gradient(circle, #000 0 44%, rgba(255, 126, 42, 0.55) 46%, transparent 70%);
-  filter: none;
-}
-
-.galaxy-observatory.is-list-mode .galaxy-black-hole {
-  display: none;
-}
-
-.galaxy-observatory.is-panning,
-.galaxy-observatory.is-panning * {
-  cursor: grabbing !important;
 }
 
 .galaxy-map text {

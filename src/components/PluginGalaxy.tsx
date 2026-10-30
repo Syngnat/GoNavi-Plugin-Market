@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { Link } from 'react-router-dom';
 import type { PluginItem } from '../api/types';
 import { InstallButton } from './InstallButton';
-import { BlackHole } from './BlackHole';
 
 export type GalaxyCategory = '全部' | '数据源' | 'AI 供应商' | '导出器' | '技能' | '面板' | '命令' | '运维' | '其他';
 
@@ -857,6 +856,16 @@ export function PluginGalaxy({
           data-zoom-level="normal"
           transform={cameraTransform(DEFAULT_CAMERA)}
         >
+          <image
+            href="/galaxy/gargantua-map.webp"
+            x={0}
+            y={0}
+            width={1440}
+            height={900}
+            preserveAspectRatio="xMidYMid slice"
+            pointerEvents="none"
+            aria-hidden="true"
+          />
           <circle cx={WORLD.cx} cy={WORLD.cy} r="620" fill="url(#galaxyHalo)" />
           <g className="galaxy-axis" aria-hidden="true" transform={`rotate(-11 ${WORLD.cx} ${WORLD.cy})`}>
             <ellipse className="orbit-wash" cx={WORLD.cx} cy={WORLD.cy} rx={OUTER_ORBIT.rx} ry={OUTER_ORBIT.ry} fill="url(#orbitWash)" />
@@ -873,6 +882,15 @@ export function PluginGalaxy({
             <text x="735" y="748">SOUTH / SKILL</text>
             <text x="322" y="430" textAnchor="end">WEST / OPS</text>
           </g>
+          <text
+            className="galaxy-core-caption"
+            x={WORLD.cx}
+            y={WORLD.cy + 285}
+            textAnchor="middle"
+            aria-hidden="true"
+          >
+            GONAVI
+          </text>
 
           <g className="galaxy-coordinates" aria-hidden="true">
             <text x="118" y="118">X 012.4 / Y 086.1</text>
@@ -883,12 +901,6 @@ export function PluginGalaxy({
       </svg>
 
       <div className="galaxy-nodes" aria-label="插件对象">
-        <BlackHole
-          hostRef={observatoryRef}
-          worldRef={worldRef}
-          centerX={WORLD.cx}
-          centerY={WORLD.cy}
-        />
         {nodes.map((node, index) => {
           const visible = pluginMatches(node.item, activeCategory, query);
           return (
