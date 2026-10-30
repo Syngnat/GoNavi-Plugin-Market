@@ -36,9 +36,13 @@ func (s *Server) syncRelease(ctx context.Context, plugin SourcePlugin) (SyncOutc
 	if err != nil {
 		return SyncOutcome{PluginID: plugin.PluginID, Skipped: true, Reason: "invalid source url"}, err
 	}
-	release, err := s.releases.LatestRelease(ctx, owner, repo)
+	release, err := s.pluginRelease(ctx, owner, repo, plugin)
 	if err != nil {
-		return SyncOutcome{PluginID: plugin.PluginID, Skipped: true, Reason: "release unavailable"}, err
+		reason := "release unavailable"
+		if errors.Is(err, ErrTagPrefixUnsupported) {
+			reason = "tag prefix tracking unsupported"
+		}
+		return SyncOutcome{PluginID: plugin.PluginID, Skipped: true, Reason: reason}, err
 	}
 	archive, err := s.releases.FetchAsset(ctx, release.AssetURL)
 	if err != nil || len(archive) == 0 || int64(len(archive)) > MaxArtifactBytes {
@@ -106,6 +110,23 @@ func (s *Server) validateReleaseArchive(ctx context.Context, archive []byte, nam
 		return ValidatedPackage{}, fmt.Errorf("stage release archive failed")
 	}
 	return ValidatePackage(ctx, path)
+}
+
+// ErrTagPrefixUnsupported marks a fetcher that cannot filter by tag prefix, so a
+// shared-repository plugin is skipped instead of publishing the wrong archive.
+var ErrTagPrefixUnsupported = errors.New("release fetcher cannot filter by tag prefix")
+
+// pluginRelease picks the release that belongs to this plugin: a tag-prefixed
+// stream in a shared repository, otherwise the repository-wide latest release.
+func (s *Server) pluginRelease(ctx context.Context, owner, repo string, plugin SourcePlugin) (ReleaseSource, error) {
+	if plugin.TagPrefix == "" {
+		return s.releases.LatestRelease(ctx, owner, repo)
+	}
+	tagged, ok := s.releases.(TaggedReleaseFetcher)
+	if !ok {
+		return ReleaseSource{}, ErrTagPrefixUnsupported
+	}
+	return tagged.LatestTaggedRelease(ctx, owner, repo, plugin.TagPrefix)
 }
 
 // SyncAllReleases runs one pass over every tracked plugin. Single-plugin

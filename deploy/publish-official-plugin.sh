@@ -20,6 +20,7 @@ REVIEWER=""
 HOST=BeroHost-6h16-DE
 PORT=""
 NAMESPACE=com.gonavi
+TAG_PREFIX=""
 SERVER_BIN=/srv/gonavi-plugin-market/server/gonavi-market-server
 ENV_FILE=/etc/gonavi-market/env
 DRY_RUN=0
@@ -32,6 +33,7 @@ while [ $# -gt 0 ]; do
     --host) HOST=$2; shift 2 ;;
     --port) PORT=$2; shift 2 ;;
     --namespace) NAMESPACE=$2; shift 2 ;;
+    --tag-prefix) TAG_PREFIX=$2; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help) sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -41,6 +43,10 @@ done
 log() { printf '%s\n' "==> $*"; }
 
 [ -n "$PLUGIN" ] && [ -n "$TAG" ] || { echo "--plugin and --tag are required" >&2; exit 2; }
+# mongo-shell-v1.0.4 -> mongo-shell-v, so sync can tell this plugin's stream apart.
+if [ -z "$TAG_PREFIX" ]; then
+  TAG_PREFIX=$(printf '%s' "$TAG" | sed -E 's/[0-9].*$//')
+fi
 MANIFEST="$REPO_ROOT/plugins/$PLUGIN/gonavi.plugin.json"
 [ -f "$MANIFEST" ] || { echo "no manifest at $MANIFEST" >&2; exit 1; }
 PLUGIN_ID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$MANIFEST")
@@ -83,7 +89,9 @@ fi
 log "import through the submission pipeline"
 ssh "${SSH_ARGS[@]}" "$HOST" "set -euo pipefail
   set -a; . $ENV_FILE; set +a
-  $SERVER_BIN -publish-official $REMOTE_PATH -official-namespace $NAMESPACE $REVIEW_ARGS
+  $SERVER_BIN -publish-official $REMOTE_PATH -official-namespace $NAMESPACE \
+    -official-source https://github.com/Syngnat/GoNavi-Plugin-Market \
+    -official-tag-prefix '$TAG_PREFIX' $REVIEW_ARGS
   rm -f $REMOTE_PATH
 "
 

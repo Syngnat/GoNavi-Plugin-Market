@@ -14,6 +14,15 @@ DNS 为 Cloudflare DNS-only（灰云直连），公网入口 `https://plugin.gon
 :80   ACME HTTP-01（/var/www/letsencrypt webroot）+ 301 → https
 ```
 
+### 迁移与同步的运维前提
+
+- 迁移用**表 owner** 连接执行：`-migrate` 会优先读 `GONAVI_MARKET_MIGRATION_DATABASE_URL`，
+  缺省才退回运行角色的 `GONAVI_MARKET_DATABASE_URL`。运行角色 `gonavi_market_app` 不是表
+  owner，直接拿它跑 `ALTER TABLE` 会报 `must be owner of table`。
+- 官方插件在同一个仓里，`release_tag_prefix` 决定同步看哪条 tag 流（如 `mongo-shell-v`）。
+  `publish-official-plugin.sh` 会按 tag 自动推导并写入；没有前缀时同步会跳过该插件而不是
+  拿仓库 latest 乱发。
+
 ## 上架官方插件版本（多插件仓库必走）
 
 站点的插件列表来自 `/api/v1`（数据库），不是 `public/catalog.json`；`catalog.json` 只描述

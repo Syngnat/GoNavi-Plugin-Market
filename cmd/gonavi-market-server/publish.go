@@ -38,7 +38,7 @@ func publishOfficial(ctx context.Context, db *sql.DB, options commandOptions) er
 	if current, pluginErr := repository.Plugin(ctx, packageInfo.ID); pluginErr == nil &&
 		current.Version == packageInfo.Version && current.Artifact != nil && current.Artifact.SHA256 == packageInfo.SHA256 {
 		logger.Infof("market plugin %s %s already published with identical artifact", packageInfo.ID, packageInfo.Version)
-		return nil
+		return trackOfficialSource(ctx, repository, packageInfo.ID, options)
 	}
 	publisher := market.Account{ID: officialPublisherAccount, Role: "publisher", PublisherID: options.namespace, Official: true}
 	submission, err := repository.BeginSubmission(ctx, publisher, packageInfo.ID, packageInfo.Version)
@@ -60,6 +60,19 @@ func publishOfficial(ctx context.Context, db *sql.DB, options commandOptions) er
 		return err
 	}
 	logger.Infof("market plugin %s %s published by official import", packageInfo.ID, packageInfo.Version)
+	return trackOfficialSource(ctx, repository, packageInfo.ID, options)
+}
+
+// trackOfficialSource registers where the plugin is released so the periodic
+// sync can keep it current without another manual import.
+func trackOfficialSource(ctx context.Context, repository *market.Postgres, pluginID string, options commandOptions) error {
+	if options.officialSource == "" {
+		return nil
+	}
+	if err := repository.SetPluginTracking(ctx, pluginID, options.officialSource, options.officialTagPrefix); err != nil {
+		return fmt.Errorf("track official source failed: %w", err)
+	}
+	logger.Infof("market plugin %s tracks %s (tag prefix %q)", pluginID, options.officialSource, options.officialTagPrefix)
 	return nil
 }
 

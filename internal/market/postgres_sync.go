@@ -9,13 +9,14 @@ import (
 type SourcePlugin struct {
 	PluginID         string
 	SourceURL        string
+	TagPrefix        string
 	Owner            Account
 	PublishedVersion string
 }
 
 // SourcePlugins lists every plugin registered for GitHub release auto-sync.
 func (p *Postgres) SourcePlugins(ctx context.Context) ([]SourcePlugin, error) {
-	rows, err := p.db.QueryContext(ctx, `SELECT p.id,p.source_url,u.id,u.login,u.role,u.publisher_id,u.official,
+	rows, err := p.db.QueryContext(ctx, `SELECT p.id,p.source_url,COALESCE(p.release_tag_prefix,''),u.id,u.login,u.role,u.publisher_id,u.official,
 		COALESCE((SELECT version FROM market_versions WHERE plugin_id=p.id AND state='published' ORDER BY updated_at DESC,id LIMIT 1),'')
 		FROM market_plugins p JOIN market_users u ON u.id=p.owner_id WHERE p.source_url<>'' ORDER BY p.id`)
 	if err != nil {
@@ -25,7 +26,7 @@ func (p *Postgres) SourcePlugins(ctx context.Context) ([]SourcePlugin, error) {
 	result := []SourcePlugin{}
 	for rows.Next() {
 		var item SourcePlugin
-		if err = rows.Scan(&item.PluginID, &item.SourceURL, &item.Owner.ID, &item.Owner.Login, &item.Owner.Role,
+		if err = rows.Scan(&item.PluginID, &item.SourceURL, &item.TagPrefix, &item.Owner.ID, &item.Owner.Login, &item.Owner.Role,
 			&item.Owner.PublisherID, &item.Owner.Official, &item.PublishedVersion); err != nil {
 			return nil, repositoryError(err)
 		}
@@ -62,6 +63,22 @@ func (p *Postgres) storePluginSource(ctx context.Context, owner Account, pluginI
 		return repositoryError(err)
 	}
 	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// SetPluginTracking records which repository a plugin follows and, for shared
+// repositories, the tag prefix that identifies its own release stream.
+func (p *Postgres) SetPluginTracking(ctx context.Context, pluginID, sourceURL, tagPrefix string) error {
+	if _, _, err := parseRepositoryURL(sourceURL); err != nil {
+		return err
+	}
+	result, err := p.db.ExecContext(ctx, `UPDATE market_plugins SET source_url=$2, release_tag_prefix=$3 WHERE id=$1`, pluginID, sourceURL, tagPrefix)
+	if err != nil {
+		return repositoryError(err)
+	}
+	if affected, rowsErr := result.RowsAffected(); rowsErr == nil && affected == 0 {
 		return ErrNotFound
 	}
 	return nil

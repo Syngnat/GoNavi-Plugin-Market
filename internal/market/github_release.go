@@ -69,6 +69,14 @@ type ReleaseFetcher interface {
 	FetchAsset(ctx context.Context, url string) ([]byte, error)
 }
 
+// TaggedReleaseFetcher resolves the newest release belonging to one plugin's tag
+// stream. Official plugins share a single repository, so the repository-wide
+// "latest release" belongs to whichever plugin was tagged last; a prefix such as
+// "mongo-shell-v" pins the sync to the right stream.
+type TaggedReleaseFetcher interface {
+	LatestTaggedRelease(ctx context.Context, owner, repo, tagPrefix string) (ReleaseSource, error)
+}
+
 // ExactReleaseFetcher is implemented by the production fetcher. Keeping it
 // separate preserves the existing release-sync test seam.
 type ExactReleaseFetcher interface {
@@ -79,13 +87,14 @@ type ExactReleaseFetcher interface {
 // GitHubReleaseFetcher talks to the public GitHub API; an optional token lifts
 // the anonymous 60 requests/hour ceiling for larger catalogs.
 type GitHubReleaseFetcher struct {
-	client *http.Client
-	token  string
+	client  *http.Client
+	token   string
+	baseURL string
 }
 
 // NewGitHubReleaseFetcher creates the production fetcher with bounded timeouts.
 func NewGitHubReleaseFetcher(token string) *GitHubReleaseFetcher {
-	return &GitHubReleaseFetcher{client: &http.Client{Timeout: 2 * time.Minute}, token: token}
+	return &GitHubReleaseFetcher{client: &http.Client{Timeout: 2 * time.Minute}, token: token, baseURL: "https://api.github.com"}
 }
 
 type githubRelease struct {
@@ -102,9 +111,9 @@ type githubRelease struct {
 // Release resolves one exact tag or the repository's latest stable release.
 // An explicit tag permits prereleases; the implicit latest lookup does not.
 func (f *GitHubReleaseFetcher) Release(ctx context.Context, ref RepositoryRef) (ReleaseSource, error) {
-	endpoint := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", ref.Owner, ref.Repo)
+	endpoint := fmt.Sprintf("%s/repos/%s/%s/releases/latest", f.apiBase(), ref.Owner, ref.Repo)
 	if ref.Tag != "" {
-		endpoint = fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/tags/%s", ref.Owner, ref.Repo, url.PathEscape(ref.Tag))
+		endpoint = fmt.Sprintf("%s/repos/%s/%s/releases/tags/%s", f.apiBase(), ref.Owner, ref.Repo, url.PathEscape(ref.Tag))
 	}
 	return f.release(ctx, ref, endpoint, ref.Tag != "")
 }
@@ -114,6 +123,81 @@ func (f *GitHubReleaseFetcher) Release(ctx context.Context, ref RepositoryRef) (
 // never a guess: a wrong archive would publish under the wrong plugin identity.
 func (f *GitHubReleaseFetcher) LatestRelease(ctx context.Context, owner, repo string) (ReleaseSource, error) {
 	return f.Release(ctx, RepositoryRef{Owner: owner, Repo: repo})
+}
+
+// LatestTaggedRelease walks the release list and keeps the highest version whose
+// tag carries the plugin prefix; drafts and prereleases are never candidates.
+func (f *GitHubReleaseFetcher) LatestTaggedRelease(ctx context.Context, owner, repo, tagPrefix string) (ReleaseSource, error) {
+	if tagPrefix == "" {
+		return f.LatestRelease(ctx, owner, repo)
+	}
+	best := ""
+	for page := 1; page <= 10; page++ {
+		releases, err := f.listReleases(ctx, owner, repo, page)
+		if err != nil {
+			return ReleaseSource{}, err
+		}
+		for _, release := range releases {
+			if release.Draft || release.Prerelease || !strings.HasPrefix(release.TagName, tagPrefix) {
+				continue
+			}
+			version := strings.TrimPrefix(release.TagName, tagPrefix)
+			if version == "" {
+				continue
+			}
+			if best == "" || versionNewer(version, best) {
+				best = version
+			}
+		}
+		if len(releases) < releaseListPageSize {
+			break
+		}
+	}
+	if best == "" {
+		return ReleaseSource{}, ErrNotFound
+	}
+	return f.Release(ctx, RepositoryRef{Owner: owner, Repo: repo, Tag: tagPrefix + best})
+}
+
+const releaseListPageSize = 100
+
+func (f *GitHubReleaseFetcher) apiBase() string {
+	if f.baseURL != "" {
+		return f.baseURL
+	}
+	return "https://api.github.com"
+}
+
+func (f *GitHubReleaseFetcher) listReleases(ctx context.Context, owner, repo string, page int) ([]githubRelease, error) {
+	endpoint := fmt.Sprintf("%s/repos/%s/%s/releases?per_page=%d&page=%d", f.apiBase(), owner, repo, releaseListPageSize, page)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, ErrInvalid
+	}
+	request.Header.Set("Accept", "application/vnd.github+json")
+	if f.token != "" {
+		request.Header.Set("Authorization", "Bearer "+f.token)
+	}
+	response, err := f.client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("release list request failed")
+	}
+	defer response.Body.Close()
+	if response.StatusCode == http.StatusNotFound {
+		return nil, ErrNotFound
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("release list status %d", response.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+	if err != nil {
+		return nil, fmt.Errorf("release list read failed")
+	}
+	var releases []githubRelease
+	if err = json.Unmarshal(data, &releases); err != nil {
+		return nil, ErrInvalid
+	}
+	return releases, nil
 }
 
 func (f *GitHubReleaseFetcher) release(ctx context.Context, ref RepositoryRef, endpoint string, explicitTag bool) (ReleaseSource, error) {

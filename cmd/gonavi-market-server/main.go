@@ -22,6 +22,8 @@ type commandOptions struct {
 	grantID, grantRole, publisher string
 	official                      bool
 	publishArchive                string
+	officialSource                string
+	officialTagPrefix             string
 	namespace, reviewer           string
 	syncOnce                      bool
 	issueSession                  string
@@ -36,6 +38,8 @@ func main() {
 	flag.StringVar(&options.publisher, "publisher", "", "unique publisher namespace for an operator role grant")
 	flag.BoolVar(&options.official, "official", false, "mark the explicitly granted publisher official")
 	flag.StringVar(&options.publishArchive, "publish-official", "", "import one official plugin zip through the submission pipeline, then exit")
+	flag.StringVar(&options.officialSource, "official-source", "https://github.com/Syngnat/GoNavi-Plugin-Market", "repository that official imports follow for release auto-sync")
+	flag.StringVar(&options.officialTagPrefix, "official-tag-prefix", "", "release tag prefix that identifies this plugin in the shared repository, e.g. mongo-shell-v")
 	flag.StringVar(&options.namespace, "official-namespace", "com.gonavi", "publisher namespace for -publish-official")
 	flag.StringVar(&options.reviewer, "official-reviewer", "", "admin github id that approves a -publish-official import")
 	flag.BoolVar(&options.syncOnce, "sync-once", false, "run one GitHub release sync pass, print outcomes, then exit")
@@ -55,6 +59,13 @@ func main() {
 
 func run(ctx context.Context, options commandOptions) error {
 	dsn := os.Getenv("GONAVI_MARKET_DATABASE_URL")
+	// Schema changes need the table owner; the runtime role is deliberately not
+	// the owner, so operators point migrations at the owner DSN when it differs.
+	if options.migrate {
+		if migrationDSN := os.Getenv("GONAVI_MARKET_MIGRATION_DATABASE_URL"); migrationDSN != "" {
+			dsn = migrationDSN
+		}
+	}
 	if dsn == "" {
 		return errors.New("market database configuration required")
 	}
