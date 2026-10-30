@@ -49,7 +49,7 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY }: BlackHoleProp
     <div ref={frameRef} className="galaxy-black-hole" aria-hidden="true">
       <img
         className="galaxy-black-hole-canvas"
-        src="/galaxy/black-hole.png"
+        src="/galaxy/black-hole.webp"
         width={960}
         height={540}
         alt=""
