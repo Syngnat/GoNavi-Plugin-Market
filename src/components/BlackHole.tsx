@@ -106,10 +106,10 @@ const fragmentShader = /* glsl */ `
 
     float alpha = max(disk * 0.66, innerRim * 0.48);
     alpha = max(alpha, photonRing * 0.46 + photonHalo * 0.22);
-    alpha = max(alpha, lensedArc * 0.34);
+    alpha = max(alpha, lensedArc * 0.50);
     vec3 color = diskColor * max(disk, innerRim * 1.05);
     color += whiteHot * (photonRing * 0.72 + photonHalo * 0.22);
-    color += copper * lensedArc * 0.36;
+    color += copper * lensedArc * 0.50;
 
     // Event horizon: an opaque shadow, with a fine warm rim outside it.
     float shadow = 1.0 - smoothstep(0.185, 0.199, radius);
@@ -118,6 +118,13 @@ const fragmentShader = /* glsl */ `
     alpha = max(alpha, shadow);
     alpha = max(alpha, rim * 0.22);
     color += whiteHot * rim * 0.25;
+
+    // The near side of the disk passes in front of the horizon; without this
+    // the hole reads as a flat black sticker with a halo behind it.
+    float frontSide = smoothstep(-0.018, 0.055, p.y);
+    float frontDisk = disk * frontSide * 0.78;
+    color = mix(color, diskColor, clamp(frontDisk, 0.0, 0.82));
+    alpha = max(alpha, frontDisk);
 
     // Soft outer corona so the black hole sits naturally on the star field.
     float corona = exp(-pow((radius - 0.42) * 3.4, 2.0)) * 0.055;
