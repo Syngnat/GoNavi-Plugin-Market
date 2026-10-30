@@ -30,6 +30,13 @@ func TestArtifactAIProvidersRequireBackendPermissionAndUniqueBoundedLists(t *tes
 			f["contributes"].(map[string]any)["aiProviders"] = providers
 		}},
 		{name: "no models", change: func(f, p, m map[string]any) { p["models"] = []any{} }},
+		{name: "relative default base url", change: func(f, p, m map[string]any) { p["defaultBaseUrl"] = "api.example.com/v1" }},
+		{name: "default base url with userinfo", change: func(f, p, m map[string]any) { p["defaultBaseUrl"] = "https://user:secret@api.example.com/v1" }},
+		{name: "default base url with query", change: func(f, p, m map[string]any) { p["defaultBaseUrl"] = "https://api.example.com/v1?key=1" }},
+		{name: "default base url with fragment", change: func(f, p, m map[string]any) { p["defaultBaseUrl"] = "https://api.example.com/v1#frag" }},
+		{name: "oversized default base url", change: func(f, p, m map[string]any) {
+			p["defaultBaseUrl"] = "https://api.example.com/" + strings.Repeat("a", maxArtifactAIBaseURLBytes)
+		}},
 		{name: "duplicate model ids", change: func(f, p, m map[string]any) { p["models"] = []any{m, m} }},
 		{name: "thirty three models", change: func(f, p, m map[string]any) {
 			models := make([]any, 0, 33)

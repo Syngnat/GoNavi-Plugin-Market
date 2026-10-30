@@ -2,8 +2,10 @@ package market
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"slices"
+	"strings"
 )
 
 const (
@@ -12,6 +14,8 @@ const (
 	minArtifactAIContext      = 1024
 	maxArtifactAIContext      = 262144
 	maxArtifactAIOutputTokens = 65536
+	// maxArtifactAIBaseURLBytes 与宿主一致：预填地址是展示默认值，长度必须受限。
+	maxArtifactAIBaseURLBytes = 2048
 )
 
 var (
@@ -23,8 +27,11 @@ var (
 // Keep publication metadata independent of the host runtime and provider packages.
 // Pointer booleans distinguish explicit false capabilities from omitted claims.
 type artifactAIProvider struct {
-	ID             string            `json:"id"`
-	Name           string            `json:"name"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// DefaultBaseURL 是插件自带的网关地址，宿主在用户还没填地址时预填进表单；
+	// 插件自己的兜底仍然生效，所以这里只是可选的展示默认值。
+	DefaultBaseURL string            `json:"defaultBaseUrl,omitempty"`
 	Command        string            `json:"command"`
 	Icon           string            `json:"icon,omitempty"`
 	Models         []artifactAIModel `json:"models"`
@@ -67,6 +74,9 @@ func validateArtifactAIProviders(manifest artifactManifest, commands map[string]
 		if provider.Icon != "" && (len(provider.Icon) > 256 || !artifactAIProviderIconPattern.MatchString(provider.Icon) || safeArtifactPath(provider.Icon) != nil) {
 			return fmt.Errorf("invalid ai provider icon")
 		}
+		if provider.DefaultBaseURL != "" && !validArtifactAIBaseURL(provider.DefaultBaseURL) {
+			return fmt.Errorf("invalid ai provider default base url")
+		}
 		if provider.SupportsTools == nil || provider.SupportsImages == nil {
 			return fmt.Errorf("ai provider capabilities require explicit supportsTools and supportsImages")
 		}
@@ -99,4 +109,17 @@ func validateArtifactAIModels(models []artifactAIModel) error {
 		seen[model.ID] = true
 	}
 	return nil
+}
+
+// validArtifactAIBaseURL 与宿主同口径：只接受绝对 http(s) 地址，无用户信息、
+// 无查询串、无片段，长度受限。预填地址会进设置表单，不能让包内的异常值蒙混过关。
+func validArtifactAIBaseURL(raw string) bool {
+	if len(raw) > maxArtifactAIBaseURLBytes || strings.TrimSpace(raw) != raw {
+		return false
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+	return parsed.Scheme == "http" || parsed.Scheme == "https"
 }

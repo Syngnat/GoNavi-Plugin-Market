@@ -35,6 +35,9 @@ func TestArtifactAIProvidersAcceptExplicitStaticModels(t *testing.T) {
 	}{
 		{name: "tools"},
 		{name: "text only", change: func(_ map[string]any, p map[string]any, _ map[string]any) { p["supportsTools"] = false }},
+		{name: "shipped gateway default", change: func(_ map[string]any, p map[string]any, _ map[string]any) {
+			p["defaultBaseUrl"] = "https://api.example.com/v1"
+		}},
 		{name: "image input", change: func(_ map[string]any, p map[string]any, _ map[string]any) { p["supportsImages"] = true }},
 		{name: "minimum token limits", change: func(_ map[string]any, _ map[string]any, m map[string]any) {
 			m["contextWindow"] = 1024
