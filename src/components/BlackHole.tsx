@@ -188,7 +188,6 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     let frame = 0;
     let lastDraw = 0;
-    let lastSync = 0;
     const started = performance.now();
     let visible = true;
     let onScreen = true;
@@ -203,7 +202,8 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }
         );
     observer?.observe(host);
 
-    const syncPosition = () => {
+    let lastPlacement = '';
+    const syncPosition = (force = false) => {
       const world = worldRef.current;
       if (!world || !host) return;
       const matrix = world.getScreenCTM();
@@ -211,18 +211,19 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }
       const point = new DOMPoint(centerX, centerY).matrixTransform(matrix);
       const rect = host.getBoundingClientRect();
       const scale = Math.max(0.35, Math.min(2.6, matrix.a));
+      const placement = `${(point.x - rect.left).toFixed(2)}:${(point.y - rect.top).toFixed(2)}:${scale.toFixed(4)}`;
+      if (!force && placement === lastPlacement) return;
+      lastPlacement = placement;
       overlay.style.transform = `translate3d(${(point.x - rect.left).toFixed(2)}px, ${(point.y - rect.top).toFixed(2)}px, 0) translate(-50%, -50%) scale(${scale.toFixed(4)})`;
     };
 
     const render = (now: number) => {
       frame = requestAnimationFrame(render);
       if (!visible || !onScreen || !activeRef.current) return;
-      if (now - lastSync < 1000 / 30) return;
-      lastSync = now;
-      syncPosition();
       if (!nearCenter || reduced.matches) return;
       if (now - lastDraw < 1000 / TARGET_FPS) return;
       lastDraw = now;
+      syncPosition();
       material.uniforms.uTime.value = (now - started) / 1000;
       renderer.render(scene, camera);
     };
@@ -246,13 +247,16 @@ export function BlackHole({ hostRef, worldRef, centerX, centerY, active = true }
     document.addEventListener('visibilitychange', onVisibility);
     host.addEventListener('pointermove', onPointerMove, { passive: true });
     host.addEventListener('pointerleave', onPointerLeave, { passive: true });
-    syncPosition();
+    const cameraObserver = new MutationObserver(() => syncPosition());
+    if (worldRef.current) cameraObserver.observe(worldRef.current, { attributes: true, attributeFilter: ['transform'] });
+    syncPosition(true);
     renderer.render(scene, camera);
     render(performance.now());
 
     return () => {
       cancelAnimationFrame(frame);
       observer?.disconnect();
+      cameraObserver.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
       host.removeEventListener('pointermove', onPointerMove);
       host.removeEventListener('pointerleave', onPointerLeave);
