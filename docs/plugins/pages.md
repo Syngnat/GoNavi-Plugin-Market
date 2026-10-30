@@ -87,6 +87,7 @@ func (a *App) PluginPageCall(id, pageID, method, argumentsJSON string) connectio
 | `plugin.invoke` | `ui.pages` | `{ command, arguments?, connectionId? }` | 调用本插件 manifest 已声明的命令并绑定当前代际；持 `host.connections.credentials`、带 `connectionId` 且命令声明 `config` 时，宿主可向插件后端参数注入保存配置；后端不得把凭据回传页面 |
 | `query.read` | `host.query.read` | `{ connectionId, sql, maxRows? }` | `{ columns: [{name,type?}], rows: [[…]], truncated, elapsedMs }`；maxRows 1..1000，默认 100；扫描层行预算为 maxRows+1 |
 | `ui.notify` | 无（前端本地处理） | `{ message, type? }` | 无；在页面桥内直接展示 antd message |
+| `system.open-external` | `system.open-external` | `{ url }` | `{ opened: true }`；只接受绝对 http(s) 链接且不含 `user:pass@`，其余返回 `invalid_arguments`；交给系统默认浏览器打开，不导航宿主 WebView；Web／headless 运行时返回 `unsupported` |
 
 - 连接一律用**保存连接 ID** 解析；连接列表、元数据和读取查询不向插件返回凭据，宿主从现有仓储／secretstore 解析配置。`plugin.invoke` 的凭据注入仅面向明确授权的可信插件后端，不是凭据不会被插件代码接触的保证。
 - `connections.list` 的 `readOnly` 是**有效只读**：连接模式本身支持只读且被强制只读时才为 `true`，不能当成「这次查询不会改数据」的承诺。多主机／副本集连接可能没有单一 `host`／`port`，这两个字段可为空。

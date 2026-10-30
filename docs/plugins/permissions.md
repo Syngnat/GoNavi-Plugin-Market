@@ -18,6 +18,7 @@
 | `host.schema.write` | 通过 `schema.preview` / `schema.apply` 对已保存连接执行受控 DDL | 仅 CREATE/ALTER/DROP TABLE\|INDEX\|VIEW；拒绝只读/结构保护连接、TRUNCATE、数据库/schema 级 DDL、DML 与多语句；apply 必须经宿主原生确认，计划一次性且 5 分钟过期 |
 | `ui.pages` | 渲染 `pages` 并把 `navigation` 挂到主窗口（标题栏「插件」菜单） | 不授予任何 `host.*` 能力，也不授权其他插件页面 |
 | `ui.html-panel` | 在主窗口内以不透明源沙箱 iframe 渲染有界自定义 HTML；面板没有桥，`pages` 里的 HTML 页面自 v1 起可通过页面桥调用**已单独授权**的 `host.*` 能力 | 不提供存储、Cookie、凭据、同源访问、表单或嵌套 frame；CSP 拦截页面 fetch／XHR／WebSocket 与外部资源，但这不是 OS 或网络栈沙箱，也**不阻止页面自我导航**（导航后宿主撤销桥，见页面契约） |
+| `system.open-external` | 通过 `system.open-external` 能力把**一个** http(s) 链接交给系统默认浏览器打开；插件页面与插件窗口均可调用 | 不接受 `file:`／`javascript:`／`data:`／`mailto:`／自定义 scheme、带用户名密码的 URL 或超长目标；不导航宿主 WebView，插件无法把主窗口、页面 frame 或插件窗口变成地址栏；Web／headless 运行时不执行 |
 
 ## 声明与说明文字
 

@@ -63,6 +63,7 @@ GoNavi registers host capabilities explicitly. The page bridge (`PluginPageCall`
 | `query.explain` | `host.query.read` | page, window, backend | no |
 | `query.read` | `host.query.read` | page, window, backend | no |
 | `ui.notify` | — | page | no |
+| `system.open-external` | `system.open-external` | page, window | no |
 
 Connections are always resolved by saved connection id on the host. Connection-listing, metadata and read-query capabilities do not return usernames, passwords, SSH/proxy credentials, DSNs or arbitrary host paths. `plugin.invoke` is different: when the plugin declares `host.connections.credentials` and the command accepts `config`, the host may inject the saved configuration into that plugin's backend arguments. The host does not expose that configuration directly to the page bridge; the backend is trusted code and must not echo secrets in its result. Metadata and read queries return bounded results; data that exceeds the result budget must be split by the caller.
 
