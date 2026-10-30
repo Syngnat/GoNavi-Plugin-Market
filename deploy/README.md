@@ -14,6 +14,22 @@ DNS 为 Cloudflare DNS-only（灰云直连），公网入口 `https://plugin.gon
 :80   ACME HTTP-01（/var/www/letsencrypt webroot）+ 301 → https
 ```
 
+## 上架官方插件版本（多插件仓库必走）
+
+站点的插件列表来自 `/api/v1`（数据库），不是 `public/catalog.json`；`catalog.json` 只描述
+可安装来源。后台的 GitHub release 定时同步只认带 `sourceUrl` 的插件，且读的是**仓库 latest
+release**——官方插件都挤在 GoNavi-Plugin-Market 一个仓里，latest 属于最后打 tag 的那个插件，
+所以官方插件永远不会自动同步，必须逐个版本导入：
+
+```bash
+deploy/publish-official-plugin.sh --plugin mongo-shell --tag mongo-shell-v1.0.4 \
+    --reviewer <admin-github-id>
+```
+
+脚本：下载该 tag 的资产 → 上传 → 以 `-publish-official` 走投稿管线入库 → 回读
+`/api/v1/plugins` 校验版本与清单一致。`--dry-run` 只下载与校验。改完 `public/catalog.json`
+后仍需发布站点（CI 或 `deploy/publish-site.sh`），两者缺一：目录新了而接口还旧。
+
 ## 推送即发布（CI）
 
 `.github/workflows/deploy-site.yml` 在 `main` 有站点相关改动时自动调用
