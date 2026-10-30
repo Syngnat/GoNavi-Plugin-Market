@@ -1,6 +1,6 @@
 {
   "sourceId": "plugin-market-site",
-  "updatedAt": "2026-10-29T23:56:33Z",
+  "updatedAt": "2026-10-30T04:13:41Z",
   "items": [
     {
       "id": "com.gonavi.nginx-inspector",
@@ -78,7 +78,7 @@
       "author": "GoNavi Project",
       "publisherId": "gonavi",
       "official": true,
-      "version": "1.0.2",
+      "version": "1.0.3",
       "category": "数据库",
       "minHostVersion": "1.2.0",
       "platforms": [
@@ -86,18 +86,18 @@
         "macos",
         "linux"
       ],
-      "updatedAt": "2026-10-28T04:07:01Z",
+      "updatedAt": "2026-10-30T04:13:41Z",
       "icon": "database",
-      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@mongo-shell-v1.0.2",
+      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@mongo-shell-v1.0.3",
       "repoUrl": "https://github.com/Syngnat/GoNavi-Plugin-Market",
-      "contentDigest": "83ca638db5a53c1be7d7f5d627b46de96f68b43a4bf42d5374dd50363c6bddeb",
+      "contentDigest": "e88a037b47ac0d06be4f83e688a47355f9cbdd73921dac305aeb1fc92c70da51",
       "license": "Apache-2.0",
       "artifact": {
-        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/mongo-shell-v1.0.2/gonavi-plugin-mongo-shell-1.0.2.zip",
-        "sha256": "b6b7411b3122aa6d84ab682de42cd8ec3b7eaea038252096db8c2515d5db48e3",
-        "sizeBytes": 38136129,
+        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/mongo-shell-v1.0.3/gonavi-plugin-mongo-shell-1.0.3.zip",
+        "sha256": "54b547a42cc9506cf7ca28ce195230fb233b8162853f1ecf26146e35e9ec93ed",
+        "sizeBytes": 38149346,
         "platform": "all",
-        "version": "1.0.2"
+        "version": "1.0.3"
       },
       "sourceId": "plugin-market-site",
       "features": [
@@ -107,7 +107,10 @@
         "goja JavaScript Shell，支持查询、聚合与写入。",
         "只读连接拒绝写入；行数上限 200/2000，命令超时 30 秒。",
         "工作台页通过受控 plugin.invoke 复用 connect/run，页面不接触凭据。",
-        "五平台原生 backend；窗口从宿主加载统一主题与设计令牌。"
+        "五平台原生 backend；窗口从宿主加载统一主题与设计令牌。",
+        "界面按 Precision Database Canvas 重做，跟随宿主深浅主题。",
+        "六语言界面：中文简繁、英、日、德、俄。",
+        "结果集边界提示：达上限截断、零行保留表头、无列文档单独说明。"
       ],
       "permissions": [
         {
