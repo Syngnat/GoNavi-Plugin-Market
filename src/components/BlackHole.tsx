@@ -94,7 +94,7 @@ const fragmentShader = /* glsl */ `
     vec2 screen = vUv * 2.0 - 1.0;
     screen.x *= uResolution.x / max(uResolution.y, 1.0);
 
-    vec3 ro = vec3(0.0, 2.35, 14.0);
+    vec3 ro = vec3(0.0, 4.2, 14.0);
     vec3 target = vec3(0.0, 0.0, 0.0);
     vec3 forward = normalize(target - ro);
     vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), forward));
@@ -106,15 +106,13 @@ const fragmentShader = /* glsl */ `
     vec3 angularMomentum = cross(p, v);
     float h2 = dot(angularMomentum, angularMomentum);
     bool captured = false;
-    float diskDistance = 1e9;
-    vec3 diskColor = vec3(0.0);
-    float diskAlpha = 0.0;
+    vec3 color = vec3(0.0);
+    float transmittance = 1.0;
 
-    // Integrate a null geodesic in the Schwarzschild metric. The acceleration
-    // term bends the ray around the mass; the first disk-plane crossing is the
-    // visible front of the accretion disk, while later crossings form the
-    // lensed arcs above and below the shadow.
-    for (int i = 0; i < 128; i++) {
+    // Integrate a null geodesic through a volumetric accretion torus. Sampling
+    // the disk along the bent ray makes the far side wrap over the shadow and
+    // avoids the cut-out look of a single plane intersection.
+    for (int i = 0; i < 150; i++) {
       float r = length(p);
       if (r < 1.0) {
         captured = true;
@@ -124,44 +122,30 @@ const fragmentShader = /* glsl */ `
         break;
       }
 
-      float dt = 0.075 + min(r, 5.0) * 0.012;
-      vec3 nextP = p + v * dt;
-
-      if (p.y * nextP.y < 0.0) {
-        float t = -p.y / v.y;
-        if (t > 0.0 && t < dt) {
-          vec3 hit = p + v * t;
-          float radius = length(hit.xz);
-          if (radius > 2.85 && radius < 9.0 && t < diskDistance) {
-            vec4 sampleDisk = diskSample(hit, v, uTime);
-            diskDistance = t;
-            diskColor = sampleDisk.rgb;
-            diskAlpha = sampleDisk.a;
-          }
-        }
+      float radial = length(p.xz);
+      float vertical = exp(-pow(p.y / 0.19, 2.0));
+      float radialBand = smoothstep(2.7, 3.35, radial) * (1.0 - smoothstep(7.4, 9.0, radial));
+      float density = vertical * radialBand;
+      if (density > 0.002) {
+        vec4 sampleDisk = diskSample(p, v, uTime);
+        float stepAlpha = sampleDisk.a * density * 0.58;
+        color += sampleDisk.rgb * stepAlpha * transmittance;
+        transmittance *= 1.0 - stepAlpha;
       }
 
+      float dt = 0.065 + min(r, 5.0) * 0.011;
       vec3 accel = -1.5 * h2 * p / pow(max(dot(p, p), 0.0001), 2.5);
       v += accel * dt;
-      p = nextP;
+      p += v * dt;
     }
 
-    vec3 color = vec3(0.0);
-    float alpha = 0.0;
-    if (diskDistance < 1e8) {
-      color = diskColor;
-      alpha = diskAlpha;
-    }
-    if (captured) {
-      alpha = 1.0;
-      color = mix(vec3(0.0), color, diskAlpha);
-    }
-
-    // A restrained halo around the shadow, not a painted ring.
+    float alpha = captured ? 1.0 : 1.0 - transmittance;
+    // A very restrained photon rim; the volumetric disk supplies the real arcs.
     float screenRadius = length(screen);
-    float halo = exp(-pow((screenRadius - 0.205) * 18.0, 2.0)) * 0.10;
-    alpha = max(alpha, halo * 0.45);
-    color += vec3(1.0, 0.42, 0.10) * halo * 0.45;
+    float photonRim = exp(-pow((screenRadius - 0.255) * 74.0, 2.0));
+    float halo = exp(-pow((screenRadius - 0.255) * 12.0, 2.0)) * 0.055;
+    alpha = max(alpha, photonRim * 0.22 + halo * 0.20);
+    color += vec3(1.0, 0.58, 0.24) * (photonRim * 0.28 + halo * 0.20);
 
     alpha = clamp(alpha, 0.0, 1.0);
     color *= 1.0 + (hash21(gl_FragCoord.xy + uTime) - 0.5) * 0.03;
