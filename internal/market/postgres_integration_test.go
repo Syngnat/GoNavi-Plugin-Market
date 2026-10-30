@@ -150,15 +150,33 @@ func TestPostgresReviewedCatalogAndRatingTransactions(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := p.PutRating(ctx, user, Rating{PluginID: "acme.example", Stars: 4}); err != nil {
+			if _, err := p.CreateRating(ctx, user, Rating{PluginID: "acme.example", Stars: 4}); err != nil {
 				t.Error(err)
 			}
 		}()
 	}
 	wg.Wait()
 	detail, err := p.Plugin(ctx, "acme.example")
-	if err != nil || detail.RatingCount != 1 || detail.RatingAverage != 4 || !detail.Official {
+	if err != nil || detail.RatingCount != 20 || detail.RatingAverage != 4 || !detail.Official {
 		t.Fatalf("detail=%+v err=%v", detail, err)
+	}
+	reviews, err := p.Ratings(ctx, "acme.example")
+	if err != nil || len(reviews) != 20 {
+		t.Fatalf("reviews=%+v err=%v", reviews, err)
+	}
+	reply, err := p.AddReply(ctx, admin, "acme.example", reviews[0].ID, "thanks")
+	if err != nil || reply.ParentID == nil || *reply.ParentID != reviews[0].ID {
+		t.Fatalf("reply=%+v err=%v", reply, err)
+	}
+	if _, err = p.UpdateRating(ctx, user, reviews[0].ID, Rating{PluginID: "acme.example", Stars: 5, Body: "edited"}); err != nil {
+		t.Fatal(err)
+	}
+	reviews, err = p.Ratings(ctx, "acme.example")
+	if err != nil || len(reviews[0].Replies) != 1 || reviews[0].Replies[0].Body != "thanks" {
+		t.Fatalf("nested replies=%+v err=%v", reviews, err)
+	}
+	if err = p.DeleteReply(ctx, admin, "acme.example", reviews[0].ID, reply.ID); err != nil {
+		t.Fatal(err)
 	}
 	page, err := p.Catalog(ctx, CatalogQuery{Limit: 24, Sort: "rating", HostVersion: "1.0.0", Platform: "linux/amd64"})
 	if err != nil || len(page.Items) != 1 {
@@ -167,7 +185,7 @@ func TestPostgresReviewedCatalogAndRatingTransactions(t *testing.T) {
 	if err = p.HideRating(ctx, admin, "acme.example", user.ID, "abuse"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = p.PutRating(ctx, user, Rating{PluginID: "acme.example", Stars: 5}); err != nil {
+	if _, err = p.CreateRating(ctx, user, Rating{PluginID: "acme.example", Stars: 5}); err != nil {
 		t.Fatal(err)
 	}
 	detail, err = p.Plugin(ctx, "acme.example")
@@ -177,7 +195,7 @@ func TestPostgresReviewedCatalogAndRatingTransactions(t *testing.T) {
 	if err = p.DeleteRating(ctx, user, "acme.example"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = p.PutRating(ctx, user, Rating{PluginID: "acme.example", Stars: 5, Body: "recreated"}); err != nil {
+	if _, err = p.CreateRating(ctx, user, Rating{PluginID: "acme.example", Stars: 5, Body: "recreated"}); err != nil {
 		t.Fatal(err)
 	}
 	detail, err = p.Plugin(ctx, "acme.example")

@@ -280,9 +280,11 @@ func TestPublisherDeleteOwnerPurgesPlugin(t *testing.T) {
 		t.Fatalf("submissions=%+v", submissions)
 	}
 	f.repo.mu.Lock()
-	if _, ok := f.repo.ratings["3/acme.example"]; ok {
-		f.repo.mu.Unlock()
-		t.Fatal("rating rows survived the purge")
+	for _, rating := range f.repo.ratings {
+		if rating.PluginID == "acme.example" {
+			f.repo.mu.Unlock()
+			t.Fatal("rating rows survived the purge")
+		}
 	}
 	f.repo.mu.Unlock()
 	audits := decodeResponse[[]Audit](t, f.request("GET", "/admin/audit", "admin", nil))

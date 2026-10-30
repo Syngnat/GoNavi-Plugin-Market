@@ -25,22 +25,25 @@ type testSession struct {
 }
 
 type memoryRepo struct {
-	mu        sync.Mutex
-	accounts  map[string]Account
-	sessions  map[string]testSession
-	flows     map[string]AuthFlow
-	releases  map[string]testRelease
-	ratings   map[string]Rating
-	hidden    map[string]bool
-	downloads map[string]int64
-	audit     []Audit
+	mu           sync.Mutex
+	accounts     map[string]Account
+	sessions     map[string]testSession
+	flows        map[string]AuthFlow
+	releases     map[string]testRelease
+	ratings      map[int64]Rating
+	hidden       map[int64]bool
+	moderated    map[string]bool
+	nextRatingID int64
+	downloads    map[string]int64
+	audit        []Audit
 }
 
 var _ Repository = (*memoryRepo)(nil)
 
 func newMemoryRepo() *memoryRepo {
 	return &memoryRepo{accounts: map[string]Account{}, sessions: map[string]testSession{}, flows: map[string]AuthFlow{},
-		releases: map[string]testRelease{}, ratings: map[string]Rating{}, hidden: map[string]bool{}, downloads: map[string]int64{}}
+		releases: map[string]testRelease{}, ratings: map[int64]Rating{}, hidden: map[int64]bool{},
+		moderated: map[string]bool{}, downloads: map[string]int64{}}
 }
 
 func (m *memoryRepo) published(id string) bool {
@@ -59,8 +62,8 @@ func (m *memoryRepo) plugin(v testRelease) MarketPlugin {
 		SourceURL: v.sourceURL, Category: categoryFromManifest(pkg.Manifest),
 		Manifest: append([]byte(nil), pkg.Manifest...), UpdatedAt: v.submission.UpdatedAt, DownloadCount: m.downloads[pkg.ID],
 		Artifact: &Artifact{SHA256: pkg.SHA256, SizeBytes: pkg.SizeBytes, Platform: "any", Version: pkg.Version}}
-	for key, r := range m.ratings {
-		if r.PluginID == pkg.ID && !m.hidden[key] {
+	for id, r := range m.ratings {
+		if r.PluginID == pkg.ID && r.ParentID == nil && !m.hidden[id] {
 			p.RatingCount++
 			p.RatingAverage += float64(r.Stars)
 		}
@@ -114,8 +117,8 @@ func (m *memoryRepo) Catalog(ctx context.Context, q CatalogQuery) (CatalogPage, 
 	}
 	mean, total := 3.0, 0
 	sum := 0.0
-	for key, r := range m.ratings {
-		if !m.hidden[key] && m.published(r.PluginID) {
+	for id, r := range m.ratings {
+		if r.ParentID == nil && !m.hidden[id] && m.published(r.PluginID) {
 			sum += float64(r.Stars)
 			total++
 		}
@@ -230,15 +233,38 @@ func (m *memoryRepo) Ratings(ctx context.Context, id string) ([]Rating, error) {
 		return nil, ErrNotFound
 	}
 	result := []Rating{}
-	for key, r := range m.ratings {
-		if r.PluginID == id && !m.hidden[key] {
+	for ratingID, r := range m.ratings {
+		if r.PluginID == id && r.ParentID == nil && !m.hidden[ratingID] {
 			result = append(result, r)
 		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if !result[i].UpdatedAt.Equal(result[j].UpdatedAt) {
+			return result[i].UpdatedAt.After(result[j].UpdatedAt)
+		}
+		return result[i].ID > result[j].ID
+	})
+	for index := range result {
+		for replyID, reply := range m.ratings {
+			if reply.ParentID != nil && *reply.ParentID == result[index].ID && !m.hidden[replyID] {
+				result[index].Replies = append(result[index].Replies, reply)
+			}
+		}
+		sort.Slice(result[index].Replies, func(i, j int) bool {
+			return result[index].Replies[i].CreatedAt.Before(result[index].Replies[j].CreatedAt)
+		})
 	}
 	return result, nil
 }
 
 func (m *memoryRepo) PutRating(ctx context.Context, a Account, r Rating) (Rating, error) {
+	return m.CreateRating(ctx, a, r)
+}
+
+func (m *memoryRepo) CreateRating(ctx context.Context, a Account, r Rating) (Rating, error) {
+	if a.ID == "" {
+		return Rating{}, ErrUnauthorized
+	}
 	if err := validateRating(r); err != nil {
 		return Rating{}, err
 	}
@@ -259,10 +285,48 @@ func (m *memoryRepo) PutRating(ctx context.Context, a Account, r Rating) (Rating
 	if !found {
 		return Rating{}, ErrNotFound
 	}
+	m.nextRatingID++
+	r.ID = m.nextRatingID
 	r.UserID = a.ID
-	r.UpdatedAt = time.Now().UTC()
-	m.ratings[a.ID+"/"+r.PluginID] = r
+	r.ParentID = nil
+	r.CreatedAt = time.Now().UTC()
+	r.UpdatedAt = r.CreatedAt
+	m.ratings[r.ID] = r
+	if m.moderated[a.ID+"/"+r.PluginID] {
+		m.hidden[r.ID] = true
+	}
 	return r, nil
+}
+
+func (m *memoryRepo) UpdateRating(ctx context.Context, a Account, ratingID int64, r Rating) (Rating, error) {
+	if err := validateRating(r); err != nil {
+		return Rating{}, err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	current, ok := m.ratings[ratingID]
+	if !ok || current.ParentID != nil {
+		return Rating{}, ErrNotFound
+	}
+	if current.UserID != a.ID {
+		return Rating{}, ErrForbidden
+	}
+	for _, v := range m.releases {
+		if v.submission.PluginID == current.PluginID && v.submission.State == "published" {
+			if v.owner == a.ID {
+				return Rating{}, ErrForbidden
+			}
+			if r.Version == "" || v.submission.Version == r.Version {
+				r.Version = v.submission.Version
+			}
+		}
+	}
+	current.Stars = r.Stars
+	current.Body = r.Body
+	current.Version = r.Version
+	current.UpdatedAt = time.Now().UTC()
+	m.ratings[ratingID] = current
+	return current, nil
 }
 
 func (m *memoryRepo) DeleteRating(ctx context.Context, a Account, id string) error {
@@ -271,7 +335,67 @@ func (m *memoryRepo) DeleteRating(ctx context.Context, a Account, id string) err
 	if !m.published(id) {
 		return ErrNotFound
 	}
-	delete(m.ratings, a.ID+"/"+id)
+	for ratingID, r := range m.ratings {
+		if r.PluginID == id && r.UserID == a.ID {
+			delete(m.ratings, ratingID)
+		}
+	}
+	return nil
+}
+
+func (m *memoryRepo) DeleteRatingByID(ctx context.Context, a Account, ratingID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	r, ok := m.ratings[ratingID]
+	if !ok || r.ParentID != nil {
+		return ErrNotFound
+	}
+	if r.UserID != a.ID {
+		return ErrForbidden
+	}
+	delete(m.ratings, ratingID)
+	for replyID, reply := range m.ratings {
+		if reply.ParentID != nil && *reply.ParentID == ratingID {
+			delete(m.ratings, replyID)
+		}
+	}
+	return nil
+}
+
+func (m *memoryRepo) AddReply(ctx context.Context, a Account, pluginID string, parentID int64, body string) (Rating, error) {
+	body = strings.TrimSpace(body)
+	if !boundedText(body, 4000, true) {
+		return Rating{}, ErrInvalid
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	parent, ok := m.ratings[parentID]
+	if !ok || parent.PluginID != pluginID || parent.ParentID != nil || m.hidden[parentID] {
+		return Rating{}, ErrNotFound
+	}
+	m.nextRatingID++
+	parentCopy := parentID
+	now := time.Now().UTC()
+	r := Rating{ID: m.nextRatingID, UserID: a.ID, PluginID: pluginID, ParentID: &parentCopy,
+		Stars: 0, Body: body, CreatedAt: now, UpdatedAt: now}
+	m.ratings[r.ID] = r
+	if m.moderated[a.ID+"/"+pluginID] {
+		m.hidden[r.ID] = true
+	}
+	return r, nil
+}
+
+func (m *memoryRepo) DeleteReply(ctx context.Context, a Account, pluginID string, parentID, replyID int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	r, ok := m.ratings[replyID]
+	if !ok || r.PluginID != pluginID || r.ParentID == nil || *r.ParentID != parentID {
+		return ErrNotFound
+	}
+	if r.UserID != a.ID {
+		return ErrForbidden
+	}
+	delete(m.ratings, replyID)
 	return nil
 }
 
@@ -281,11 +405,17 @@ func (m *memoryRepo) HideRating(ctx context.Context, a Account, id, user, reason
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	key := user + "/" + id
-	if _, ok := m.ratings[key]; !ok {
+	found := false
+	for ratingID, r := range m.ratings {
+		if r.PluginID == id && r.UserID == user {
+			m.hidden[ratingID] = true
+			found = true
+		}
+	}
+	if !found {
 		return ErrNotFound
 	}
-	m.hidden[key] = true
+	m.moderated[user+"/"+id] = true
 	return nil
 }
 

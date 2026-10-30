@@ -67,12 +67,16 @@ export interface PluginReview {
 
 /** 市场服务公开返回的一条真实评分；userId 由服务端会话派生，不接受客户端伪造。 */
 export interface PluginRating {
+  id: number;
   userId: string;
   pluginId: string;
+  parentId?: number;
   stars: number;
   body: string;
   version: string;
+  createdAt?: string;
   updatedAt: string;
+  replies?: PluginRating[];
 }
 
 // ---- 网站账号与发布闭环（v2）----

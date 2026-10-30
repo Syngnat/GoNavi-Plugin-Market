@@ -15,7 +15,12 @@ type CatalogRepository interface {
 	CountDownload(context.Context, string) error
 	Ratings(context.Context, string) ([]Rating, error)
 	PutRating(context.Context, Account, Rating) (Rating, error)
+	CreateRating(context.Context, Account, Rating) (Rating, error)
+	UpdateRating(context.Context, Account, int64, Rating) (Rating, error)
 	DeleteRating(context.Context, Account, string) error
+	DeleteRatingByID(context.Context, Account, int64) error
+	AddReply(context.Context, Account, string, int64, string) (Rating, error)
+	DeleteReply(context.Context, Account, string, int64, int64) error
 	Report(context.Context, Account, Report) error
 }
 

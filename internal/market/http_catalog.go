@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/Syngnat/GoNavi-Plugin-Market/internal/logger"
 )
@@ -179,6 +180,127 @@ func (s *Server) deleteRating(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.repo.DeleteRating(r.Context(), a, r.PathValue("id")); err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"deleted": true})
+}
+
+func ratingID(r *http.Request, name string) (int64, error) {
+	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
+	if err != nil || id <= 0 {
+		return 0, ErrNotFound
+	}
+	return id, nil
+}
+
+func (s *Server) createRating(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	var body struct {
+		Stars   int    `json:"stars"`
+		Body    string `json:"body"`
+		Version string `json:"version"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, err)
+		return
+	}
+	result, err := s.repo.CreateRating(r.Context(), a, Rating{PluginID: r.PathValue("id"), Stars: body.Stars, Body: body.Body, Version: body.Version})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, 200, result)
+}
+
+func (s *Server) updateRating(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	id, err := ratingID(r, "rating")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		Stars   int    `json:"stars"`
+		Body    string `json:"body"`
+		Version string `json:"version"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, err)
+		return
+	}
+	result, err := s.repo.UpdateRating(r.Context(), a, id, Rating{PluginID: r.PathValue("id"), Stars: body.Stars, Body: body.Body, Version: body.Version})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, 200, result)
+}
+
+func (s *Server) deleteRatingByID(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	id, err := ratingID(r, "rating")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if err := s.repo.DeleteRatingByID(r.Context(), a, id); err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"deleted": true})
+}
+
+func (s *Server) addReply(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	parentID, err := ratingID(r, "rating")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		Body string `json:"body"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, err)
+		return
+	}
+	result, err := s.repo.AddReply(r.Context(), a, r.PathValue("id"), parentID, body.Body)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, 200, result)
+}
+
+func (s *Server) deleteReply(w http.ResponseWriter, r *http.Request) {
+	a, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	parentID, err := ratingID(r, "rating")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	replyID, err := ratingID(r, "reply")
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if err := s.repo.DeleteReply(r.Context(), a, r.PathValue("id"), parentID, replyID); err != nil {
 		writeError(w, err)
 		return
 	}

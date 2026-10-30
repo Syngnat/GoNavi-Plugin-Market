@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -187,38 +188,55 @@ func TestHTTPSelfPublicationAndImmutableDownload(t *testing.T) {
 	}
 }
 
-func TestHTTPRatingsUpsertDeleteHideAndAuthorGuard(t *testing.T) {
+func TestHTTPRatingsCreateReplyEditDeleteAndModeration(t *testing.T) {
 	f := newHTTPFixture(t)
 	f.publish(t, "acme.example", "1.0.0", "")
-	ratingPath := "/plugins/acme.example/rating"
-	assertStatus(t, f.request("PUT", ratingPath, "", strings.NewReader(`{"stars":5}`)), 401)
-	assertStatus(t, f.request("PUT", ratingPath, "publisher", strings.NewReader(`{"stars":5}`)), 403)
-	for _, stars := range []string{"5", "2"} {
-		assertStatus(t, f.request("PUT", ratingPath, "user", strings.NewReader(`{"stars":`+stars+`,"body":"review","version":"1.0.0"}`)), 200)
+	ratingPath := "/plugins/acme.example/ratings"
+	assertStatus(t, f.request("POST", ratingPath, "", strings.NewReader(`{"stars":5}`)), 401)
+	assertStatus(t, f.request("POST", ratingPath, "publisher", strings.NewReader(`{"stars":5}`)), 403)
+
+	first := decodeResponse[Rating](t, f.request("POST", ratingPath, "user", strings.NewReader(`{"stars":5,"body":"first","version":"1.0.0"}`)))
+	second := decodeResponse[Rating](t, f.request("POST", ratingPath, "user", strings.NewReader(`{"stars":2,"body":"second","version":"1.0.0"}`)))
+	if first.ID == 0 || second.ID == first.ID {
+		t.Fatalf("multiple reviews were not created: %+v %+v", first, second)
 	}
 	detail := decodeResponse[MarketPlugin](t, f.request("GET", "/plugins/acme.example", "", nil))
-	if detail.RatingCount != 1 || detail.RatingAverage != 2 {
+	if detail.RatingCount != 2 || detail.RatingAverage != 3.5 {
 		t.Fatalf("aggregate=%+v", detail)
 	}
+
+	reply := decodeResponse[Rating](t, f.request("POST", ratingPath+"/"+strconv.FormatInt(first.ID, 10)+"/replies", "user", strings.NewReader(`{"body":"thanks"}`)))
+	if reply.ParentID == nil || *reply.ParentID != first.ID || reply.Stars != 0 {
+		t.Fatalf("reply=%+v", reply)
+	}
+	ratings := decodeResponse[[]Rating](t, f.request("GET", ratingPath, "", nil))
+	foundReply := false
+	for _, rating := range ratings {
+		if rating.ID == first.ID && len(rating.Replies) == 1 && rating.Replies[0].Body == "thanks" {
+			foundReply = true
+		}
+	}
+	if !foundReply {
+		t.Fatal("reply not nested in review list")
+	}
+
+	assertStatus(t, f.request("PUT", ratingPath+"/"+strconv.FormatInt(first.ID, 10), "user", strings.NewReader(`{"stars":1,"body":"edited"}`)), 200)
+	assertStatus(t, f.request("DELETE", ratingPath+"/"+strconv.FormatInt(first.ID, 10)+"/replies/"+strconv.FormatInt(reply.ID, 10), "user", nil), 200)
+	assertStatus(t, f.request("DELETE", ratingPath+"/"+strconv.FormatInt(second.ID, 10), "user", nil), 200)
+	ratings = decodeResponse[[]Rating](t, f.request("GET", ratingPath, "", nil))
+	if len(ratings) != 1 || len(ratings[0].Replies) != 0 {
+		t.Fatalf("ratings after delete=%+v", ratings)
+	}
+
 	assertStatus(t, f.request("POST", "/admin/plugins/acme.example/ratings/3/hide", "admin", strings.NewReader(`{"reason":"abuse"}`)), 200)
-	assertStatus(t, f.request("PUT", ratingPath, "user", strings.NewReader(`{"stars":5}`)), 200)
+	assertStatus(t, f.request("POST", ratingPath, "user", strings.NewReader(`{"stars":5,"body":"after hide"}`)), 200)
 	detail = decodeResponse[MarketPlugin](t, f.request("GET", "/plugins/acme.example", "", nil))
 	if detail.RatingCount != 0 {
-		t.Fatal("hidden rating counted")
-	}
-	assertStatus(t, f.request("DELETE", ratingPath, "user", nil), 200)
-	ratings := decodeResponse[[]Rating](t, f.request("GET", "/plugins/acme.example/ratings", "", nil))
-	if len(ratings) != 0 {
-		t.Fatal("deleted rating leaked")
-	}
-	assertStatus(t, f.request("PUT", ratingPath, "user", strings.NewReader(`{"stars":5,"body":"recreated"}`)), 200)
-	detail = decodeResponse[MarketPlugin](t, f.request("GET", "/plugins/acme.example", "", nil))
-	if detail.RatingCount != 0 {
-		t.Fatal("delete/recreate bypassed moderation")
+		t.Fatal("hidden or recreated rating counted")
 	}
 }
 
-func TestHTTPConcurrentRatingsRemainUnique(t *testing.T) {
+func TestHTTPConcurrentRatingsAllowMultiple(t *testing.T) {
 	f := newHTTPFixture(t)
 	f.publish(t, "acme.example", "1.0.0", "")
 	var wg sync.WaitGroup
@@ -226,7 +244,7 @@ func TestHTTPConcurrentRatingsRemainUnique(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			r := f.request("PUT", "/plugins/acme.example/rating", "user", strings.NewReader(`{"stars":4}`))
+			r := f.request("POST", "/plugins/acme.example/ratings", "user", strings.NewReader(`{"stars":4}`))
 			if r.Code != 200 {
 				t.Errorf("concurrent status=%d", r.Code)
 			}
@@ -234,7 +252,7 @@ func TestHTTPConcurrentRatingsRemainUnique(t *testing.T) {
 	}
 	wg.Wait()
 	item, err := f.repo.Plugin(context.Background(), "acme.example")
-	if err != nil || item.RatingCount != 1 || item.RatingAverage != 4 {
+	if err != nil || item.RatingCount != 24 || item.RatingAverage != 4 {
 		t.Fatalf("aggregate=%+v err=%v", item, err)
 	}
 }

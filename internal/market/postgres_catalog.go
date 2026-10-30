@@ -15,7 +15,7 @@ const catalogColumns = `p.id,v.name,v.description,v.author,p.publisher_id,u.offi
  v.updated_at,v.manifest,v.sha256,v.size_bytes,market_plugin_category(v.manifest)`
 
 const ratingJoin = ` LEFT JOIN LATERAL (SELECT AVG(stars)::float8 AS average,COUNT(*) AS count
- FROM market_ratings WHERE plugin_id=p.id AND NOT hidden AND NOT deleted) r ON true `
+ FROM market_ratings WHERE plugin_id=p.id AND parent_id IS NULL AND NOT hidden AND NOT deleted) r ON true `
 
 func scanPlugin(row scanner) (MarketPlugin, error) {
 	var p MarketPlugin
@@ -45,7 +45,7 @@ func (p *Postgres) Catalog(ctx context.Context, q CatalogQuery) (CatalogPage, er
 	order := "v.updated_at DESC"
 	switch q.Sort {
 	case "rating":
-		order = `((COALESCE(r.average,0)*COALESCE(r.count,0)+10*(SELECT COALESCE(AVG(stars),3) FROM market_ratings rating WHERE NOT hidden AND NOT deleted AND EXISTS(SELECT 1 FROM market_versions published WHERE published.plugin_id=rating.plugin_id AND published.state='published')))/(COALESCE(r.count,0)+10)) DESC`
+		order = `((COALESCE(r.average,0)*COALESCE(r.count,0)+10*(SELECT COALESCE(AVG(stars),3) FROM market_ratings rating WHERE parent_id IS NULL AND NOT hidden AND NOT deleted AND EXISTS(SELECT 1 FROM market_versions published WHERE published.plugin_id=rating.plugin_id AND published.state='published')))/(COALESCE(r.count,0)+10)) DESC`
 	case "downloads":
 		order = "p.download_count DESC"
 	}

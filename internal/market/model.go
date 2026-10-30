@@ -53,14 +53,19 @@ type CatalogQuery struct {
 	Limit, Offset                      int
 }
 
-// Rating is the one mutable rating per authenticated user and plugin.
+// Rating is one mutable review; users may publish multiple reviews and replies.
+// Replies have ParentID set and Stars=0; they are excluded from catalog aggregates.
 type Rating struct {
+	ID        int64     `json:"id"`
 	UserID    string    `json:"userId"`
 	PluginID  string    `json:"pluginId"`
+	ParentID  *int64    `json:"parentId,omitempty"`
 	Stars     int       `json:"stars"`
 	Body      string    `json:"body"`
 	Version   string    `json:"version"`
+	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+	Replies   []Rating  `json:"replies,omitempty"`
 }
 
 // Account contains service-assigned privileges, never claims from an OAuth client.

@@ -208,26 +208,79 @@ export async function fetchPluginRatings(
   return Array.isArray(ratings) ? ratings : [];
 }
 
-/** 登录用户新增或更新自己的评分；作者自评由服务端拒绝。 */
-export function savePluginRating(
+/** 新建一条评价；同一账号可以发布多条。 */
+export function createPluginRating(
   pluginId: string,
   input: RatingInput,
   csrf: string,
 ): Promise<PluginRating> {
-  return requestJson<PluginRating>(`/plugins/${encodeURIComponent(pluginId)}/rating`, {
-    method: 'PUT',
+  return requestJson<PluginRating>(`/plugins/${encodeURIComponent(pluginId)}/ratings`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
     csrf,
   });
 }
 
-/** 删除当前登录用户自己的评分。 */
-export function deletePluginRating(pluginId: string, csrf: string): Promise<{ deleted: boolean }> {
-  return requestJson<{ deleted: boolean }>(`/plugins/${encodeURIComponent(pluginId)}/rating`, {
-    method: 'DELETE',
-    csrf,
-  });
+/** 修改自己的某一条评价。 */
+export function updatePluginRating(
+  pluginId: string,
+  ratingId: number,
+  input: RatingInput,
+  csrf: string,
+): Promise<PluginRating> {
+  return requestJson<PluginRating>(
+    `/plugins/${encodeURIComponent(pluginId)}/ratings/${ratingId}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+      csrf,
+    },
+  );
+}
+
+/** 删除自己的某一条评价。 */
+export function deletePluginRating(
+  pluginId: string,
+  ratingId: number,
+  csrf: string,
+): Promise<{ deleted: boolean }> {
+  return requestJson<{ deleted: boolean }>(
+    `/plugins/${encodeURIComponent(pluginId)}/ratings/${ratingId}`,
+    { method: 'DELETE', csrf },
+  );
+}
+
+/** 回复某条评价。 */
+export function createRatingReply(
+  pluginId: string,
+  ratingId: number,
+  body: string,
+  csrf: string,
+): Promise<PluginRating> {
+  return requestJson<PluginRating>(
+    `/plugins/${encodeURIComponent(pluginId)}/ratings/${ratingId}/replies`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+      csrf,
+    },
+  );
+}
+
+/** 删除自己的一条回复。 */
+export function deleteRatingReply(
+  pluginId: string,
+  ratingId: number,
+  replyId: number,
+  csrf: string,
+): Promise<{ deleted: boolean }> {
+  return requestJson<{ deleted: boolean }>(
+    `/plugins/${encodeURIComponent(pluginId)}/ratings/${ratingId}/replies/${replyId}`,
+    { method: 'DELETE', csrf },
+  );
 }
 
 // ---- 发布者接口 ----
