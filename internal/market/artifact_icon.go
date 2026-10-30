@@ -8,7 +8,8 @@ import (
 const (
 	// maxArtifactIconBytes 与宿主一致：图标在未启动插件的情况下被读入内存并嗅探，
 	// 因此包内文件本体也必须受限，否则市场放行的图标在客户端会被静默丢弃。
-	maxArtifactIconBytes     = 64 << 10
+	// 5 MiB 允许作者放高分辨率品牌图；宿主读取时会再次按同一上限拒绝超限文件。
+	maxArtifactIconBytes     = 5 << 20
 	maxArtifactIconPathBytes = 256
 )
 

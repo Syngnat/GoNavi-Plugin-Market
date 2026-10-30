@@ -40,7 +40,7 @@ A package may declare up to **8 providers**, each with **1–32 static models**.
 
 ### Provider icon
 
-`icon` is optional and names a package-relative raster image such as `icons/provider.png`. PNG, JPEG, WebP and GIF are accepted and must be at most 64 KiB. The file must exist in the package: `gonavi plugin check`, `gonavi plugin install --digest` and marketplace inspection reject a declared but missing icon. SVG is rejected; the host renders the icon in the main window and does not need an executable vector format.
+`icon` is optional and names a package-relative raster image such as `icons/provider.png`. PNG, JPEG, WebP and GIF are accepted and must be at most 5 MiB. The file must exist in the package: `gonavi plugin check`, `gonavi plugin install --digest` and marketplace inspection reject a declared but missing icon. SVG is rejected; the host renders the icon in the main window and does not need an executable vector format.
 
 The host reads the bounded file without starting the plugin, verifies the image type from its bytes, and returns a data URL in the provider catalog. The AI settings provider list and saved provider rows then show the brand logo. Missing, oversized, linked or non-raster files are omitted and the UI falls back to the provider's first letter. Inline base64 icons in the manifest are not supported; ship the file in the package.
 

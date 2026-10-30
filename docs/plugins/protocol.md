@@ -88,7 +88,7 @@ These are SDK implementation errors, not a new host permission API. An explicitl
 
 A package has a root manifest named `gonavi.plugin.json`. Required fields include `schemaVersion:1`, `apiVersion:1`, `id`, `name` and a semver `version`. Declare `permissions` explicitly, usually an empty array for a standalone example. The [hello manifest template](<../../examples/plugins/hello/gonavi.plugin.json>) illustrates commands and a declarative panel; build it before checking because its executable is produced by the package tool.
 
-An optional top-level `icon` names the plugin logo: a package-relative PNG, JPEG, WebP or GIF path of at most 256 bytes that must resolve to a packaged regular file of at most 64 KiB. SVG, absolute paths and traversal are rejected.
+An optional top-level `icon` names the plugin logo: a package-relative PNG, JPEG, WebP or GIF path of at most 256 bytes that must resolve to a packaged regular file of at most 5 MiB. SVG, absolute paths and traversal are rejected.
 
 Backend entries name package-relative files. A native entry runs directly, never through a shell. Node/Python entries name scripts and an explicit runtime; an absent interpreter is an error, not an automatic download. Platform entries use keys such as `windows/amd64` or `darwin/arm64`. Every declared entry must exist in the package, including platform entries not selected on this machine.
 

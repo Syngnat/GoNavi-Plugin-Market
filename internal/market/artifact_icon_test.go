@@ -8,7 +8,7 @@ import (
 
 // TestArtifactPluginIconAcceptsDeclaredRasterFile pins the shared icon contract:
 // a top-level manifest icon is a package-relative raster path that must resolve to
-// an exact regular package file no larger than the host's 64 KiB read budget.
+// an exact regular package file no larger than the host's 5 MiB read budget.
 func TestArtifactPluginIconAcceptsDeclaredRasterFile(t *testing.T) {
 	cases := []struct {
 		name string

@@ -14,7 +14,7 @@
 | `unknown manifest field "xxx"` | 清单里有多余字段。短且可打印的字段名会显示出来，长名或非 ASCII 名不显示。 | 对照 [SDK 类型](<sdk.md>)删掉多余字段。 |
 | `invalid declared skill document: skill document is empty or exceeds size limit` | 技能正文为空、超过 64 KiB，或声明了不存在的入口。 | 确认 `SKILL.md` 存在且为非空 UTF-8，入口与配套合计各自不超过 64 KiB。 |
 | `unsafe package path` / `reserved package path` | 包内路径含 `..`、绝对路径、禁止字符，或用了 Windows 保留名（`CON`、`COM1` 等）。 | 改用可移植的相对路径。 |
-| `invalid plugin icon` / `plugin icon: entry must reference an exact regular package file` / `plugin icon: icon exceeds the 65536 byte limit` | 顶层 `icon` 不是包内相对的光栅图路径，或声明的文件没有真实打进包里、超过 64 KiB。 | 把 PNG/JPEG/WebP/GIF 放进包内，路径与 `icon` 完全一致；SVG 与内联 base64 不被接受。 |
+| `invalid plugin icon` / `plugin icon: entry must reference an exact regular package file` / `plugin icon: icon exceeds the 5242880 byte limit` | 顶层 `icon` 不是包内相对的光栅图路径，或声明的文件没有真实打进包里、超过 5 MiB。 | 把 PNG/JPEG/WebP/GIF 放进包内，路径与 `icon` 完全一致；SVG 与内联 base64 不被接受。 |
 
 ## 安装阶段失败
 
