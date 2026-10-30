@@ -1,0 +1,233 @@
+import { useEffect, useRef, type RefObject } from 'react';
+import {
+  Mesh,
+  OrthographicCamera,
+  PlaneGeometry,
+  Scene,
+  ShaderMaterial,
+  SRGBColorSpace,
+  Vector2,
+  WebGLRenderer,
+} from 'three';
+
+const BASE_SIZE = 480;
+
+const vertexShader = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+  }
+`;
+
+const fragmentShader = /* glsl */ `
+  precision highp float;
+  uniform float uTime;
+  uniform vec2 uResolution;
+  varying vec2 vUv;
+
+  mat2 rotate2d(float a) {
+    float s = sin(a), c = cos(a);
+    return mat2(c, -s, s, c);
+  }
+
+  float hash21(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+  }
+
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+      mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x),
+      f.y
+    );
+  }
+
+  float fbm(vec2 p) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    for (int i = 0; i < 5; i++) {
+      value += amplitude * noise(p);
+      p = rotate2d(0.63) * p * 2.03 + 17.1;
+      amplitude *= 0.52;
+    }
+    return value;
+  }
+
+  void main() {
+    vec2 p = vUv * 2.0 - 1.0;
+    p.x *= uResolution.x / max(uResolution.y, 1.0);
+    float time = uTime;
+    float radius = length(p);
+    float angle = atan(p.y, p.x);
+
+    // Thin, tilted accretion disk. The extra vertical scale turns the ring
+    // into the flattened ellipse seen from a low inclination.
+    vec2 diskP = rotate2d(-0.24) * p;
+    diskP.y *= 2.15;
+    float diskRadius = length(diskP);
+    float diskAngle = atan(diskP.y, diskP.x);
+    float inner = 0.30;
+    float outer = 1.02;
+    float band = smoothstep(inner, inner + 0.055, diskRadius) *
+                 (1.0 - smoothstep(outer - 0.15, outer, diskRadius));
+
+    // Turbulent spiral structure; the phase moves so the disk visibly flows.
+    float spiral = diskAngle * 2.6 + time * 0.34 + log(max(diskRadius, 0.001)) * 4.2;
+    float turbulence = fbm(vec2(spiral, diskRadius * 9.0 - time * 0.18));
+    float filaments = fbm(vec2(spiral * 2.2 + 13.0, diskRadius * 18.0 + time * 0.08));
+    float diskTexture = 0.48 + 0.58 * turbulence + 0.2 * filaments;
+
+    // Relativistic beaming: the approaching side is brighter and whiter.
+    float doppler = 0.48 + 1.35 * pow(max(0.0, cos(diskAngle + 0.72)), 2.4);
+    float disk = band * diskTexture * doppler;
+
+    // Hot inner rim and the thin photon ring around the shadow.
+    float innerRim = exp(-pow((diskRadius - inner) * 24.0, 2.0)) * doppler;
+    float photonRing = exp(-pow((radius - 0.218) * 34.0, 2.0));
+    float photonHalo = exp(-pow((radius - 0.225) * 8.0, 2.0)) * 0.22;
+    float lensedArc = smoothstep(0.24, 0.30, radius) *
+                      (1.0 - smoothstep(0.60, 0.78, radius)) *
+                      smoothstep(0.02, 0.22, -p.y) *
+                      (0.30 + 0.7 * fbm(vec2(angle * 5.0 + time * 0.22, radius * 8.0)));
+
+    vec3 ember = vec3(0.44, 0.075, 0.018);
+    vec3 copper = vec3(1.0, 0.34, 0.055);
+    vec3 whiteHot = vec3(1.0, 0.92, 0.72);
+    float heat = smoothstep(outer, inner, diskRadius);
+    vec3 diskColor = mix(ember, copper, heat);
+    diskColor = mix(diskColor, whiteHot, pow(1.0 - smoothstep(inner, 0.64, diskRadius), 2.4));
+
+    float alpha = max(disk * 0.92, innerRim * 0.90);
+    alpha = max(alpha, photonRing * 0.92 + photonHalo);
+    alpha = max(alpha, lensedArc * 0.34);
+    vec3 color = diskColor * max(disk, innerRim * 1.35);
+    color += whiteHot * (photonRing * 1.25 + photonHalo * 0.35);
+    color += copper * lensedArc * 0.30;
+
+    // Event horizon: an opaque shadow, with a faint warm rim outside it.
+    float shadow = 1.0 - smoothstep(0.185, 0.202, radius);
+    float rim = exp(-pow((radius - 0.205) * 54.0, 2.0));
+    color = mix(color, vec3(0.0), shadow);
+    alpha = max(alpha, shadow);
+    alpha = max(alpha, rim * 0.48);
+    color += whiteHot * rim * 0.55;
+
+    // Soft outer corona so the black hole sits naturally on the star field.
+    float corona = exp(-pow((radius - 0.42) * 3.4, 2.0)) * 0.055;
+    alpha = max(alpha, corona);
+    color += copper * corona * 0.5;
+
+    // Alpha edges and a tiny grain keep the disk from looking like a flat ring.
+    alpha *= smoothstep(1.06, 0.74, radius) + shadow + rim;
+    alpha = clamp(alpha, 0.0, 1.0);
+    color *= 1.0 + (hash21(gl_FragCoord.xy + time) - 0.5) * 0.035;
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+export interface BlackHoleProps {
+  hostRef: RefObject<HTMLElement | null>;
+  worldRef: RefObject<SVGGElement | null>;
+  centerX: number;
+  centerY: number;
+}
+
+/**
+ * A WebGL black hole rendered over the SVG star map. Its CSS transform is
+ * synced to the map camera every frame, so pan/zoom carry it with the world
+ * without making plugin nodes depend on WebGL.
+ */
+export function BlackHole({ hostRef, worldRef, centerX, centerY }: BlackHoleProps) {
+  const frameRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const overlay = frameRef.current;
+    const host = hostRef.current;
+    if (!overlay || !host) return;
+
+    let renderer: WebGLRenderer;
+    try {
+      renderer = new WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'low-power' });
+    } catch {
+      overlay.classList.add('is-webgl-unavailable');
+      return;
+    }
+
+    const scene = new Scene();
+    const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const geometry = new PlaneGeometry(2, 2);
+    const material = new ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      uniforms: {
+        uTime: { value: 0 },
+        uResolution: { value: new Vector2(BASE_SIZE, BASE_SIZE) },
+      },
+      vertexShader,
+      fragmentShader,
+    });
+    const mesh = new Mesh(geometry, material);
+    scene.add(mesh);
+    renderer.outputColorSpace = SRGBColorSpace;
+    renderer.setClearColor(0x000000, 0);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(BASE_SIZE, BASE_SIZE, false);
+    overlay.prepend(renderer.domElement);
+    renderer.domElement.className = 'galaxy-black-hole-canvas';
+
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let frame = 0;
+    const started = performance.now();
+    let visible = true;
+
+    const syncPosition = () => {
+      const world = worldRef.current;
+      if (!world || !host) return;
+      const matrix = world.getScreenCTM();
+      if (!matrix) return;
+      const point = new DOMPoint(centerX, centerY).matrixTransform(matrix);
+      const rect = host.getBoundingClientRect();
+      const scale = Math.max(0.35, Math.min(2.6, matrix.a));
+      overlay.style.transform = `translate3d(${(point.x - rect.left).toFixed(2)}px, ${(point.y - rect.top).toFixed(2)}px, 0) translate(-50%, -50%) scale(${scale.toFixed(4)})`;
+    };
+
+    const render = (now: number) => {
+      if (!visible) {
+        frame = requestAnimationFrame(render);
+        return;
+      }
+      const elapsed = reduced.matches ? 8.0 : (now - started) / 1000;
+      material.uniforms.uTime.value = elapsed;
+      syncPosition();
+      renderer.render(scene, camera);
+      frame = requestAnimationFrame(render);
+    };
+
+    const onVisibility = () => {
+      visible = document.visibilityState === 'visible';
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    render(performance.now());
+
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('visibilitychange', onVisibility);
+      geometry.dispose();
+      material.dispose();
+      renderer.dispose();
+      renderer.domElement.remove();
+    };
+  }, [centerX, centerY, hostRef, worldRef]);
+
+  return (
+    <div ref={frameRef} className="galaxy-black-hole" aria-hidden="true">
+      <span className="galaxy-black-hole-caption">GONAVI</span>
+    </div>
+  );
+}

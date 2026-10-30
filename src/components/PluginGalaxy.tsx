@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { PluginItem } from '../api/types';
+import { BlackHole } from './BlackHole';
 import { InstallButton } from './InstallButton';
 
 export type GalaxyCategory = '全部' | '数据源' | 'AI 供应商' | '导出器' | '技能' | '面板' | '命令' | '运维' | '其他';
@@ -864,17 +865,6 @@ export function PluginGalaxy({
             <text x="322" y="430" textAnchor="end">WEST / OPS</text>
           </g>
 
-          <g className="galaxy-core" transform={`translate(${WORLD.cx} ${WORLD.cy})`}>
-            <circle className="core-corona" r="230" fill="url(#coreCorona)" />
-            <circle className="core-halo" r="96" fill="url(#galaxySweep)" />
-            <circle className="core-ring" r="58" />
-            <circle className="core-ring reverse" r="40" />
-            <circle className="core-body" r="22" />
-            <circle className="core-inner" r="16" fill="url(#galaxyCore)" />
-            <circle className="core-hot" r="5.5" />
-            <text className="core-caption" y="46">GONAVI</text>
-          </g>
-
           <g className="galaxy-coordinates" aria-hidden="true">
             <text x="118" y="118">X 012.4 / Y 086.1</text>
             <text x="118" y="132">SECTOR 07 / LOCAL CLUSTER</text>
@@ -882,6 +872,13 @@ export function PluginGalaxy({
           </g>
         </g>
       </svg>
+
+      <BlackHole
+        hostRef={observatoryRef}
+        worldRef={worldRef}
+        centerX={WORLD.cx}
+        centerY={WORLD.cy}
+      />
 
       <div className="galaxy-nodes" aria-label="插件对象">
         {nodes.map((node, index) => {
