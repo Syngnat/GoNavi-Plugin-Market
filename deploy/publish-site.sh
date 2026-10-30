@@ -128,6 +128,8 @@ log "verify origin"
 ssh "${SSH_ARGS[@]}" "$HOST" 'bash -s' < "$REPO_ROOT/deploy/verify-origin.sh"
 
 log "verify public catalog"
-LIVE=$(curl -fsS https://plugin.gonavi.org/catalog.json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(" ".join(f"{i[\"id\"]}={i[\"version\"]}" for i in d.get("items",[])[:4]))')
+LIVE=$(curl -fsS https://plugin.gonavi.org/catalog.json | python3 -c 'import json,sys
+d = json.load(sys.stdin)
+print(" ".join(i["id"] + "=" + i["version"] for i in d.get("items", [])[:4]))')
 log "live: $LIVE"
 log "published $TAG"
