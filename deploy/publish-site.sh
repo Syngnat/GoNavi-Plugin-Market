@@ -105,12 +105,21 @@ log "upload to $HOST"
 scp "${SCP_ARGS[@]}" "$TARBALL" "$HOST:/root/plugin-market-staging.tar.gz"
 
 log "remote verify, unpack and switch current -> $TAG"
+# 并发发布会同时改 current：串行化切换，且不让较旧的构建覆盖较新的。
 ssh "${SSH_ARGS[@]}" "$HOST" "set -euo pipefail
   echo '$SHA256  /root/plugin-market-staging.tar.gz' | sha256sum -c - >/dev/null
+  exec 9>/tmp/gonavi-market-publish.lock
+  flock 9
   mkdir -p $REMOTE_ROOT/releases/$TAG
   tar -xzf /root/plugin-market-staging.tar.gz -C $REMOTE_ROOT/releases/$TAG
-  ln -sfn $REMOTE_ROOT/releases/$TAG $REMOTE_ROOT/current.tmp
-  mv -Tf $REMOTE_ROOT/current.tmp $REMOTE_ROOT/current
+  CUR=\$(readlink -f $REMOTE_ROOT/current 2>/dev/null || true)
+  if [ -n \"\$CUR\" ] && [ -d \"\$CUR\" ] && [ \"\$CUR\" -nt \"$REMOTE_ROOT/releases/$TAG\" ]; then
+    echo \"skip switch: current is newer than $TAG\"
+    rm -rf \"$REMOTE_ROOT/releases/$TAG\"
+  else
+    ln -sfn $REMOTE_ROOT/releases/$TAG $REMOTE_ROOT/current.tmp
+    mv -Tf $REMOTE_ROOT/current.tmp $REMOTE_ROOT/current
+  fi
   rm -f /root/plugin-market-staging.tar.gz
   ls -l $REMOTE_ROOT/current
   # keep the newest N releases so a bad publish can be rolled back by hand
