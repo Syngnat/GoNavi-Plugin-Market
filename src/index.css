@@ -214,8 +214,8 @@ body {
   top: 0;
   left: 0;
   z-index: 2;
-  width: 720px;
-  height: 405px;
+  width: 640px;
+  height: 360px;
   pointer-events: none;
   transform-origin: center;
 }
