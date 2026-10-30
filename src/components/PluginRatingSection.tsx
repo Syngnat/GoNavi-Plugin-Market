@@ -153,7 +153,7 @@ export function PluginRatingSection({
     setPendingDelete(null);
     try {
       await savePluginRating(pluginId, { stars, body: body.trim(), version }, csrf);
-      setFeedback(mine ? '评价已更新。' : '评价已发布。');
+      setFeedback(mine ? '我的评价已保存。' : '我的评价已发布。');
       await load();
       await onChanged();
     } catch (error) {
@@ -245,9 +245,12 @@ export function PluginRatingSection({
         </div>
       ) : (
         <form onSubmit={submit} className="rounded-lg border border-hairline bg-paper/60 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-muted">
+            每个账号对同一插件只有一条评价；{mine ? '这里的保存会修改你自己的那条。' : '发布后会出现在下方列表。'}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <span id={starsLabelId} className="text-sm font-medium">
-              你的评分
+              我的评分
             </span>
             <div role="group" aria-labelledby={starsLabelId} className="flex items-center gap-1">
               {STAR_VALUES.map((value) => (
@@ -270,7 +273,7 @@ export function PluginRatingSection({
           </div>
 
           <label htmlFor={bodyId} className="mt-4 block text-sm font-medium">
-            评价（可选）
+            我的评价（可选）
           </label>
           <textarea
             id={bodyId}
@@ -292,7 +295,7 @@ export function PluginRatingSection({
                 disabled={busy || bodyBytes > 4000 || stars < 1}
                 className="rounded-lg bg-copper px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {busy ? '提交中…' : mine ? '更新评价' : '发布评价'}
+                {busy ? '保存中…' : mine ? '保存我的评价' : '发布我的评价'}
               </button>
             </div>
           </div>
