@@ -49,6 +49,7 @@ Go SDK 和示例最完整，适合原生后端。仓库同时提供 TypeScript S
 - 主窗口声明式面板：无需完整前端工程，适合简单操作；
 - 独立自定义窗口：需要完整 Wails/Web UI 时使用；
 - `pages` + `navigation` + `ui.pages`：把页面挂到标题栏菜单；
+- `window` + `navigation` 且 `target: "window"`：从标题栏直接打开独立窗口，不需要 `ui.pages`；
 - HTML 页面还需 `ui.html-panel`，并在沙箱和 CSP 限制内工作。
 
 见[SDK 的 UI 选择](<sdk.md#ui-choices>)与[页面契约](<pages.md>)。

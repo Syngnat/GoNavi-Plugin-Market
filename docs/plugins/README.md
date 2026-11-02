@@ -44,7 +44,7 @@ gonavi plugin --safe-mode disable publisher.name
 |---|---|
 | 后端运行时 | 独立子进程、异步启动、心跳、请求取消、有界通信、持久化启停意图与故障隔离。禁用先撤销贡献与调用，再限时清理并终止进程树；generation 检查拒绝旧实例结果，不循环自动重启。 |
 | 插件 UI | 主窗口默认渲染有界声明式面板；声明 `ui.html-panel` 后可用不透明源沙箱 iframe 渲染有界自定义 HTML（面板无宿主桥接，CSP 拦截页面网络与外部资源）；需要完整桌面能力时仍走独立 Wails 进程与 WebView 配置目录。真实桌面渲染仍需平台验收。 |
-| 插件页面与宿主能力 | 显式 `ui.pages` 后可声明最多 32 个页面与 32 条 `location:"tools"` 导航：声明式页面复用 `DeclarativePanel`，HTML 页面在既有 CSP 沙箱内获得 `window.gonavi` 页面桥。宿主能力逐项登记并按权限分派（`host.connections.read`、`host.metadata.read`、`host.query.read`），连接只按已保存 ID 解析，参数 ≤64 KiB、结果 ≤256 KiB、单次 30s。桥按每帧 token 校验（缺失／不符静默丢弃）、调用 30 次／10s、notify 10 次／10s；CSP 不阻止自我导航，二次 load 视为逃逸并撤销桥。Web 未允许管理时不显示可点击入口；页面标签不跨重启恢复。`query.read` 走扫描层行预算，且「只读 ≠ 无副作用」。不是通用绑定反射，也未开放页面自定义网络。见[页面契约](<pages.md>)。 |
+| 插件页面与宿主能力 | 显式 `ui.pages` 后可声明最多 32 个页面；最多 32 条 `location:"tools"` 导航把页面挂到标题栏，`target:"window"` 的条目则直接打开清单声明的窗口且不需要该权限：声明式页面复用 `DeclarativePanel`，HTML 页面在既有 CSP 沙箱内获得 `window.gonavi` 页面桥。宿主能力逐项登记并按权限分派（`host.connections.read`、`host.metadata.read`、`host.query.read`），连接只按已保存 ID 解析，参数 ≤64 KiB、结果 ≤256 KiB、单次 30s。桥按每帧 token 校验（缺失／不符静默丢弃）、调用 30 次／10s、notify 10 次／10s；CSP 不阻止自我导航，二次 load 视为逃逸并撤销桥。Web 未允许管理时不显示可点击入口；页面标签不跨重启恢复。`query.read` 走扫描层行预算，且「只读 ≠ 无副作用」。不是通用绑定反射，也未开放页面自定义网络。见[页面契约](<pages.md>)。 |
 | 安装与管理 | 本地目录、ZIP、TGZ 和市场安装；静态检查不执行插件。内容摘要绑定信任确认，市场使用实际归档预览与一次性批准，安装后保留来源记录。已安装插件可用「替换」保留启用状态地换包（CLI `replace`、桌面确认框自动识别），失败时保留原包。 |
 | SDK 与示例 | 不依赖宿主 internal 包的独立 Go 模块、TypeScript 类型与协议 helper；真实 hello 插件、可检查的 page／navigation 示例、打包工具和崩溃／挂起／忽略取消／输出洪泛夹具。 |
 | 数据源 | `data.sources` 声明接入真实连接、查询、元数据与取消路径，支持 mysql／postgres／sqlite 方言标签。默认协议 v1 只读；显式 `readOnly:false` 后协议 v2 支持单条写入与插件自管理事务。缺失、禁用或过期实例不能回退为内置驱动；批量执行与通用传输仍不支持。见[数据源指南](<data-sources.md>)。 |

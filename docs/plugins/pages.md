@@ -22,6 +22,19 @@
 }
 ```
 
+导航也可以把清单声明的 `window` 挂到标题栏，此时不引用任何页面，也不需要 `ui.pages`：
+
+```json
+{
+  "window": { "entry": "index.html", "title": "My Plugin", "width": 1200, "height": 760 },
+  "contributes": {
+    "navigation": [
+      { "id": "open-window", "title": "My Plugin", "target": "window", "location": "tools" }
+    ]
+  }
+}
+```
+
 ### 1.1 pages
 
 - `id`：`localIDPattern`（`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`），同插件内唯一。
@@ -35,22 +48,28 @@
 
 - `id`：`localIDPattern`，同插件内唯一（与 pages 的 id 命名空间独立）。
 - `title`：非空文本，≤256 字节。
-- `page`：必须引用本插件已声明的 page id。
-- `location`：v1 只接受 `"tools"`（标题栏「插件」菜单）。枚举保留扩展位，未知值拒绝。
+- `target`：可选，`"page"`（默认）或 `"window"`；其他值直接拒绝。
+  - `""`／`"page"`：打开页面标签页，`page` 必须引用本插件已声明的 page id。
+  - `"window"`：打开清单 `window` 声明的独立窗口，要求存在 `window`，且**禁止同时声明 `page`**。
+- `page`：目标为页面时必须引用本插件已声明的 page id；目标为 `window` 时必须缺省或为空字符串。
+- `location`：v1 只接受 `"tools"`（标题栏「插件」菜单）。枚举保留扩展位，未知值拒绝。两种 target 共用这一位置。
 - `order`：可选整数，`-1000..1000`，默认 0；同插件内按升序展示，相同 order 按声明顺序。
 - 最多 32 条导航。
+
+`target` 缺省等价于 `"page"`，所以在该字段出现之前写下的清单保持原义。窗口目标与 `connectionActions` 的 `{"target":{"type":"window"}}` 是两套独立声明：前者挂标题栏入口，后者挂连接右键菜单，但两者都只打开清单自己声明的窗口，因此都不要求 `ui.pages`。
 
 ### 1.3 权限
 
 | 权限 | 作用 |
 |---|---|
-| `ui.pages` | 渲染 `pages` 并把 `navigation` 挂到主窗口；缺失时 pages/navigation 声明直接校验失败 |
+| `ui.pages` | 渲染 `pages` 并把页面导航挂到主窗口；声明了 `pages` 或存在非 `window` 目标的导航时缺失即校验失败 |
 | `ui.html-panel` | 允许声明 `html` 页面（复用现有权限语义；v1 起同时允许页面通过桥调用已授权宿主能力） |
 | `host.connections.read` | 读取脱敏后的保存连接列表 |
 | `host.metadata.read` | 读取已保存连接的数据库／表／列元数据 |
 | `host.query.read` | 通过已保存连接执行单条只读查询（见 2.3；v1 已接通只读连接、SQL 审计与超时路径） |
 
-- `ui.pages` 是页面与导航的前置条件；`host.*` 权限只影响对应能力调用，不隐式授予页面渲染。
+- `ui.pages` 是页面与页面导航的前置条件；`host.*` 权限只影响对应能力调用，不隐式授予页面渲染。
+- 全部导航都指向 `target: "window"` 时不需要 `ui.pages`：窗口目标只打开插件自己的窗口，与窗口连接动作同一套规则。
 - 未声明 `ui.pages` 的包仍可只使用旧的面板／窗口能力。
 - 只有处于 `running` 的插件才展示入口；静态包（无 backend）在运行时所有者启动后同样进入 `running`，只是没有子进程。
 
@@ -106,10 +125,10 @@ func (a *App) PluginPageCall(id, pageID, method, argumentsJSON string) connectio
 - 新增工作台标签页类型 `plugin-page`，`TabData.pluginPage = { pluginID, pageID, title }`。
 - 页面内容：声明式页面复用 `DeclarativePanel`；HTML 页面复用 `sandboxedPanelDocument` 的 CSP 包装并注入桥运行时。
 - 入口：
-  1. 标题栏新增「插件」快捷菜单，列出所有 running 插件的 `navigation`（location=tools），点击打开对应标签页；懒加载，首次打开菜单时读取，不改变启动时插件运行时初始化时机。
+  1. 标题栏新增「插件」快捷菜单，列出所有 running 插件的 `navigation`（location=tools）：页面目标点击打开对应标签页，窗口目标打开清单声明的独立窗口；懒加载，首次打开菜单时读取，不改变启动时插件运行时初始化时机。
   2. 设置中心 →「插件」页每个插件卡展示其页面列表与「打开」按钮。
 - 插件被禁用／移除／换代时：已打开页面显示不可用状态并停止桥调用；错误码 `not_running`。
-- 页面标签页标题使用 navigation.title；同一 (pluginID,pageID) 复用已有标签页。
+- 页面标签页标题使用 navigation.title；同一 (pluginID,pageID) 复用已有标签页。窗口目标不使用标签页，沿用插件窗口既有的复用语义（同一插件已有窗口时复用，不另开一个）。
 - 页面标签页**不跨重启恢复**：`plugin-page` 不在工作台 session snapshot 的恢复集合内，重启后需重新从菜单打开。
 - Web 运行时且 `managementAllowed=false` 时：标题栏「插件」菜单不列出可点击条目，插件卡里的「打开」按钮禁用并显示提示（`plugin.pages.web_unavailable`）；桌面端或允许管理时保持原行为。
 

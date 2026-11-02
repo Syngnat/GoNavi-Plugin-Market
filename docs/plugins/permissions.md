@@ -16,7 +16,7 @@
 | `host.metadata.read` | 通过插件页面桥读取已保存连接的库／表／列元数据 | 不执行查询、不读数据行、不写任何对象 |
 | `host.query.read` | 通过插件页面桥用已保存连接执行单条只读查询 | 仍受只读连接、SQL 审计、30s 超时、扫描层行预算与 256 KiB 结果上限约束；不能写入或开事务。**只读 ≠ 无副作用**：锁子句与常见危险函数被拒绝，其余副作用未穷举 |
 | `host.schema.write` | 通过 `schema.preview` / `schema.apply` 对已保存连接执行受控 DDL | 仅 CREATE/ALTER/DROP TABLE\|INDEX\|VIEW；拒绝只读/结构保护连接、TRUNCATE、数据库/schema 级 DDL、DML 与多语句；apply 必须经宿主原生确认，计划一次性且 5 分钟过期 |
-| `ui.pages` | 渲染 `pages` 并把 `navigation` 挂到主窗口（标题栏「插件」菜单） | 不授予任何 `host.*` 能力，也不授权其他插件页面 |
+| `ui.pages` | 渲染 `pages` 并把页面导航挂到主窗口（标题栏「插件」菜单）；`target: "window"` 的导航只打开插件自己的窗口，不需要本权限 | 不授予任何 `host.*` 能力，也不授权其他插件页面 |
 | `ui.html-panel` | 在主窗口内以不透明源沙箱 iframe 渲染有界自定义 HTML；面板没有桥，`pages` 里的 HTML 页面自 v1 起可通过页面桥调用**已单独授权**的 `host.*` 能力 | 不提供存储、Cookie、凭据、同源访问、表单或嵌套 frame；CSP 拦截页面 fetch／XHR／WebSocket 与外部资源，但这不是 OS 或网络栈沙箱，也**不阻止页面自我导航**（导航后宿主撤销桥，见页面契约） |
 | `system.open-external` | 通过 `system.open-external` 能力把**一个** http(s) 链接交给系统默认浏览器打开；插件页面与插件窗口均可调用 | 不接受 `file:`／`javascript:`／`data:`／`mailto:`／自定义 scheme、带用户名密码的 URL 或超长目标；不导航宿主 WebView，插件无法把主窗口、页面 frame 或插件窗口变成地址栏；Web／headless 运行时不执行 |
 
@@ -28,13 +28,14 @@
 
 ## 页面与宿主能力
 
-- `ui.pages` 是 `contributes.pages`／`contributes.navigation` 的前置条件：声明了任一数组就必须声明 `ui.pages`，否则清单校验失败。
+- `ui.pages` 是 `contributes.pages` 与页面导航的前置条件：声明了 `pages`，或 `navigation` 里存在非 `target: "window"` 的条目，就必须声明 `ui.pages`，否则清单校验失败。
+- 导航全部指向 `target: "window"` 时不需要 `ui.pages`；该目标只打开清单声明的窗口，与窗口连接动作同规则，窗口自身仍受 `window` 声明与条目存在性校验。
 - `host.*` 只影响**页面桥**里的对应能力调用，不隐式授予页面渲染。缺权限时该能力返回 `permission_denied`，页面其余部分仍可渲染。
 - HTML 页面必须声明 `ui.html-panel`；声明式页面不需要。
 - 页面桥不绕过连接策略：连接一律按**已保存连接 ID** 解析，插件永远拿不到用户名、密码、SSH／代理凭据或 DSN。`host.query.read` 只接受单条只读语句，并沿用宿主的只读连接、SQL 审计、超时与扫描层行预算。
 - `host.query.read` 是「按语句分类只读」，**不等于无副作用**：v1 拒绝常见锁子句（`FOR UPDATE`／`FOR SHARE` 等）与 `nextval`／`setval`／`pg_terminate_backend`／`pg_read_file`，但 `pg_advisory_lock`、`pg_sleep`、用户自定义函数等未穷举。只向确实需要读数据的页面授予该权限。
 - 页面网络边界只覆盖主动请求：CSP 不阻止自我导航；第二次 frame 加载会被宿主判定逃逸并撤销桥。`host.*` 数据仍应视为暴露给已声明权限的插件代码。
-- 只有 `navigation.location = "tools"` 的页面会出现在标题栏「插件」菜单；只有处于 `running` 的插件才有可打开的页面；页面标签页不跨重启恢复。Web 运行时未允许插件管理时不显示可点击入口。
+- 只有 `navigation.location = "tools"` 的条目会出现在标题栏「插件」菜单；页面导航打开页面标签页，窗口导航打开清单声明的独立窗口。只有处于 `running` 的插件才有可打开的入口；页面标签页不跨重启恢复。Web 运行时未允许插件管理时不显示可点击入口，窗口目标在 Web 运行时也不出现。
 
 ## 边界
 

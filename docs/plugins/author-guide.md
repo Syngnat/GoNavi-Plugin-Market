@@ -23,6 +23,7 @@
 |---|---|---|
 | 可调用命令 / 宿主渲染面板 | [开发指南](<development.md>)、[SDK](<sdk.md>) | 自定义窗口、声明式面板 |
 | 完整插件页面并挂到标题栏菜单 | [页面契约](<pages.md>) | `pages` / `navigation` |
+| 从标题栏直接打开插件窗口 | [页面契约](<pages.md>) | `window` + `navigation[].target: "window"` |
 | Agent 可调用的普通命令 | [Agent 工具](<ai-tools.md>) | `ai.tools` |
 | 打包技能文档 | [Skills](<skills.md>) | `ai.skills` |
 | SQL 数据源 | [数据源](<data-sources.md>) | `data.sources` |
