@@ -290,6 +290,10 @@ func TestArtifactWindowTargetNavigationRejections(t *testing.T) {
 func TestValidatePackageAcceptsWindowTargetEntry(t *testing.T) {
 	manifest := artifactTestChange(t, func(fields map[string]any) {
 		fields["window"] = map[string]any{"entry": "index.html", "title": "GoNavi SSH", "width": 1200, "height": 760}
+		// target 只存在于 1.2.1 起的主机契约；市场要求声明能解析它的最低版本。
+		// 窗口在原生 WebView 里跑包内 HTML/JS，与自定义 HTML 页同一权限门。
+		fields["minHostVersion"] = artifactMinHostNavigationTarget
+		fields["permissions"] = []string{"ui.html-panel"}
 		fields["contributes"] = map[string]any{
 			"navigation": []any{artifactWindowTargetNavigation("window", "")},
 		}

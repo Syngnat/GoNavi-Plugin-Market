@@ -26,6 +26,12 @@ func (index *artifactIndex) validateManifest(ctx context.Context) (ValidatedPack
 	if err != nil {
 		return ValidatedPackage{}, err
 	}
+	// The SDK owns the manifest field whitelist so this validator cannot drift from
+	// the host again. It runs first: a field the pinned host cannot decode must be
+	// rejected before any other rule reasons about the package.
+	if err := validateArtifactContract(index.manifest); err != nil {
+		return ValidatedPackage{}, err
+	}
 	if err := validateArtifactMetadata(manifest); err != nil {
 		return ValidatedPackage{}, err
 	}
@@ -36,10 +42,22 @@ func (index *artifactIndex) validateManifest(ctx context.Context) (ValidatedPack
 	if err := validateArtifactContributions(manifest); err != nil {
 		return ValidatedPackage{}, err
 	}
+	// Runs after the structural checks so it only reasons about valid declarations,
+	// and before any package metadata is returned to a publisher.
+	if err := validateArtifactHostCompatibility(manifest); err != nil {
+		return ValidatedPackage{}, err
+	}
 	if err := index.validateSkillContributions(manifest); err != nil {
 		return ValidatedPackage{}, err
 	}
 	if window := manifest.Window; window != nil {
+		// A window runs packaged HTML/JS in a native WebView with the window bridge,
+		// so the host requires the same explicit sandboxed-HTML permission it requires
+		// for a custom HTML page. Accepting the package without it would publish
+		// something every released host rejects.
+		if !artifactHasPermission(manifest.Permissions, artifactCustomPanelPermission) {
+			return ValidatedPackage{}, fmt.Errorf("window requires the %s permission", artifactCustomPanelPermission)
+		}
 		if err := index.reference(window.Entry); err != nil {
 			return ValidatedPackage{}, fmt.Errorf("window entry: %w", err)
 		}
@@ -59,8 +77,12 @@ func (index *artifactIndex) validateManifest(ctx context.Context) (ValidatedPack
 			}
 		}
 	}
-	if err := validateArtifactSchema(manifest.ConfigSchema); err != nil {
-		return ValidatedPackage{}, err
+	// configSchema was removed from the host contract: it was parsed but never
+	// consumed, and every host now rejects a manifest that still declares it as an
+	// unknown field. This validator kept accepting it, so such a package published
+	// cleanly and then failed to install everywhere.
+	if len(manifest.ConfigSchema) > 0 {
+		return ValidatedPackage{}, fmt.Errorf("configSchema is no longer part of the manifest contract")
 	}
 	if err := ctx.Err(); err != nil {
 		return ValidatedPackage{}, err

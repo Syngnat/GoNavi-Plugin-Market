@@ -121,11 +121,26 @@ func TestArtifactDependencyCountBound(t *testing.T) {
 
 func TestValidatePackageAcceptsWindowBounds(t *testing.T) {
 	manifest := artifactTestChange(t, func(fields map[string]any) {
+		fields["permissions"] = []string{"ui.html-panel"}
 		fields["window"] = map[string]any{"entry": "bin/plugin", "title": strings.Repeat("中", 85), "width": 8192, "height": 0}
 	})
 	filename := artifactTestWrite(t, ".zip", artifactTestZIP(t, artifactTestEntries(manifest)))
 	if _, err := ValidatePackage(context.Background(), filename); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestValidatePackageRejectsWindowWithoutSandboxedHTMLPermission(t *testing.T) {
+	// A window runs packaged HTML/JS in a native WebView with the window bridge, so
+	// it needs the same explicit permission a custom HTML page needs. A package
+	// without it publishes cleanly here and is rejected by every released host.
+	manifest := artifactTestChange(t, func(fields map[string]any) {
+		fields["permissions"] = []string{}
+		fields["window"] = map[string]any{"entry": "bin/plugin", "title": "Fixture"}
+	})
+	filename := artifactTestWrite(t, ".zip", artifactTestZIP(t, artifactTestEntries(manifest)))
+	if _, err := ValidatePackage(context.Background(), filename); err == nil {
+		t.Fatal("window without ui.html-panel was accepted")
 	}
 }
 
@@ -151,10 +166,10 @@ func TestArtifactSemanticVersions(t *testing.T) {
 
 func TestArtifactManifestDeclarativeAndScriptEntries(t *testing.T) {
 	manifest := artifactTestChange(t, func(fields map[string]any) {
+		fields["permissions"] = []string{"ui.html-panel"}
 		fields["backend"] = map[string]any{"default": map[string]any{"executable": "bin/plugin", "runtime": "python", "args": []string{"--name", "$(touch never)"}}}
 		fields["window"] = map[string]any{"entry": "bin/plugin", "title": "Fixture", "width": 800, "height": 600}
 		fields["requires"] = []any{map[string]any{"id": "example.other", "minVersion": "1.0.0", "optional": true}}
-		fields["configSchema"] = map[string]any{"type": "object", "properties": map[string]any{"Case": map[string]any{}, "case": map[string]any{}}}
 		fields["contributes"] = map[string]any{
 			"commands": []any{map[string]any{"id": "run", "title": "Run", "effect": "read", "inputSchema": map[string]any{"type": "object"}}},
 			"panels": []any{map[string]any{"id": "panel", "title": "Panel", "body": map[string]any{"type": "column", "children": []any{
