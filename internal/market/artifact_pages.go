@@ -14,6 +14,8 @@ const (
 	artifactPagesPermission       = "ui.pages"
 	artifactCustomPanelPermission = "ui.html-panel"
 	artifactPageLocationTools     = "tools"
+	artifactPageTargetPage        = "page"
+	artifactPageTargetWindow      = "window"
 	artifactMaxPages              = 32
 	artifactMaxNavigation         = 32
 	artifactMinNavigationOrder    = -1000
@@ -30,17 +32,27 @@ func validateArtifactPages(manifest artifactManifest, commands map[string]bool) 
 	for _, permission := range manifest.Permissions {
 		permissions[permission] = true
 	}
-	if !permissions[artifactPagesPermission] {
-		return fmt.Errorf("pages or navigation require the %s permission", artifactPagesPermission)
-	}
 	if len(pages) > artifactMaxPages || len(navigation) > artifactMaxNavigation {
 		return fmt.Errorf("too many pages or navigation entries")
+	}
+	// ui.pages gates page declarations and page navigation; a window target only
+	// opens the plugin window, exactly like a window connection action, so a
+	// manifest whose navigation entries all target the window needs no page
+	// permission.
+	declaresPages := len(pages) > 0
+	for _, item := range navigation {
+		if item.Target != artifactPageTargetWindow {
+			declaresPages = true
+		}
+	}
+	if declaresPages && !permissions[artifactPagesPermission] {
+		return fmt.Errorf("pages or navigation require the %s permission", artifactPagesPermission)
 	}
 	declared, err := validateArtifactPageDeclarations(pages, permissions, commands)
 	if err != nil {
 		return err
 	}
-	return validateArtifactNavigationDeclarations(navigation, declared)
+	return validateArtifactNavigationDeclarations(navigation, declared, manifest.Window != nil)
 }
 
 // validateArtifactPageDeclarations returns the declared page ids for navigation
@@ -89,15 +101,27 @@ func validateArtifactPageHTML(panel artifactHTMLPanel) error {
 	return nil
 }
 
-func validateArtifactNavigationDeclarations(navigation []artifactNavigation, pages map[string]bool) error {
+func validateArtifactNavigationDeclarations(navigation []artifactNavigation, pages map[string]bool, hasWindow bool) error {
 	declared := make(map[string]bool, len(navigation))
 	for _, item := range navigation {
 		if !artifactLocalIDPattern.MatchString(item.ID) || declared[item.ID] || !artifactText(item.Title, 256) {
 			return fmt.Errorf("invalid or duplicate navigation entry")
 		}
 		declared[item.ID] = true
-		if !pages[item.Page] {
-			return fmt.Errorf("navigation references an undeclared page")
+		switch item.Target {
+		case "", artifactPageTargetPage:
+			if !pages[item.Page] {
+				return fmt.Errorf("navigation references an undeclared page")
+			}
+		case artifactPageTargetWindow:
+			if !hasWindow {
+				return fmt.Errorf("window navigation requires a window")
+			}
+			if item.Page != "" {
+				return fmt.Errorf("window navigation cannot declare a page")
+			}
+		default:
+			return fmt.Errorf("unsupported navigation target")
 		}
 		if item.Location != artifactPageLocationTools {
 			return fmt.Errorf("unsupported navigation location")
