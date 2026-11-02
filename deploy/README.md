@@ -41,8 +41,15 @@ deploy/publish-official-plugin.sh --plugin mongo-shell --tag mongo-shell-v1.0.4 
 
 ## 推送即发布（CI）
 
-`.github/workflows/deploy-site.yml` 在 `main` 有站点相关改动时自动调用
-`deploy/publish-site.sh`（也可在 Actions 页面手动 `Run workflow`）。仓库 secrets：
+`.github/workflows/deploy.yml` 在 `main` 上**测试通过后发布整套**：先 `deploy/publish-server.sh`
+更新 Go 服务，再 `deploy/publish-site.sh` 更新站点，两者取自同一个提交（也可在 Actions 页面
+手动 `Run workflow`）。顺序是有意的：站点读 `/api/v1`，新站点可能依赖新接口；新服务继续服务
+旧站点是安全的，反过来不是。服务端安装或健康检查失败会回滚并中止整次发布，站点不会在坏后端
+之上被发布。
+
+触发器覆盖服务端路径（`internal/**`、`cmd/**`、`go.mod`、`go.sum`）与站点路径；只改其中一侧
+也会整套发布，保证线上两半始终同一提交。纯测试的 pull request 仍由 `.github/workflows/server-tests.yml`
+检查，它不再在 push 时重复跑一遍。仓库 secrets：
 
 | Secret | 含义 |
 |---|---|
@@ -57,14 +64,26 @@ deploy/publish-official-plugin.sh --plugin mongo-shell --tag mongo-shell-v1.0.4 
 ## 一键发布（推荐）
 
 ```bash
-deploy/publish-site.sh                    # 构建 origin/main 并发布
+deploy/publish-server.sh                  # 构建 origin/main 的服务端并发布
+deploy/publish-site.sh                    # 构建 origin/main 的站点并发布
+deploy/publish-server.sh --dry-run        # 只构建二进制，不连服务器
 deploy/publish-site.sh --dry-run          # 只构建打包，不连服务器
 deploy/publish-site.sh --ref <ref>        # 指定提交/分支
 deploy/publish-site.sh --keep 10          # 保留最近 10 个 release（默认 5）
 deploy/publish-site.sh --skip-verify      # 跳过源站与线上目录校验
 ```
 
-脚本行为：在临时 worktree 里从**已提交的 ref** 构建（本地未提交改动不会上线）→
+服务端脚本行为：临时 worktree 里从**已提交的 ref** 交叉编译 `CGO_ENABLED=0 GOOS=linux
+GOARCH=amd64` 静态二进制 → 上传并远端校验 SHA-256 → 备份当前二进制 → 原子替换 →
+用 operator 凭据跑 `-migrate`（迁移已内嵌在二进制里）→ `systemctl restart gonavi-market` →
+轮询 `127.0.0.1:8090/api/v1/plugins` 至多 30 秒；迁移或健康检查失败则恢复旧二进制并重启，
+整次发布失败。备份按 `--keep` 保留，可手工回滚：
+
+```bash
+ssh BeroHost-6h16-DE 'ls -1dt /srv/gonavi-plugin-market/server/gonavi-market-server.bak-*'
+```
+
+站点脚本行为：在临时 worktree 里从**已提交的 ref** 构建（本地未提交改动不会上线）→
 打包 `dist` 并算 SHA-256 → 上传 `/root/plugin-market-staging.tar.gz` 远端校验 →
 解包到 `releases/site-<sha>-<ts>/` → 原子切换 `current` → 按 `--keep` 清理旧版本 →
 跑 `verify-origin.sh` 与线上 `catalog.json` 比对。远端根目录固定
@@ -122,7 +141,7 @@ Let's Encrypt ECDSA，cert-name `plugin.gonavi.org`，webroot 续期（certbot �
 - 服务监听 `127.0.0.1:8090`，经站点 nginx 的 `/api/v1/` 反代对外（65 MiB 请求上限、120s 上游超时）。
 - 工件目录 `/srv/gonavi-plugin-market/artifacts`（700，gonavi-market 用户私有）；日志 `/var/log/gonavi-market`。
 - 环境/凭据：`/etc/gonavi-market/env`（600）与 `/root/gonavi-market-credentials.txt`（600，含 operator 连接串）。**不要把这两个文件的内容提交进仓库。**
-- 开通脚本的留档：`deploy/provision-market.sh`（首run专用；服务二进制由本仓 `go build ./cmd/gonavi-market-server` 交叉编译上传 `/srv/gonavi-plugin-market/server/`）。
+- 开通脚本的留档：`deploy/provision-market.sh`（首run专用）。服务二进制由 `deploy/publish-server.sh` 交叉编译并原子替换到 `/srv/gonavi-plugin-market/server/gonavi-market-server`，push 到 `main` 时随站点一起自动发布。
 - 常用运维：`systemctl status|restart gonavi-market`、`journalctl -u gonavi-market -e`、
   `curl -s http://127.0.0.1:8090/api/v1/plugins`（服务器上自检）。
 - 公网验收：`https://plugin.gonavi.org/api/v1/plugins` 应 200；站点默认读取同源 `/api/v1/plugins`，服务不可用时才回退 `catalog.json`。

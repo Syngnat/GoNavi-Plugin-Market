@@ -1,0 +1,121 @@
+name: Deploy
+
+# Publishes the whole plugin market from main: the Go service and the static
+# site are one deployment, so a run always leaves both at the same commit.
+#
+# Order matters. The service goes first because the site reads /api/v1 and a new
+# bundle may depend on a new API; a new service keeps serving an older bundle.
+# If the service fails to install or fails its health check it rolls back and the
+# run stops, so the site is never published against a broken backend.
+#
+# Tests run in this workflow rather than a separate push workflow so nothing is
+# deployed before it passes. The pull-request workflow still checks every PR.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'internal/**'
+      - 'cmd/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'src/**'
+      - 'public/**'
+      - 'docs/**'
+      - 'index.html'
+      - 'vite.config.*'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'scripts/**'
+      - 'deploy/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: gofmt
+        run: |
+          files="$(gofmt -l internal cmd)"
+          if [ -n "$files" ]; then
+            echo "gofmt required for:"
+            echo "$files"
+            exit 1
+          fi
+      - name: vet
+        run: go vet ./internal/market/... ./cmd/gonavi-market-server
+      - name: test
+        run: go test ./internal/market/... ./cmd/gonavi-market-server
+      - name: test race
+        run: go test -race ./internal/market
+      - name: build
+        run: go build ./cmd/gonavi-market-server
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Configure ssh
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+
+      - name: Publish service
+        env:
+          SSH_KEY: /home/runner/.ssh/deploy_key
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          deploy/publish-server.sh \
+            --ref HEAD \
+            --host "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            --port "${DEPLOY_PORT}" \
+            --keep 5
+
+      - name: Publish site
+        env:
+          SSH_KEY: /home/runner/.ssh/deploy_key
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          deploy/publish-site.sh \
+            --ref HEAD \
+            --host "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            --port "${DEPLOY_PORT}" \
+            --keep 5

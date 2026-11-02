@@ -1,14 +1,9 @@
 name: Server tests
 
+# Pull requests only. A push to main is checked by the Deploy workflow, which
+# runs the same job before publishing; testing it here too would duplicate every
+# release run.
 on:
-  push:
-    paths:
-      - "internal/**"
-      - "cmd/**"
-      - "deploy/server/**"
-      - "go.mod"
-      - "go.sum"
-      - ".github/workflows/server-tests.yml"
   pull_request:
     paths:
       - "internal/**"
