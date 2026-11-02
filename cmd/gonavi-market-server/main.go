@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,6 +17,11 @@ import (
 	"github.com/Syngnat/GoNavi-Plugin-Market/internal/logger"
 	"github.com/Syngnat/GoNavi-Plugin-Market/internal/market"
 )
+
+// buildRevision is injected by deploy/publish-server.sh so the deployed binary
+// reports the commit it was built from even when the build runs outside a git
+// checkout (a module cache or a shallow copy loses the vcs build settings).
+var buildRevision = "dev"
 
 type commandOptions struct {
 	migrate                       bool
@@ -28,6 +34,7 @@ type commandOptions struct {
 	syncOnce                      bool
 	issueSession                  string
 	sessionTTL                    time.Duration
+	version                       bool
 }
 
 func main() {
@@ -45,7 +52,12 @@ func main() {
 	flag.BoolVar(&options.syncOnce, "sync-once", false, "run one GitHub release sync pass, print outcomes, then exit")
 	flag.StringVar(&options.issueSession, "issue-session", "", "issue one operator bearer token for this immutable GitHub numeric ID, print it once, then exit")
 	flag.DurationVar(&options.sessionTTL, "session-ttl", defaultSessionTTL, "lifetime of an -issue-session token, between 1h and 8760h")
+	flag.BoolVar(&options.version, "version", false, "print the build revision and exit")
 	flag.Parse()
+	if options.version {
+		fmt.Println(buildRevision)
+		return
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := run(ctx, options); err != nil {

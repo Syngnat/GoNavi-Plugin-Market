@@ -56,6 +56,9 @@ fi
 cd "$REPO_ROOT"
 git rev-parse --verify "$REF" >/dev/null 2>&1 || { echo "ref not found: $REF" >&2; exit 1; }
 SHA=$(git rev-parse --short "$REF")
+# Full commit id, injected into the binary. Builds made from a module cache or a
+# shallow copy lose Go's own vcs settings, so the revision is stamped explicitly.
+REVISION=$(git rev-parse "$REF")
 TAG="server-${SHA}-$(date -u +%Y%m%dT%H%M%SZ)"
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/market-server-build.XXXXXX")
 BINARY="${TMPDIR:-/tmp}/gonavi-market-server-${TAG}"
@@ -72,7 +75,7 @@ git -C "$REPO_ROOT" worktree add --detach "$STAGE" "$REF" >/dev/null
 # The production host is linux/amd64; a static build keeps the binary free of
 # host libc assumptions. Same flags as the manual deployments before this script.
 ( cd "$STAGE" && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -trimpath -ldflags="-s -w" -o "$BINARY" ./cmd/gonavi-market-server )
+    go build -trimpath -ldflags="-s -w -X main.buildRevision=$REVISION" -o "$BINARY" ./cmd/gonavi-market-server )
 
 [ -s "$BINARY" ] || { echo "build produced no binary" >&2; exit 1; }
 if command -v sha256sum >/dev/null 2>&1; then
@@ -146,7 +149,7 @@ fi
 # Keep a bounded set of backups so a bad publish can be rolled back by hand.
 ls -1dt "$SERVER_DIR"/gonavi-market-server.bak-* 2>/dev/null | tail -n +$((KEEP + 1)) | xargs -r rm -f
 
-echo "revision: $(strings "$BIN" | grep -m1 -o 'vcs.revision=[0-9a-f]*' || echo unknown)"
+echo "revision: $("$BIN" -version)"
 systemctl is-active gonavi-market
 REMOTE
 
