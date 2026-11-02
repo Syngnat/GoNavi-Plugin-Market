@@ -212,3 +212,91 @@ func TestArtifactPageJSONShape(t *testing.T) {
 		})
 	}
 }
+
+// A navigation entry that targets the plugin window attaches the window to the
+// tools location without declaring a page, so ui.pages is not required.
+func artifactWindowTargetNavigation(target string, page string) map[string]any {
+	entry := map[string]any{"id": "ssh.terminal", "title": "SSH", "location": "tools"}
+	if target != "" {
+		entry["target"] = target
+	}
+	if page != "" {
+		entry["page"] = page
+	}
+	return entry
+}
+
+func artifactWindowManifest(t *testing.T, window map[string]any, permissions []string, contributes map[string]any) artifactManifest {
+	t.Helper()
+	raw := artifactTestChange(t, func(fields map[string]any) {
+		if window == nil {
+			delete(fields, "window")
+		} else {
+			fields["window"] = window
+		}
+		fields["permissions"] = permissions
+		fields["contributes"] = contributes
+	})
+	manifest, err := decodeArtifactManifest([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return manifest
+}
+
+func TestArtifactWindowTargetNavigationNeedsNoPagePermission(t *testing.T) {
+	window := map[string]any{"entry": "index.html", "title": "GoNavi SSH", "width": 1200, "height": 760}
+	manifest := artifactWindowManifest(t, window, []string{}, map[string]any{
+		"navigation": []any{artifactWindowTargetNavigation("window", "")},
+	})
+	if err := validateArtifactContributions(manifest); err != nil {
+		t.Fatalf("window target navigation without ui.pages was rejected: %v", err)
+	}
+	manifest = artifactWindowManifest(t, window, []string{"ui.pages"}, map[string]any{
+		"pages":      []any{artifactTextPageMap("overview", "Overview")},
+		"navigation": []any{artifactWindowTargetNavigation("window", ""), artifactNavigationMap("nav", "overview")},
+	})
+	if err := validateArtifactContributions(manifest); err != nil {
+		t.Fatalf("window and page navigation together were rejected: %v", err)
+	}
+}
+
+func TestArtifactWindowTargetNavigationRejections(t *testing.T) {
+	window := map[string]any{"entry": "index.html"}
+	cases := []struct {
+		name        string
+		window      map[string]any
+		permissions []string
+		contributes map[string]any
+	}{
+		{"missing window", nil, []string{}, map[string]any{"navigation": []any{artifactWindowTargetNavigation("window", "")}}},
+		{"window target with page", window, []string{"ui.pages"}, map[string]any{
+			"pages":      []any{artifactTextPageMap("overview", "Overview")},
+			"navigation": []any{artifactWindowTargetNavigation("window", "overview")},
+		}},
+		{"unsupported target", window, []string{"ui.pages"}, map[string]any{"navigation": []any{artifactWindowTargetNavigation("panel", "")}}},
+		{"page target without ui.pages", window, []string{}, map[string]any{"navigation": []any{artifactWindowTargetNavigation("", "overview")}}},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			manifest := artifactWindowManifest(t, test.window, test.permissions, test.contributes)
+			if validateArtifactContributions(manifest) == nil {
+				t.Fatalf("navigation case %q was accepted", test.name)
+			}
+		})
+	}
+}
+
+func TestValidatePackageAcceptsWindowTargetEntry(t *testing.T) {
+	manifest := artifactTestChange(t, func(fields map[string]any) {
+		fields["window"] = map[string]any{"entry": "index.html", "title": "GoNavi SSH", "width": 1200, "height": 760}
+		fields["contributes"] = map[string]any{
+			"navigation": []any{artifactWindowTargetNavigation("window", "")},
+		}
+	})
+	entries := append(artifactTestEntries(manifest), artifactTestEntry{name: "index.html", body: []byte("<!doctype html><title>GoNavi SSH</title>")})
+	filename := artifactTestWrite(t, ".zip", artifactTestZIP(t, entries))
+	if _, err := ValidatePackage(context.Background(), filename); err != nil {
+		t.Fatalf("window target navigation package was rejected: %v", err)
+	}
+}

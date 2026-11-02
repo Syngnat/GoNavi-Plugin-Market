@@ -102,7 +102,8 @@ type artifactHTMLPanel struct {
 type artifactNavigation struct {
 	ID       string `json:"id"`
 	Title    string `json:"title"`
-	Page     string `json:"page"`
+	Target   string `json:"target,omitempty"`
+	Page     string `json:"page,omitempty"`
 	Location string `json:"location"`
 	Order    int    `json:"order,omitempty"`
 }
