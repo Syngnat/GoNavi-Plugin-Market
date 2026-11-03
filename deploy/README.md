@@ -161,3 +161,16 @@ Let's Encrypt ECDSA，cert-name `plugin.gonavi.org`，webroot 续期（certbot �
 
 服务端目录是主路径：`gonavi-market-server -publish-official <zip>` 走同一条静态校验/发布流水线（官方徽标由运营授予）。`public/catalog.json` 作为服务不可用时的静态兜底，仍可用 `python deploy/update-catalog.py` 更新。
 
+## Host checker
+
+Uploads are re-checked with a real `gonavi plugin check` run, so the server needs a
+gonavi binary. Install or refresh it with:
+
+```bash
+deploy/install-host-checker.sh --version 1.2.0 --host BeroHost-6h16-DE
+```
+
+The script verifies the release checksum, installs under `<root>/host-tools/gonavi`
+and writes `GONAVI_MARKET_HOST_BINARY` into `/etc/gonavi-market/env` before
+restarting the service. `deploy/publish-server.sh` prints the installed checker
+version at the end of every release, so an outdated one shows up immediately.
