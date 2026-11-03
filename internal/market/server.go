@@ -70,6 +70,13 @@ func NewServer(o ServerOptions) (*Server, error) {
 	if o.Clock == nil {
 		o.Clock = time.Now
 	}
+	// Operators need to see whether the real-host pass is active; a silent empty
+	// path looks identical to a configured one until an upload happens.
+	if strings.TrimSpace(o.HostBinary) == "" {
+		logger.Warnf("market: GONAVI_MARKET_HOST_BINARY is unset; uploads are checked against the shared SDK rules only and report hostCheck \"unavailable\"")
+	} else {
+		logger.Infof("market: host checker configured at %s", o.HostBinary)
+	}
 	return &Server{repo: o.Repository, artifacts: o.Artifacts, identity: o.Identity, releases: o.Releases, publicURL: base, secure: secure, now: o.Clock,
 		limits: make(map[string]requestLimit), slots: make(chan struct{}, 64), uploadSlots: make(chan struct{}, 2), artifactSlots: make(chan struct{}, 2),
 		host: hostChecker{binary: o.HostBinary}}, nil // Two artifact operations bound archive and object-store snapshots.
