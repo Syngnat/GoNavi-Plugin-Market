@@ -150,6 +150,16 @@ fi
 ls -1dt "$SERVER_DIR"/gonavi-market-server.bak-* 2>/dev/null | tail -n +$((KEEP + 1)) | xargs -r rm -f
 
 echo "revision: $("$BIN" -version)"
+
+# Keep the host checker current: an outdated binary would reject packages the
+# shared SDK already accepts, which is the drift this check exists to catch.
+# A missing checker only downgrades inspections to hostCheck "unavailable", so a
+# failure here is reported without failing an otherwise healthy release.
+if [ -x "$REMOTE_ROOT/host-tools/gonavi" ]; then
+  echo "host checker: $("$REMOTE_ROOT/host-tools/gonavi" -version 2>/dev/null || echo unknown)"
+else
+  echo "host checker: not installed (run deploy/install-host-checker.sh)"
+fi
 systemctl is-active gonavi-market
 REMOTE
 

@@ -31,6 +31,17 @@ Set these environment variables through your shell or secret manager; never comm
 | GONAVI_MARKET_GITHUB_CLIENT_ID | GitHub OAuth application ID |
 | GONAVI_MARKET_GITHUB_CLIENT_SECRET | GitHub OAuth application secret |
 | GONAVI_LOG_DIR | Private service log directory |
+| GONAVI_MARKET_HOST_BINARY | Path to a gonavi binary used to re-check every upload with the released host rules. Unset means inspections report `hostCheck: "unavailable"`; `deploy/install-host-checker.sh` installs it and writes this variable |
+
+### Host verification
+
+Every upload is checked twice: in-process against the manifest rules shared with the host SDK, then by running `gonavi plugin check` on the real binary. The second pass is what catches a rule the SDK has not caught yet. Install it with:
+
+```bash
+deploy/install-host-checker.sh --version 1.2.1
+```
+
+It downloads the release asset for this machine, verifies its published SHA-256, installs it under `<root>/host-tools/gonavi`, and records `GONAVI_MARKET_HOST_BINARY` in the service environment before restarting the service. A host refusal blocks publishing with `host_rejected`; an unconfigured or unrunnable binary never blocks a release and is reported as `unavailable` instead.
 
 Only loopback origins may use HTTP. For local development use http://localhost:8090 and register this exact GitHub OAuth callback:
 

@@ -77,6 +77,9 @@ GONAVI_MARKET_PUBLIC_URL=https://plugin.gonavi.org
 GONAVI_MARKET_LISTEN=127.0.0.1:8090
 GONAVI_MARKET_ARTIFACT_ROOT=${ARTIFACTS}
 GONAVI_LOG_DIR=${LOG_DIR}
+# Set by deploy/install-host-checker.sh once a gonavi binary is installed; while
+# it stays unset, package inspections report hostCheck "unavailable".
+# GONAVI_MARKET_HOST_BINARY=${ROOT}/host-tools/gonavi
 # Enable login by filling both GitHub OAuth values and restarting the service:
 # GONAVI_MARKET_GITHUB_CLIENT_ID=
 # GONAVI_MARKET_GITHUB_CLIENT_SECRET=
