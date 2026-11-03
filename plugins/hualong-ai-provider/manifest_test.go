@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	plugin "github.com/Syngnat/GoNavi/sdk/go"
@@ -34,14 +35,17 @@ func TestManifestParsesAndMatchesExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if manifest.ID != "com.gonavi.hualong-ai" || manifest.Name != providerName || manifest.Version != "1.2.0" {
+	if manifest.ID != "com.gonavi.hualong-ai" || manifest.Name != providerName || manifest.Version != "1.2.1" {
 		t.Fatal("incorrect identity")
 	}
 	if manifest.Author != "GoNavi" || manifest.License != "Apache-2.0" || manifest.APIVersion != 1 || manifest.SchemaVersion != 1 {
 		t.Fatal("incorrect metadata")
 	}
-	if len(manifest.Permissions) != 1 || manifest.Permissions[0] != "ai.providers" {
-		t.Fatal("incorrect permissions")
+	// ui.html-panel 是窗口契约的硬性要求：window 在原生 WebView 里跑包内 HTML/JS，
+	// 与自定义 HTML 页同一权限门，缺它宿主会直接拒绝整份清单。
+	permissions := strings.Join(manifest.Permissions, ",")
+	if permissions != "ai.providers,ui.html-panel" {
+		t.Fatalf("incorrect permissions: %s", permissions)
 	}
 	if manifest.Backend == nil || manifest.Backend.Default == nil || manifest.Backend.Default.Executable != "bin/plugin" || manifest.Backend.Default.Runtime != "native" {
 		t.Fatal("manifest does not declare the native executable")

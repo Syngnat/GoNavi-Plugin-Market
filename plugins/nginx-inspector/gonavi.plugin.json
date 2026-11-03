@@ -3,16 +3,17 @@
   "apiVersion": 1,
   "id": "com.gonavi.nginx-inspector",
   "name": "Nginx Inspector",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Read-only nginx diagnostics over SSH: config tree with include expansion, nginx -t validation, gated reload, error/access log tailing and search, access log statistics, TLS certificate expiry review and upstream health probes.",
   "author": "GoNavi",
   "license": "Apache-2.0",
   "minHostVersion": "1.1.5",
-  "permissions": ["ai.tools", "ai.skills", "host.log"],
+  "permissions": ["ai.tools", "ai.skills", "host.log", "ui.html-panel"],
   "permissionNotes": {
     "ai.tools": "Exposes the nginx diagnostics commands to the GoNavi Agent. Write commands (connection edits, service reload) still require explicit approval.",
     "ai.skills": "Ships the nginx-triage skill document for explicit Agent loading.",
-    "host.log": "Writes bounded diagnostics while connecting and executing remote commands."
+    "host.log": "Writes bounded diagnostics while connecting and executing remote commands.",
+    "ui.html-panel": "Runs the inspector window HTML/JS inside a sandboxed native view with no host bindings beyond the window bridge."
   },
   "backend": {
     "default": {
