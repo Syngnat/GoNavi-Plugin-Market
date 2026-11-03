@@ -184,6 +184,14 @@ func (s *Server) submit(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, 400, "artifact_invalid")
 		return
 	}
+	// Publish re-checks with the real host binary, not only the shared SDK rules:
+	// this is the last point before bytes become immutable and reach users.
+	hostCheck := s.host.check(r.Context(), upload.Path)
+	if hostErr := verifyWithHost(hostCheck); hostErr != nil {
+		s.failValidation(r, a, submission.ID, "host_rejected")
+		writeAPIError(w, 400, "host_rejected")
+		return
+	}
 	if err = s.storeUpload(r, upload.Path, validated); err != nil {
 		s.failValidation(r, a, submission.ID, "artifact_storage_failed")
 		writeError(w, err)

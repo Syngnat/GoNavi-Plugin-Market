@@ -124,6 +124,8 @@ export interface PackageInspection {
   sha256: string;
   sizeBytes: number;
   manifest: PluginManifestSummary;
+  /** 真实宿主二进制的复核结果；unavailable 表示这次没有宿主背书。 */
+  hostCheck?: { status: 'passed' | 'failed' | 'unavailable'; version?: string; detail?: string };
 }
 
 /** GitHub Release 直发预检：复用包身份字段，并附带具体 Release 来源。 */

@@ -16,13 +16,14 @@ import (
 // it; before the host quarantined such records that failure took the whole
 // plugin runtime down.
 //
-// Every field added to the host contract after v1 needs an entry here, naming
-// the first released version that understands it. Publishing a package that uses
-// the field without declaring at least that minimum is rejected.
-const (
-	// navigation[].target ("page" default / "window") landed after v1.2.0.
-	artifactMinHostNavigationTarget = "1.2.1"
-)
+// The mechanism below stays even though it currently has no entries: a future
+// field addition needs exactly this gate. Its one entry was
+// navigation[].target -> "1.2.1", removed because that version never shipped, so
+// the rule demanded a minimum no publisher could satisfy and rejected every
+// package declaring the field (gonavi-ssh among them). The field's own legality
+// is still checked by the shared SDK contract in artifact_contract.go; only the
+// "declare a newer minimum" gate is empty.
+var artifactHostRequirements = []artifactFieldRequirement{}
 
 // artifactFieldRequirement is one contract addition and the first release that
 // accepts it.
@@ -37,18 +38,11 @@ type artifactFieldRequirement struct {
 // could not parse. It runs after the manifest is structurally valid, so every
 // field it inspects already passed its own shape and value checks.
 func validateArtifactHostCompatibility(manifest artifactManifest) error {
-	var requirements []artifactFieldRequirement
-	if usesArtifactNavigationTarget(manifest) {
-		requirements = append(requirements, artifactFieldRequirement{
-			field:   "contributes.navigation[].target",
-			minimum: artifactMinHostNavigationTarget,
-		})
-	}
-	if len(requirements) == 0 {
+	if len(artifactHostRequirements) == 0 {
 		return nil
 	}
 	minimum := normalizeArtifactHostVersion(manifest.MinHostVersion)
-	for _, requirement := range requirements {
+	for _, requirement := range artifactHostRequirements {
 		if minimum == "" {
 			return fmt.Errorf("%s requires minHostVersion %s or newer", requirement.field, requirement.minimum)
 		}
@@ -60,19 +54,6 @@ func validateArtifactHostCompatibility(manifest artifactManifest) error {
 		}
 	}
 	return nil
-}
-
-// usesArtifactNavigationTarget reports whether any navigation entry declares a
-// target at all. An empty target is the pre-existing page default, so only the
-// presence of the key needs a newer host; page and window both do, because the
-// field itself is what an older host rejects.
-func usesArtifactNavigationTarget(manifest artifactManifest) bool {
-	for _, item := range manifest.Contributes.Navigation {
-		if item.Target != "" {
-			return true
-		}
-	}
-	return false
 }
 
 func normalizeArtifactHostVersion(value string) string {

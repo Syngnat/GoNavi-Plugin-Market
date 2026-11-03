@@ -34,6 +34,10 @@ type ValidatedPackage struct {
 	Platforms                              []string
 	SHA256                                 string
 	SizeBytes                              int64
+	// HostCheck records whether a released host binary also accepted the package.
+	// It never implies approval it did not receive: an unconfigured checker
+	// reports "unavailable" rather than "passed".
+	HostCheck HostCheck `json:"hostCheck,omitempty"`
 }
 
 // ValidatePackage validates a ZIP or TGZ snapshot, including every entry's data.

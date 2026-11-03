@@ -150,6 +150,10 @@ type PackageInspection struct {
 	Platforms      []string        `json:"platforms"`
 	SHA256         string          `json:"sha256"`
 	Manifest       json.RawMessage `json:"manifest"`
+	// HostCheck reports what the optional real-host verification concluded. It is
+	// always present so a caller can tell "the host approved this" apart from
+	// "no host binary was configured".
+	HostCheck HostCheck `json:"hostCheck"`
 }
 
 // ErrNotFound means the resource is absent or not publicly visible.

@@ -24,6 +24,10 @@ type ServerOptions struct {
 	Releases  ReleaseFetcher
 	PublicURL string
 	Clock     func() time.Time
+	// HostBinary is the path to a gonavi binary used to re-check every package
+	// with the real host rules. Empty disables the run and every inspection
+	// reports hostCheck "unavailable" instead of implying approval.
+	HostBinary string
 }
 
 // Server owns HTTP policy; repository methods own atomic domain invariants.
@@ -40,6 +44,7 @@ type Server struct {
 	slots         chan struct{}
 	uploadSlots   chan struct{}
 	artifactSlots chan struct{}
+	host          hostChecker
 }
 
 type requestLimit struct {
@@ -66,7 +71,8 @@ func NewServer(o ServerOptions) (*Server, error) {
 		o.Clock = time.Now
 	}
 	return &Server{repo: o.Repository, artifacts: o.Artifacts, identity: o.Identity, releases: o.Releases, publicURL: base, secure: secure, now: o.Clock,
-		limits: make(map[string]requestLimit), slots: make(chan struct{}, 64), uploadSlots: make(chan struct{}, 2), artifactSlots: make(chan struct{}, 2)}, nil // Two artifact operations bound archive and object-store snapshots.
+		limits: make(map[string]requestLimit), slots: make(chan struct{}, 64), uploadSlots: make(chan struct{}, 2), artifactSlots: make(chan struct{}, 2),
+		host: hostChecker{binary: o.HostBinary}}, nil // Two artifact operations bound archive and object-store snapshots.
 }
 
 // Handler returns an isolated net/http API with no desktop or plugin execution capability.

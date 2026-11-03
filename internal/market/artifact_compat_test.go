@@ -2,7 +2,6 @@ package market
 
 import (
 	"context"
-	"strings"
 	"testing"
 )
 
@@ -28,37 +27,18 @@ func artifactCompatManifest(t *testing.T, minHostVersion any, navigation []any) 
 	return manifest
 }
 
-func TestArtifactNavigationTargetRequiresParseableHost(t *testing.T) {
+// The minimum-version gate for navigation[].target was removed: it pointed at
+// 1.2.1, a release that never shipped, so no publisher could satisfy it and every
+// package declaring the field was rejected. These tests pin the behaviour that
+// replaced it: the field itself is still validated by the shared SDK contract,
+// and a navigation block without a target still publishes unchanged.
+func TestArtifactNavigationTargetIsAcceptedWithoutMinimumGate(t *testing.T) {
 	windowEntry := []any{artifactWindowTargetNavigation("window", "")}
-
-	// An absent minimum cannot promise the field is understood.
-	if err := validateArtifactHostCompatibility(artifactCompatManifest(t, nil, windowEntry)); err == nil {
-		t.Fatal("navigation target without minHostVersion was accepted")
+	if err := validateArtifactHostCompatibility(artifactCompatManifest(t, "1.2.0", windowEntry)); err != nil {
+		t.Fatalf("navigation target was rejected after the gate was removed: %v", err)
 	}
-	// A minimum below the release that added the field is the dangerous case:
-	// the package publishes, the latest channel installs, and the host cannot
-	// parse the navigation entry.
-	below := "1.2.0"
-	if err := validateArtifactHostCompatibility(artifactCompatManifest(t, below, windowEntry)); err == nil {
-		t.Fatalf("navigation target with minHostVersion %s was accepted", below)
-	}
-	// The first release that understands the field, and anything newer, is fine.
-	for _, accepted := range []string{artifactMinHostNavigationTarget, "1.2.1", "1.3.0", "v1.2.1"} {
-		if err := validateArtifactHostCompatibility(artifactCompatManifest(t, accepted, windowEntry)); err != nil {
-			t.Fatalf("navigation target with minHostVersion %s was rejected: %v", accepted, err)
-		}
-	}
-}
-
-func TestArtifactPageTargetAlsoRequiresParseableHost(t *testing.T) {
-	// The target key itself is what an older host rejects, so an explicit page
-	// target needs the same minimum as a window target.
-	pageEntry := []any{map[string]any{"id": "nav", "title": "N", "target": "page", "location": "tools"}}
-	if err := validateArtifactHostCompatibility(artifactCompatManifest(t, "1.2.0", pageEntry)); err == nil {
-		t.Fatal("explicit page target below the field minimum was accepted")
-	}
-	if err := validateArtifactHostCompatibility(artifactCompatManifest(t, artifactMinHostNavigationTarget, pageEntry)); err != nil {
-		t.Fatalf("explicit page target at the field minimum was rejected: %v", err)
+	if err := validateArtifactHostCompatibility(artifactCompatManifest(t, nil, windowEntry)); err != nil {
+		t.Fatalf("navigation target without a minimum was rejected: %v", err)
 	}
 }
 
@@ -75,22 +55,20 @@ func TestArtifactNavigationWithoutTargetKeepsOldHosts(t *testing.T) {
 	}
 }
 
-func TestValidatePackageRejectsWindowTargetWithoutMinimum(t *testing.T) {
+// The field's own legality is still enforced, just by the shared SDK contract
+// rather than by a hand-written marketplace rule.
+func TestValidatePackageRejectsInvalidNavigationTarget(t *testing.T) {
 	manifest := artifactTestChange(t, func(fields map[string]any) {
+		fields["permissions"] = []any{"ui.html-panel"}
 		fields["window"] = map[string]any{"entry": "index.html"}
-		delete(fields, "minHostVersion")
 		fields["contributes"] = map[string]any{
-			"navigation": []any{artifactWindowTargetNavigation("window", "")},
+			"navigation": []any{map[string]any{"id": "nav", "title": "N", "target": "browser", "location": "tools"}},
 		}
 	})
 	entries := append(artifactTestEntries(manifest), artifactTestEntry{name: "index.html", body: []byte("<!doctype html><title>W</title>")})
 	filename := artifactTestWrite(t, ".zip", artifactTestZIP(t, entries))
-	_, err := ValidatePackage(context.Background(), filename)
-	if err == nil {
-		t.Fatal("window target package without minHostVersion was published")
-	}
-	if !strings.Contains(err.Error(), "minHostVersion") {
-		t.Fatalf("rejection did not name the missing minimum: %v", err)
+	if _, err := ValidatePackage(context.Background(), filename); err == nil {
+		t.Fatal("an unsupported navigation target was published")
 	}
 }
 

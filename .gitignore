@@ -7,3 +7,7 @@ plugin-dist
 .DS_Store
 npm-debug.log*
 *.test
+
+# Local cross-repo build only; never commit (points at a sibling checkout).
+go.work
+go.work.sum

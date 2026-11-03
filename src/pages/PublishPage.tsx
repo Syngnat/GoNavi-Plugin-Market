@@ -136,6 +136,18 @@ function InspectionPreview({
             : '当前账号不可发布此插件，请核对包内 ID 前缀与发布者权限。'}
         </p>
       )}
+      {preview.hostCheck && (
+        <p role="status" className={`rounded-lg border p-3 text-sm ${
+          preview.hostCheck.status === 'passed' ? 'border-ink/20 bg-paper'
+            : preview.hostCheck.status === 'failed' ? 'border-copper/40 bg-paper'
+              : 'border-ink/20 bg-paper text-muted'}`}>
+          {preview.hostCheck.status === 'passed'
+            ? '宿主二进制已确认可以安装这个包。'
+            : preview.hostCheck.status === 'failed'
+              ? `宿主拒绝了此包：${preview.hostCheck.detail || '未提供原因'}`
+              : '本次未使用宿主二进制复核（服务端未配置），仅经过共享清单规则校验。'}
+        </p>
+      )}
       <p className="text-xs text-muted leading-relaxed">
         预检不会运行代码、预约版本或上架；只有确认发布才会提交。摘要是完整性证明，不代表插件代码可信。
       </p>

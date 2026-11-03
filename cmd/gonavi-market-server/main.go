@@ -127,8 +127,12 @@ func serve(ctx context.Context, repository *market.Postgres) error {
 	if err != nil {
 		return err
 	}
+	// GONAVI_MARKET_HOST_BINARY points at a gonavi binary that every uploaded
+	// package is re-checked with. Leaving it empty keeps the shared SDK rules as
+	// the only gate, and inspections then report hostCheck "unavailable".
 	api, err := market.NewServer(market.ServerOptions{Repository: repository, Artifacts: store, Identity: provider,
-		Releases: market.NewGitHubReleaseFetcher(os.Getenv("GONAVI_MARKET_GITHUB_TOKEN")), PublicURL: publicURL})
+		Releases: market.NewGitHubReleaseFetcher(os.Getenv("GONAVI_MARKET_GITHUB_TOKEN")), PublicURL: publicURL,
+		HostBinary: os.Getenv("GONAVI_MARKET_HOST_BINARY")})
 	if err != nil {
 		return err
 	}

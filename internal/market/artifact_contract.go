@@ -20,8 +20,15 @@ import (
 func validateArtifactContract(raw []byte) error {
 	// ParseManifest rejects unknown fields, trailing data and oversized input, so a
 	// package accepted here is one the pinned host can decode.
-	if _, err := plugin.ParseManifest(raw); err != nil {
+	manifest, err := plugin.ParseManifest(raw)
+	if err != nil {
 		return fmt.Errorf("manifest does not match the host contract: %w", err)
+	}
+	// ValidateManifest is the host's own rule set. Running it here means the
+	// marketplace never publishes a package a released host would refuse, and it
+	// removes every rule this repository used to restate by hand.
+	if err := plugin.ValidateManifest(manifest); err != nil {
+		return fmt.Errorf("manifest violates the host contract: %w", err)
 	}
 	return nil
 }

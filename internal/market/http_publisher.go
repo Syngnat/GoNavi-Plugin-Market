@@ -85,9 +85,19 @@ func (s *Server) inspect(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusBadRequest, "artifact_invalid")
 		return
 	}
+	// The in-process contract shares its rules with the host SDK, but only a real
+	// binary proves the released host agrees. A refusal here is a hard error: it
+	// means the two have drifted and the package would fail on a user's machine.
+	hostCheck := s.host.check(r.Context(), path)
+	validated.HostCheck = hostCheck
+	if err = verifyWithHost(hostCheck); err != nil {
+		writeAPIError(w, http.StatusBadRequest, "host_rejected")
+		return
+	}
 	report := PackageInspection{CanPublish: true, PluginID: validated.ID, Version: validated.Version, Name: validated.Name,
 		Description: validated.Description, Category: categoryFromManifest(validated.Manifest), SizeBytes: validated.SizeBytes,
-		MinHostVersion: validated.MinHostVersion, Platforms: validated.Platforms, SHA256: validated.SHA256, Manifest: validated.Manifest}
+		MinHostVersion: validated.MinHostVersion, Platforms: validated.Platforms, SHA256: validated.SHA256, Manifest: validated.Manifest,
+		HostCheck: hostCheck}
 	if report.Platforms == nil {
 		report.Platforms = []string{}
 	}
