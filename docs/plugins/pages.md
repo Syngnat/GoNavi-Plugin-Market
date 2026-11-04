@@ -104,6 +104,29 @@
 
 入口可以是 `sidebar` 节点的 `open: {"type":"panel","view":"terminal"}`，也可以是宿主后续开放的其他入口。面板关闭后不保留状态；插件禁用、更新或卸载时宿主立即移除对应面板。
 
+### 1.5 快捷键（keybindings）
+
+`keybindings` 把已声明的页面或窗口挂到宿主全局快捷键：
+
+```json
+{
+  "permissions": ["ui.pages"],
+  "contributes": {
+    "pages": [{ "id": "terminal", "title": "终端", "html": { "source": "…" } }],
+    "keybindings": [
+      { "id": "open-terminal", "title": "打开终端", "keys": "CmdOrCtrl+Shift+T",
+        "target": { "type": "page", "page": "terminal" } }
+    ]
+  }
+}
+```
+
+- `keys`：修饰键（`CmdOrCtrl`、`Ctrl`、`Cmd`、`Alt`、`Shift`）加一个主键，如 `CmdOrCtrl+Shift+T`；`CmdOrCtrl` 在 macOS 为 Cmd、其他平台为 Ctrl；
+- `target`：`page` 需要 `ui.pages` 且页面已声明；`window` 需要清单声明 `window`；
+- 最多 16 条，keys（忽略大小写）在同插件内唯一；
+- 焦点在输入框/文本域/contenteditable 内时不触发；
+- 与宿主快捷键冲突时宿主优先，插件应避免占用宿主已有组合。
+
 ## 2. 宿主能力网关
 
 ### 2.1 绑定
