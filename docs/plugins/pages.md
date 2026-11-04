@@ -142,7 +142,7 @@
 </script>
 ```
 
-页面 CSP 仍保持 `connect-src 'none'`、`base-uri 'none'`、`frame-src 'none'`：页面不能 fetch/XHR/WebSocket，也不能加载其他 origin；iframe 仍是不透明源，读不到宿主存储与 DOM。Monaco、chart、xterm 等重组件不在页面入口中，页面需要时自行从包内资源加载。
+页面 CSP 仍保持 `connect-src 'none'`、`base-uri 'none'`、`frame-src 'none'`：页面不能 fetch/XHR/WebSocket，也不能加载其他 origin；iframe 仍是不透明源，读不到宿主存储与 DOM。宿主源按运行平台放行：macOS 的 `wails://wails`（同时给出 `wails:` scheme-source），Windows/Linux 的 `http://wails.localhost`；`img-src` 额外允许 `blob:` 与 `data:`，`font-src` 允许宿主源与 `data:`。Monaco、chart、xterm 等重组件不在页面入口中，页面需要时自行从包内资源加载。
 
 ## 2. 宿主能力网关
 
