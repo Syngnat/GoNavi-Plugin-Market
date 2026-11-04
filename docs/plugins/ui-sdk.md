@@ -12,7 +12,8 @@ GoNavi 为插件窗口提供与宿主同源的设计令牌、主题、布局、�
 {"imports":{
   "@gonavi/plugin-ui":"/__gonavi/plugin-window/ui/index.js",
   "@gonavi/plugin-ui/monaco":"/__gonavi/plugin-window/ui/monaco.js",
-  "@gonavi/plugin-ui/chart":"/__gonavi/plugin-window/ui/chart.js"
+  "@gonavi/plugin-ui/chart":"/__gonavi/plugin-window/ui/chart.js",
+  "@gonavi/plugin-ui/xterm":"/__gonavi/plugin-window/ui/xterm.js"
 }}
 </script>
 <script type="module" src="app.js"></script>
@@ -85,7 +86,7 @@ if (identity.context?.kind === 'connectionAction') {
 - 数据：`GonaviDataTable`（只读，可选分页）、`GonaviPagedTable`（客户端分页）、`GonaviResultGrid`（按行推断列）、`GonaviJsonViewer`、`GonaviTreeView`、`GonaviCodeEditor`、`GonaviSqlEditor`（Ctrl/Cmd+Enter 执行）、`GonaviConfirmDialog`。
 - 适配器：`GonaviEditableGrid`（受控可编辑表格，双击单元格编辑、提交回调）、`GonaviQueryWorkbench`（编辑器 + Run + 结果网格）、`GonaviConnectionPicker`（按 `connections.list` 能力加载脱敏连接摘要）、`GonaviConnectionTree`（只读连接/库/表树，按 `metadata.databases` / `metadata.tables` 懒加载，可按连接类型过滤）、`GonaviTableDesigner`（受控 CREATE TABLE 设计器，按方言生成 DDL 预览，**只生成不执行**）。适配器不持有宿主状态、不执行查询，数据与提交都由插件负责。
 - 图表：`GonaviChart`（line/bar/area/pie/scatter，只读；从独立入口 `@gonavi/plugin-ui/chart` 导入，不使用图表的窗口不会下载 recharts）。
-- 终端与文件：`GonaviTerminal`（滚动缓冲 + ANSI SGR 颜色，非完整 VT100）、`GonaviFileTree`（目录优先排序、懒加载子节点、双击打开文件）。两者都不访问磁盘，数据由插件提供。
+- 终端与文件：`GonaviTerminal`（滚动缓冲 + ANSI SGR 颜色，非完整 VT100；交互式程序请用独立入口的 `GonaviXtermTerminal`，它基于 xterm.js，支持光标定位、备用屏幕与按键处理，约 403 KB 按需加载）、`GonaviFileTree`（目录优先排序、懒加载子节点、双击打开文件）。两者都不访问磁盘，数据由插件提供。
 - Hooks：`usePluginContext`（读取窗口启动上下文）、`useGonaviPageLaunch`（读取页面标签启动上下文）、`useCapability`（单次能力调用状态）、`useGonaviTheme`。
 - antd：Button、Input、Select、Modal、Tabs、Table 等常用组件与 `GonaviIcons`。
 - 能力：`createGonaviClient`、`GonaviCapabilityError`。

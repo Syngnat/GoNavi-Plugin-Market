@@ -89,8 +89,11 @@ SSH 场景即：分组「SSH」展开后列出主机配置，点击某一台在�
 - `label`、`description`、`badge`：纯文本，宿主按文本渲染，不接受 HTML；
 - `children`：可选，递归结构，受深度与总数限制；
 - `open`：可选，缺省继承分组；`type` 为 `page`、`window` 或 `panel`（`panel` 需配合 `contributes.views`，用 `view` 引用已声明的视图）；
+- `actions`：可选，节点右键菜单，最多 8 项；每项 `{id, title, command, arguments?}`，`command` 必须是本插件已声明的普通命令（数据源/Provider/导出器保留命令拒绝），宿主调用时附加 `{nodeId, actionId, arguments}`；
 - `open.arguments`：≤4 KiB 的 JSON 对象，原样进入页面 `window.__gonaviLaunch` 或窗口 launch context；
-- 未知字段拒绝，重复 `id` 拒绝。
+- 未知字段忽略：插件新增元数据不会让整个分组消失；
+- 非法节点只跳过该节点（连同其子树），其余节点照常显示；`id` 重复时保留第一个；
+- 节点总数、深度、参数与结果大小仍受上限约束。
 
 ### 4.3 打开目标
 

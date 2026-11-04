@@ -68,6 +68,7 @@ GoNavi registers host capabilities explicitly. The page bridge (`PluginPageCall`
 | `files.save` | `host.files` | page, window, backend | no |
 | `events.subscribe` | `host.events` | page, window, backend | no |
 | `events.poll` | `host.events` | page, window | no |
+| `events.publish` | `host.events` | page, window, backend | no |
 | `events.unsubscribe` | `host.events` | page, window, backend | no |
 | `clipboard.read` | `host.clipboard` | page, window, backend | no |
 | `clipboard.write` | `host.clipboard` | page, window, backend | no |
@@ -99,7 +100,7 @@ Stable failure codes include `invalid_arguments`, `unknown_method`, `permission_
 
 The page bridge uses the same capability names with `window.gonavi.call(method, args)`. Page calls are limited to 64 KiB of arguments, 256 KiB of results and 30 seconds per call in this first slice. The host validates the declared page, lifecycle, permission, arguments and result size in that order. See [pages](<pages.md>).
 
-`events.subscribe` returns `{subscriptionId, snapshot}` for up to eight topics (`preferences`, `lifecycle`, `connections`). `events.poll` long-polls one subscription for up to 25 seconds and returns `{events:[{topic,data}]}`; it is an empty list at the deadline. Snapshots carry no credentials or connection details — the `connections` event only reports `{count, revision}`. Subscriptions are bound to the plugin's generation and disappear with it; `events.unsubscribe` releases one explicitly.
+`events.subscribe` returns `{subscriptionId, snapshot}` for up to eight topics (`preferences`, `lifecycle`, `connections`, `custom`). `events.poll` long-polls one subscription for up to 25 seconds and returns `{events:[{topic,data}]}`; it is an empty list at the deadline. Snapshots carry no credentials or connection details — the `connections` event only reports `{count, revision}`. `events.publish` queues one plugin-defined event (`{topic, data}`, ≤16 KiB, topic ≤64 bytes) for the same plugin's pages and windows; subscribe to `custom` to receive it as `{topic:"custom", data:{topic, data}}`. Events never cross plugin boundaries. Subscriptions are bound to the plugin's generation and disappear with it; `events.unsubscribe` releases one explicitly.
 
 `dialog.confirm` shows the host's native question dialog: `{title?, message, confirmText?, cancelText?}` → `{confirmed}`. `message` is required (≤1024 bytes), labels ≤32 bytes. The plugin only learns the choice; no plugin markup is rendered. Desktop only, and the call may stay open until the user answers.
 
