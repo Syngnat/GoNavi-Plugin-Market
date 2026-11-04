@@ -21,6 +21,18 @@ GoNavi 为插件窗口提供与宿主同源的设计令牌、主题、布局、�
 
 宿主按流式方式提供这些资源，不设固定 MB 上限；插件包与包内资源也按条目流式校验。资源请求仍受窗口 token、代际和生命周期约束。
 
+插件页面（沙箱 iframe）无法 `import` 模块，改用宿主提供的 IIFE 入口：
+
+```html
+<link rel="stylesheet" href="/__gonavi/plugin-page-ui/ui/style.css">
+<script src="/__gonavi/plugin-page-ui/ui/page-ui.js"></script>
+<script>
+  const { React, createRoot, GonaviPanel } = window.GoNaviUI;
+</script>
+```
+
+该入口包含 React、createRoot 与下列基础组件，不含 Monaco/chart/xterm。页面 CSP 只放行宿主 origin 的脚本与样式，仍禁止网络请求。
+
 ## 最小示例
 
 ```tsx

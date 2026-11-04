@@ -27,6 +27,7 @@
 | 左侧连接树分组 | [侧边栏节点](<sidebar.md>) | `sidebar` + `ui.sidebar` |
 | 右侧或底部面板 | [页面契约](<pages.md>) | `views` + `ui.pages` |
 | 状态栏 / 命令面板入口 | [页面契约](<pages.md>) | `navigation[].location: "statusbar" \| "command"` |
+| 页面引用包内多文件资源 / 页面内使用 UI Kit | [页面契约](<pages.md>)、[UI SDK](<ui-sdk.md>) | `/__gonavi/plugin-page-assets/...` / `window.GoNaviUI` |
 | 全局快捷键 | [页面契约](<pages.md>) | `keybindings` |
 | 文件/目录选择、事件订阅、剪贴板、任务进度、确认框 | [能力目录](<capabilities.md>) | `files.*` / `events.*` / `clipboard.*` / `progress.report` / `dialog.confirm` |
 | Agent 可调用的普通命令 | [Agent 工具](<ai-tools.md>) | `ai.tools` |

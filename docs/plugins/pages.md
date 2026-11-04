@@ -127,6 +127,23 @@
 - 焦点在输入框/文本域/contenteditable 内时不触发；
 - 与宿主快捷键冲突时宿主优先，插件应避免占用宿主已有组合。
 
+### 1.6 页面资源与页面 UI Kit
+
+沙箱页面可以加载**宿主同一 origin** 的两类资源；除此之外仍然不能加载任何外部资源：
+
+- 包内文件：`/__gonavi/plugin-page-assets/<pluginId>/<package-relative-path>`。只有处于 `running` 的插件可读，路径经宿主包解析器校验，MIME 白名单为 js/mjs/css/html/json/png/jpg/jpeg/webp/gif/woff2，单文件 ≤32 MiB，响应 `no-store`；
+- 页面 UI Kit：`/__gonavi/plugin-page-ui/ui/page-ui.js` 与 `/__gonavi/plugin-page-ui/ui/style.css`，以 IIFE 暴露 `window.GoNaviUI`（React、createRoot 与窗口 UI Kit 的全部基础组件）。
+
+```html
+<link rel="stylesheet" href="/__gonavi/plugin-page-ui/ui/style.css">
+<script src="/__gonavi/plugin-page-ui/ui/page-ui.js"></script>
+<script>
+  const { React, createRoot, GonaviPanel, GonaviDataTable } = window.GoNaviUI;
+</script>
+```
+
+页面 CSP 仍保持 `connect-src 'none'`、`base-uri 'none'`、`frame-src 'none'`：页面不能 fetch/XHR/WebSocket，也不能加载其他 origin；iframe 仍是不透明源，读不到宿主存储与 DOM。Monaco、chart、xterm 等重组件不在页面入口中，页面需要时自行从包内资源加载。
+
 ## 2. 宿主能力网关
 
 ### 2.1 绑定
