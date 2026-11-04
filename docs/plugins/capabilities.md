@@ -66,6 +66,11 @@ GoNavi registers host capabilities explicitly. The page bridge (`PluginPageCall`
 | `system.open-external` | `system.open-external` | page, window | no |
 | `files.pick` | `host.files` | page, window, backend | no |
 | `files.save` | `host.files` | page, window, backend | no |
+| `events.subscribe` | `host.events` | page, window, backend | no |
+| `events.poll` | `host.events` | page, window | no |
+| `events.unsubscribe` | `host.events` | page, window, backend | no |
+| `clipboard.read` | `host.clipboard` | page, window, backend | no |
+| `clipboard.write` | `host.clipboard` | page, window, backend | no |
 
 Connections are always resolved by saved connection id on the host. Connection-listing, metadata and read-query capabilities do not return usernames, passwords, SSH/proxy credentials, DSNs or arbitrary host paths. `plugin.invoke` is different: when the plugin declares `host.connections.credentials` and the command accepts `config`, the host may inject the saved configuration into that plugin's backend arguments. The host does not expose that configuration directly to the page bridge; the backend is trusted code and must not echo secrets in its result. Metadata and read queries return bounded results; data that exceeds the result budget must be split by the caller.
 
@@ -91,6 +96,10 @@ Stable failure codes include `invalid_arguments`, `unknown_method`, `permission_
 ## Page call
 
 The page bridge uses the same capability names with `window.gonavi.call(method, args)`. Page calls are limited to 64 KiB of arguments, 256 KiB of results and 30 seconds per call in this first slice. The host validates the declared page, lifecycle, permission, arguments and result size in that order. See [pages](<pages.md>).
+
+`events.subscribe` returns `{subscriptionId, snapshot}` for up to eight topics (`preferences`, `lifecycle`, `connections`). `events.poll` long-polls one subscription for up to 25 seconds and returns `{events:[{topic,data}]}`; it is an empty list at the deadline. Snapshots carry no credentials or connection details — the `connections` event only reports `{count, revision}`. Subscriptions are bound to the plugin's generation and disappear with it; `events.unsubscribe` releases one explicitly.
+
+`clipboard.read` returns at most 64 KiB of plain text (`{text, truncated}`), and `clipboard.write` accepts at most 256 KiB. Both are desktop-only.
 
 `files.pick` and `files.save` are the exception to the usual call timeouts: a native dialog stays open until the user answers, so the host allows up to five minutes. They are desktop-only and return `unsupported` in the web runtime. The result is only the path the user picked (`{"path":"…"}`; an empty string means the dialog was cancelled). The host never reads, writes or validates that path on the plugin's behalf: a plugin that moves files over SFTP or any other transport performs the I/O itself and uses this capability only to ask where.
 

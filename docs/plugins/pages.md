@@ -52,7 +52,7 @@
   - `""`／`"page"`：打开页面标签页，`page` 必须引用本插件已声明的 page id。
   - `"window"`：打开清单 `window` 声明的独立窗口，要求存在 `window`，且**禁止同时声明 `page`**。
 - `page`：目标为页面时必须引用本插件已声明的 page id；目标为 `window` 时必须缺省或为空字符串。
-- `location`：v1 只接受 `"tools"`（标题栏「插件」菜单）。枚举保留扩展位，未知值拒绝。两种 target 共用这一位置。
+- `location`：接受 `"tools"`（标题栏「插件」菜单）与 `"statusbar"`（底部状态栏）。未知值拒绝。两种 target 共用这两个位置。
 - `order`：可选整数，`-1000..1000`，默认 0；同插件内按升序展示，相同 order 按声明顺序。
 - 最多 32 条导航。
 
@@ -69,6 +69,8 @@
 | `host.query.read` | 通过已保存连接执行单条只读查询（见 2.3；v1 已接通只读连接、SQL 审计与超时路径） |
 | `ui.sidebar` | 声明 `contributes.sidebar` 分组，把插件节点挂到左侧连接树（见 [sidebar](<sidebar.md>)） |
 | `host.files` | 允许页面桥调用 `files.pick` / `files.save` 弹出宿主原生文件/目录选择与保存对话框；插件自行完成文件 I/O |
+| `host.events` | 订阅宿主事件（偏好、插件生命周期、连接列表变化），通过长轮询取回 |
+| `host.clipboard` | 读写系统剪贴板纯文本（读 64 KiB、写 256 KiB 上限） |
 
 - `ui.pages` 是页面与页面导航的前置条件；`host.*` 权限只影响对应能力调用，不隐式授予页面渲染。
 - 全部导航都指向 `target: "window"` 时不需要 `ui.pages`：窗口目标只打开插件自己的窗口，与窗口连接动作同一套规则。
