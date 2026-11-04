@@ -67,6 +67,8 @@
 | `host.connections.read` | 读取脱敏后的保存连接列表 |
 | `host.metadata.read` | 读取已保存连接的数据库／表／列元数据 |
 | `host.query.read` | 通过已保存连接执行单条只读查询（见 2.3；v1 已接通只读连接、SQL 审计与超时路径） |
+| `ui.sidebar` | 声明 `contributes.sidebar` 分组，把插件节点挂到左侧连接树（见 [sidebar](<sidebar.md>)） |
+| `host.files` | 允许页面桥调用 `files.pick` / `files.save` 弹出宿主原生文件/目录选择与保存对话框；插件自行完成文件 I/O |
 
 - `ui.pages` 是页面与页面导航的前置条件；`host.*` 权限只影响对应能力调用，不隐式授予页面渲染。
 - 全部导航都指向 `target: "window"` 时不需要 `ui.pages`：窗口目标只打开插件自己的窗口，与窗口连接动作同一套规则。

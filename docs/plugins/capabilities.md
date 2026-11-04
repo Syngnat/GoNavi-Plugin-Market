@@ -64,6 +64,8 @@ GoNavi registers host capabilities explicitly. The page bridge (`PluginPageCall`
 | `query.read` | `host.query.read` | page, window, backend | no |
 | `ui.notify` | — | page | no |
 | `system.open-external` | `system.open-external` | page, window | no |
+| `files.pick` | `host.files` | page, window, backend | no |
+| `files.save` | `host.files` | page, window, backend | no |
 
 Connections are always resolved by saved connection id on the host. Connection-listing, metadata and read-query capabilities do not return usernames, passwords, SSH/proxy credentials, DSNs or arbitrary host paths. `plugin.invoke` is different: when the plugin declares `host.connections.credentials` and the command accepts `config`, the host may inject the saved configuration into that plugin's backend arguments. The host does not expose that configuration directly to the page bridge; the backend is trusted code and must not echo secrets in its result. Metadata and read queries return bounded results; data that exceeds the result budget must be split by the caller.
 
@@ -90,6 +92,10 @@ Stable failure codes include `invalid_arguments`, `unknown_method`, `permission_
 
 The page bridge uses the same capability names with `window.gonavi.call(method, args)`. Page calls are limited to 64 KiB of arguments, 256 KiB of results and 30 seconds per call in this first slice. The host validates the declared page, lifecycle, permission, arguments and result size in that order. See [pages](<pages.md>).
 
+`files.pick` and `files.save` are the exception to the usual call timeouts: a native dialog stays open until the user answers, so the host allows up to five minutes. They are desktop-only and return `unsupported` in the web runtime. The result is only the path the user picked (`{"path":"…"}`; an empty string means the dialog was cancelled). The host never reads, writes or validates that path on the plugin's behalf: a plugin that moves files over SFTP or any other transport performs the I/O itself and uses this capability only to ask where.
+
 ## Evolution
 
 The catalogue is versioned with the host and grows in reviewable slices. `app.capabilities` is the compatibility surface: a plugin must not assume a capability exists merely because a newer document lists it. Future slices add write, DDL, export/import, sync, backup, Redis, MongoDB, AI, JVM, driver, user/session, Nacos/XxlJob, plugin/market, file and UI capabilities with their own permissions and audit rules.
+
+File capabilities are now open for the picker/save path (`host.files`). Remaining gaps tracked for the next slices are event subscription, streaming transfers (large files bypass the 256 KiB page result budget by having the plugin own the I/O) and host-rendered surfaces beyond pages, panels and the connection tree.
