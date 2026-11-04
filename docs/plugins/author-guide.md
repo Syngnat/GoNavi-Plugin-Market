@@ -24,6 +24,11 @@
 | 可调用命令 / 宿主渲染面板 | [开发指南](<development.md>)、[SDK](<sdk.md>) | 自定义窗口、声明式面板 |
 | 完整插件页面并挂到标题栏菜单 | [页面契约](<pages.md>) | `pages` / `navigation` |
 | 从标题栏直接打开插件窗口 | [页面契约](<pages.md>) | `window` + `navigation[].target: "window"` |
+| 左侧连接树分组 | [侧边栏节点](<sidebar.md>) | `sidebar` + `ui.sidebar` |
+| 右侧或底部面板 | [页面契约](<pages.md>) | `views` + `ui.pages` |
+| 状态栏 / 命令面板入口 | [页面契约](<pages.md>) | `navigation[].location: "statusbar" \| "command"` |
+| 全局快捷键 | [页面契约](<pages.md>) | `keybindings` |
+| 文件/目录选择、事件订阅、剪贴板、任务进度、确认框 | [能力目录](<capabilities.md>) | `files.*` / `events.*` / `clipboard.*` / `progress.report` / `dialog.confirm` |
 | Agent 可调用的普通命令 | [Agent 工具](<ai-tools.md>) | `ai.tools` |
 | 打包技能文档 | [Skills](<skills.md>) | `ai.skills` |
 | SQL 数据源 | [数据源](<data-sources.md>) | `data.sources` |
