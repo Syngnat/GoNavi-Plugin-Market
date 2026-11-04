@@ -95,7 +95,7 @@
 - `id`：`localIDPattern`，同插件内唯一；
 - `title`：非空文本，≤128 字节；
 - `page`：必须引用本插件已声明的 page；
-- `location`：v1 只接受 `"right"`（右侧 dock）；
+- `location`：接受 `"right"`（右侧 dock）与 `"bottom"`（底部 dock）；
 - `icon`：可选，包内栅格图（复用现有图标规则）；
 - `order`：可选，`-1000..1000`；
 - 最多 8 个视图。
