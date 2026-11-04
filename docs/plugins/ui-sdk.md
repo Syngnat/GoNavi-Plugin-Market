@@ -9,7 +9,10 @@ GoNavi 为插件窗口提供与宿主同源的设计令牌、主题、布局、�
 ```html
 <link rel="stylesheet" href="/__gonavi/plugin-window/ui/style.css">
 <script type="importmap">
-{"imports":{"@gonavi/plugin-ui":"/__gonavi/plugin-window/ui/index.js"}}
+{"imports":{
+  "@gonavi/plugin-ui":"/__gonavi/plugin-window/ui/index.js",
+  "@gonavi/plugin-ui/monaco":"/__gonavi/plugin-window/ui/monaco.js"
+}}
 </script>
 <script type="module" src="app.js"></script>
 ```
