@@ -79,7 +79,7 @@ if (identity.context?.kind === 'connectionAction') {
 - 主题：`GonaviThemeProvider`（`light`/`dark`/`system` 跟随系统）、`useGonaviTheme`、`--gonavi-*` CSS 变量。
 - 布局：`GonaviPanel`、`GonaviToolbar`、`GonaviEmptyState`、`GonaviLoadingState`、`GonaviErrorState`。
 - 数据：`GonaviDataTable`（只读，可选分页）、`GonaviPagedTable`（客户端分页）、`GonaviResultGrid`（按行推断列）、`GonaviJsonViewer`、`GonaviTreeView`、`GonaviCodeEditor`、`GonaviSqlEditor`（Ctrl/Cmd+Enter 执行）、`GonaviConfirmDialog`。
-- 适配器：`GonaviEditableGrid`（受控可编辑表格，双击单元格编辑、提交回调）、`GonaviQueryWorkbench`（编辑器 + Run + 结果网格）、`GonaviConnectionPicker`（按 `connections.list` 能力加载脱敏连接摘要）、`GonaviConnectionTree`（只读连接/库/表树，按 `metadata.databases` / `metadata.tables` 懒加载，可按连接类型过滤）。适配器不持有宿主状态、不执行查询，数据与提交都由插件负责。
+- 适配器：`GonaviEditableGrid`（受控可编辑表格，双击单元格编辑、提交回调）、`GonaviQueryWorkbench`（编辑器 + Run + 结果网格）、`GonaviConnectionPicker`（按 `connections.list` 能力加载脱敏连接摘要）、`GonaviConnectionTree`（只读连接/库/表树，按 `metadata.databases` / `metadata.tables` 懒加载，可按连接类型过滤）、`GonaviTableDesigner`（受控 CREATE TABLE 设计器，按方言生成 DDL 预览，**只生成不执行**）。适配器不持有宿主状态、不执行查询，数据与提交都由插件负责。
 - 终端与文件：`GonaviTerminal`（滚动缓冲 + ANSI SGR 颜色，非完整 VT100）、`GonaviFileTree`（目录优先排序、懒加载子节点、双击打开文件）。两者都不访问磁盘，数据由插件提供。
 - Hooks：`usePluginContext`（读取窗口启动上下文）、`useGonaviPageLaunch`（读取页面标签启动上下文）、`useCapability`（单次能力调用状态）、`useGonaviTheme`。
 - antd：Button、Input、Select、Modal、Tabs、Table 等常用组件与 `GonaviIcons`。
