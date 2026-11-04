@@ -71,6 +71,7 @@ GoNavi registers host capabilities explicitly. The page bridge (`PluginPageCall`
 | `events.unsubscribe` | `host.events` | page, window, backend | no |
 | `clipboard.read` | `host.clipboard` | page, window, backend | no |
 | `clipboard.write` | `host.clipboard` | page, window, backend | no |
+| `progress.report` | `ui.progress` | page, window, backend | no |
 
 Connections are always resolved by saved connection id on the host. Connection-listing, metadata and read-query capabilities do not return usernames, passwords, SSH/proxy credentials, DSNs or arbitrary host paths. `plugin.invoke` is different: when the plugin declares `host.connections.credentials` and the command accepts `config`, the host may inject the saved configuration into that plugin's backend arguments. The host does not expose that configuration directly to the page bridge; the backend is trusted code and must not echo secrets in its result. Metadata and read queries return bounded results; data that exceeds the result budget must be split by the caller.
 
@@ -98,6 +99,8 @@ Stable failure codes include `invalid_arguments`, `unknown_method`, `permission_
 The page bridge uses the same capability names with `window.gonavi.call(method, args)`. Page calls are limited to 64 KiB of arguments, 256 KiB of results and 30 seconds per call in this first slice. The host validates the declared page, lifecycle, permission, arguments and result size in that order. See [pages](<pages.md>).
 
 `events.subscribe` returns `{subscriptionId, snapshot}` for up to eight topics (`preferences`, `lifecycle`, `connections`). `events.poll` long-polls one subscription for up to 25 seconds and returns `{events:[{topic,data}]}`; it is an empty list at the deadline. Snapshots carry no credentials or connection details — the `connections` event only reports `{count, revision}`. Subscriptions are bound to the plugin's generation and disappear with it; `events.unsubscribe` releases one explicitly.
+
+`progress.report` publishes one bounded task update as a host notification: `{id, action: "open"|"update"|"close", title?, detail?, percent?}`. `title` is required on `open` (≤128 bytes), `detail` ≤256 bytes, `percent` 0–100. The host renders the notification and owns its lifetime; `close` removes it. Desktop only.
 
 `clipboard.read` returns at most 64 KiB of plain text (`{text, truncated}`), and `clipboard.write` accepts at most 256 KiB. Both are desktop-only.
 
