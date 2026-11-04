@@ -79,11 +79,14 @@ if (identity.context?.kind === 'connectionAction') {
 - 主题：`GonaviThemeProvider`（`light`/`dark`/`system` 跟随系统）、`useGonaviTheme`、`--gonavi-*` CSS 变量。
 - 布局：`GonaviPanel`、`GonaviToolbar`、`GonaviEmptyState`、`GonaviLoadingState`、`GonaviErrorState`。
 - 数据：`GonaviDataTable`（只读，可选分页）、`GonaviPagedTable`（客户端分页）、`GonaviResultGrid`（按行推断列）、`GonaviJsonViewer`、`GonaviTreeView`、`GonaviCodeEditor`、`GonaviSqlEditor`（Ctrl/Cmd+Enter 执行）、`GonaviConfirmDialog`。
+- 终端与文件：`GonaviTerminal`（滚动缓冲 + ANSI SGR 颜色，非完整 VT100）、`GonaviFileTree`（目录优先排序、懒加载子节点、双击打开文件）。两者都不访问磁盘，数据由插件提供。
 - Hooks：`usePluginContext`（读取窗口启动上下文）、`useGonaviPageLaunch`（读取页面标签启动上下文）、`useCapability`（单次能力调用状态）、`useGonaviTheme`。
 - antd：Button、Input、Select、Modal、Tabs、Table 等常用组件与 `GonaviIcons`。
 - 能力：`createGonaviClient`、`GonaviCapabilityError`。
 
 复杂宿主组件（完整 DataGrid 编辑态、QueryEditor、TableDesigner、连接树）在后续切片通过 Host Surface 或适配器导出；当前先由宿主标签页/对话框渲染，插件通过能力打开。
+
+UI Kit 只对**插件窗口**可用（窗口与宿主同源 loopback origin）。插件页面运行在不透明源沙箱 iframe 中，无法加载宿主模块；页面侧继续使用 `--gonavi-*` 主题令牌与数据契约，通过 `window.gonavi.call` 获取数据。
 
 ## 边界
 
