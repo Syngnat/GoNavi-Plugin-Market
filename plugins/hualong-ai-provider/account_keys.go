@@ -50,7 +50,7 @@ func (s *accountService) groups(ctx context.Context, _ json.RawMessage) (any, er
 	groups, err := s.panel.groups(ctx, record.AccessToken)
 	if err != nil {
 		if codeOf(err) == "panel_unauthorized" {
-			s.clearRecord()
+			s.clearRecordIf(record.AccessToken)
 		}
 		return rejected(err), nil
 	}
@@ -76,7 +76,7 @@ func (s *accountService) createKey(ctx context.Context, raw json.RawMessage) (an
 	key, err := s.panel.createKey(ctx, record.AccessToken, name, groupID)
 	if err != nil {
 		if codeOf(err) == "panel_unauthorized" {
-			s.clearRecord()
+			s.clearRecordIf(record.AccessToken)
 		}
 		return rejected(err), nil
 	}

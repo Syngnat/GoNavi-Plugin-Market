@@ -105,6 +105,10 @@ type accountService struct {
 	chrome  *chromeLauncher
 	now     func() time.Time
 	mu      sync.Mutex
+	// refreshMu serializes token rotation. Refresh tokens are single-use, so two
+	// commands that notice the same expiry would otherwise both spend one token:
+	// the second rotation is refused and must not discard the first one's record.
+	refreshMu sync.Mutex
 }
 
 func newAccountService() *accountService {
@@ -218,7 +222,7 @@ func (s *accountService) status(ctx context.Context, _ json.RawMessage) (any, er
 	record, refreshed, err := s.ensureFresh(ctx, record)
 	if err != nil {
 		if codeOf(err) == "panel_unauthorized" || codeOf(err) == "token_expired" {
-			s.clearRecord()
+			s.clearRecordIf(record.AccessToken)
 			return success(statusResult{State: stateSignedOut, Reason: "expired"}), nil
 		}
 		return rejected(err), nil
@@ -226,7 +230,7 @@ func (s *accountService) status(ctx context.Context, _ json.RawMessage) (any, er
 	account, err := s.panel.me(ctx, record.AccessToken)
 	if err != nil {
 		if codeOf(err) == "panel_unauthorized" {
-			s.clearRecord()
+			s.clearRecordIf(record.AccessToken)
 			return success(statusResult{State: stateSignedOut, Reason: "expired"}), nil
 		}
 		return rejected(err), nil
@@ -256,7 +260,7 @@ func (s *accountService) session(ctx context.Context) (accountRecord, error) {
 	record, _, err := s.ensureFresh(ctx, record)
 	if err != nil {
 		if codeOf(err) == "panel_unauthorized" || codeOf(err) == "token_expired" {
-			s.clearRecord()
+			s.clearRecordIf(record.AccessToken)
 			return accountRecord{}, coded("panel_unauthorized", messagePanelUnauthorized)
 		}
 		return accountRecord{}, err
@@ -273,7 +277,7 @@ func (s *accountService) keys(ctx context.Context, _ json.RawMessage) (any, erro
 	keys, err := s.panel.keys(ctx, record.AccessToken)
 	if err != nil {
 		if codeOf(err) == "panel_unauthorized" {
-			s.clearRecord()
+			s.clearRecordIf(record.AccessToken)
 		}
 		return rejected(err), nil
 	}
@@ -294,11 +298,22 @@ func (s *accountService) logout(_ context.Context, _ json.RawMessage) (any, erro
 // ensureFresh returns a usable record, rotating the access token when the
 // stored expiry has passed or is about to.
 func (s *accountService) ensureFresh(ctx context.Context, record accountRecord) (accountRecord, bool, error) {
-	if record.ExpiresAt <= 0 || s.now().UnixMilli()+refreshSkew.Milliseconds() < record.ExpiresAt {
+	if s.isFresh(record) {
 		return record, false, nil
 	}
 	if record.RefreshToken == "" {
 		return record, false, coded("token_expired", messageTokenExpired)
+	}
+	// The window asks for status and keys at once, so both commands can see the
+	// same expired token. Rotate once and let the loser adopt the winner's record
+	// instead of spending an already rotated refresh token.
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
+	if current, ok := s.loadRecord(); ok {
+		if current.AccessToken != record.AccessToken && s.isFresh(current) {
+			return current, true, nil
+		}
+		record = current
 	}
 	token, err := s.panel.refresh(ctx, record.RefreshToken)
 	if err != nil {
@@ -316,6 +331,11 @@ func (s *accountService) ensureFresh(ctx context.Context, record accountRecord) 
 		return record, false, coded("store_failed", messageStoreFailed)
 	}
 	return updated, true, nil
+}
+
+// isFresh reports whether the access token can be used without rotation.
+func (s *accountService) isFresh(record accountRecord) bool {
+	return record.ExpiresAt <= 0 || s.now().UnixMilli()+refreshSkew.Milliseconds() < record.ExpiresAt
 }
 
 func (s *accountService) recordPath() string { return filepath.Join(s.dataDir, accountFileName) }
@@ -349,5 +369,25 @@ func (s *accountService) saveRecord(record accountRecord) error {
 func (s *accountService) clearRecord() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	_ = os.Remove(s.recordPath())
+}
+
+// clearRecordIf forgets the stored session only while it still holds the token
+// the caller saw fail. A concurrent refresh may already have replaced it; that
+// stale failure must not sign the user out.
+func (s *accountService) clearRecordIf(accessToken string) {
+	if accessToken == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	raw, err := os.ReadFile(s.recordPath())
+	if err != nil || len(raw) > maxAccountBytes {
+		return
+	}
+	var record accountRecord
+	if json.Unmarshal(raw, &record) != nil || record.AccessToken != accessToken {
+		return
+	}
 	_ = os.Remove(s.recordPath())
 }

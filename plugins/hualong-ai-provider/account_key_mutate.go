@@ -33,7 +33,7 @@ func (s *accountService) updateKey(ctx context.Context, raw json.RawMessage) (an
 	key, err := s.panel.updateKey(ctx, record.AccessToken, id, name, groupID)
 	if err != nil {
 		if codeOf(err) == "panel_unauthorized" {
-			s.clearRecord()
+			s.clearRecordIf(record.AccessToken)
 		}
 		return rejected(err), nil
 	}
@@ -57,7 +57,7 @@ func (s *accountService) deleteKey(ctx context.Context, raw json.RawMessage) (an
 	}
 	if err := s.panel.deleteKey(ctx, record.AccessToken, id); err != nil {
 		if codeOf(err) == "panel_unauthorized" {
-			s.clearRecord()
+			s.clearRecordIf(record.AccessToken)
 		}
 		return rejected(err), nil
 	}

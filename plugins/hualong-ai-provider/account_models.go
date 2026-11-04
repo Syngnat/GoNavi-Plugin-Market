@@ -43,7 +43,7 @@ func (s *accountService) listModels(ctx context.Context, _ json.RawMessage) (any
 	keys, err := s.panel.keys(ctx, record.AccessToken)
 	if err != nil {
 		if codeOf(err) == "panel_unauthorized" {
-			s.clearRecord()
+			s.clearRecordIf(record.AccessToken)
 		}
 		return rejected(err), nil
 	}
