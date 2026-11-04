@@ -83,7 +83,7 @@ Each contribution type has one SDK entry point. Use it instead of writing the JS
 | Group | Identifiers |
 |---|---|
 | Protocol | `APIVersion`, `DefaultMaxFrameBytes`, `AIProviderImageFrameBytes`, `DataSourceProtocolVersion`, `DataSourceWriteProtocolVersion` |
-| Pages | `PagesPermission`, `PageCustomHTMLPermission`, `PageLocationTools`, `PageLocationStatusbar`, `SidebarPermission`, `SidebarGroup`, `ValidatePages` |
+| Pages | `PagesPermission`, `PageCustomHTMLPermission`, `PageLocationTools`, `PageLocationStatusbar`, `SidebarPermission`, `SidebarGroup`, `View`, `ViewLocationRight`, `ValidatePages` |
 | Manifest | `ValidateManifest`, `SafePackagePath`, `ErrDataSourceWriteEffect` |
 | Data source errors | `ErrDataSourceRequest`, `ErrDataSourceLimit`, `ErrDataSourceResult`, `ErrDataSourceSession`, `ErrDataSourceUnsupported` |
 | Manifest shapes | `Backend`, `Requirement`, `Panel` |

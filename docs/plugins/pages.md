@@ -77,6 +77,31 @@
 - 未声明 `ui.pages` 的包仍可只使用旧的面板／窗口能力。
 - 只有处于 `running` 的插件才展示入口；静态包（无 backend）在运行时所有者启动后同样进入 `running`，只是没有子进程。
 
+### 1.4 面板视图（views）
+
+`views` 把已声明的页面停靠到主工作台右侧面板区，页面仍走页面桥与逐项能力授权：
+
+```json
+{
+  "permissions": ["ui.pages"],
+  "contributes": {
+    "views": [
+      { "id": "terminal", "title": "终端", "page": "terminal", "location": "right", "order": 0 }
+    ]
+  }
+}
+```
+
+- `id`：`localIDPattern`，同插件内唯一；
+- `title`：非空文本，≤128 字节；
+- `page`：必须引用本插件已声明的 page；
+- `location`：v1 只接受 `"right"`（右侧 dock）；
+- `icon`：可选，包内栅格图（复用现有图标规则）；
+- `order`：可选，`-1000..1000`；
+- 最多 8 个视图。
+
+入口可以是 `sidebar` 节点的 `open: {"type":"panel","view":"terminal"}`，也可以是宿主后续开放的其他入口。面板关闭后不保留状态；插件禁用、更新或卸载时宿主立即移除对应面板。
+
 ## 2. 宿主能力网关
 
 ### 2.1 绑定

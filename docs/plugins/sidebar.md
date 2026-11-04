@@ -88,7 +88,7 @@ SSH 场景即：分组「SSH」展开后列出主机配置，点击某一台在�
 - `id`：插件内稳定标识，≤128 字节，不允许路径分隔符；
 - `label`、`description`、`badge`：纯文本，宿主按文本渲染，不接受 HTML；
 - `children`：可选，递归结构，受深度与总数限制；
-- `open`：可选，缺省继承分组；`type` 为 `page` 或 `window`；
+- `open`：可选，缺省继承分组；`type` 为 `page`、`window` 或 `panel`（`panel` 需配合 `contributes.views`，用 `view` 引用已声明的视图）；
 - `open.arguments`：≤4 KiB 的 JSON 对象，原样进入页面 `window.__gonaviLaunch` 或窗口 launch context；
 - 未知字段拒绝，重复 `id` 拒绝。
 
@@ -96,6 +96,7 @@ SSH 场景即：分组「SSH」展开后列出主机配置，点击某一台在�
 
 - `page`：要求该 page 在清单中已声明且插件具备 `ui.pages`；宿主调用现有 `openPluginPageTab`，同一 `(page, arguments)` 标签聚焦而非重复打开；
 - `window`：要求清单声明 `window`；宿主复用现有窗口打开路径，同一 `windowKey` 复用；
+- `panel`：要求 `view` 引用本插件 `contributes.views` 中已声明的视图；宿主在右侧面板区打开该页面；
 - 缺省：分组没有 `open` 且节点也没有 `open` 时，节点仅作为分组展示。
 
 ### 4.4 刷新
