@@ -16,7 +16,9 @@
 | `host.metadata.read` | 通过插件页面桥读取已保存连接的库／表／列元数据 | 不执行查询、不读数据行、不写任何对象 |
 | `host.query.read` | 通过插件页面桥用已保存连接执行单条只读查询 | 仍受只读连接、SQL 审计、30s 超时、扫描层行预算与 256 KiB 结果上限约束；不能写入或开事务。**只读 ≠ 无副作用**：锁子句与常见危险函数被拒绝，其余副作用未穷举 |
 | `host.schema.write` | 通过 `schema.preview` / `schema.apply` 对已保存连接执行受控 DDL | 仅 CREATE/ALTER/DROP TABLE\|INDEX\|VIEW；拒绝只读/结构保护连接、TRUNCATE、数据库/schema 级 DDL、DML 与多语句；apply 必须经宿主原生确认，计划一次性且 5 分钟过期 |
-| `ui.pages` | 渲染 `pages` 并把页面导航挂到主窗口（标题栏「插件」菜单）；`target: "window"` 的导航只打开插件自己的窗口，不需要本权限 | 不授予任何 `host.*` 能力，也不授权其他插件页面 |
+| `host.appearance.read` | 通过页面桥读取宿主背景状态：背景来源（自定义图片／内置图库）、透明度、位置、启用开关，以及内置图库目录与缩略图 | 不授予写入；自定义背景图片以 JPEG data URL 返回，图库缩略图以 data URL 返回，不暴露本地路径或其他插件数据 |
+| `host.appearance.write` | 通过页面桥更换／清除背景、调节透明度与位置、启用开关，并下载／切换／删除内置图库条目 | 不授予读取图库目录以外的权限；删除正在使用的背景会被拒绝；不直接访问宿主存储或文件系统 |
+| `ui.pages` | 渲染 `pages`、把页面导航挂到主窗口（标题栏「插件」菜单），并在设置中心声明的 `settingsSections` 位置渲染页面；`target: "window"` 的导航只打开插件自己的窗口，不需要本权限 | 不授予任何 `host.*` 能力，也不授权其他插件页面 |
 | `ui.html-panel` | 在主窗口内以不透明源沙箱 iframe 渲染有界自定义 HTML；面板没有桥，`pages` 里的 HTML 页面自 v1 起可通过页面桥调用**已单独授权**的 `host.*` 能力 | 不提供存储、Cookie、凭据、同源访问、表单或嵌套 frame；CSP 拦截页面 fetch／XHR／WebSocket 与外部资源，但这不是 OS 或网络栈沙箱，也**不阻止页面自我导航**（导航后宿主撤销桥，见页面契约） |
 | `system.open-external` | 通过 `system.open-external` 能力把**一个** http(s) 链接交给系统默认浏览器打开；插件页面与插件窗口均可调用 | 不接受 `file:`／`javascript:`／`data:`／`mailto:`／自定义 scheme、带用户名密码的 URL 或超长目标；不导航宿主 WebView，插件无法把主窗口、页面 frame 或插件窗口变成地址栏；Web／headless 运行时不执行 |
 

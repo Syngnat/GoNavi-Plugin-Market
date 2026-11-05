@@ -60,11 +60,34 @@
 
 `target` 缺省等价于 `"page"`，所以在该字段出现之前写下的清单保持原义。窗口目标与 `connectionActions` 的 `{"target":{"type":"window"}}` 是两套独立声明：前者挂标题栏入口，后者挂连接右键菜单，但两者都只打开清单自己声明的窗口，因此都不要求 `ui.pages`。
 
+### 1.2.1 settingsSections
+
+把插件页面嵌入宿主**固定位置**的设置区。宿主保留槽位、标题、说明与未安装时的安装引导，插件只提供页面内容：
+
+```json
+{
+  "contributes": {
+    "pages": [{ "id": "background", "title": "背景图片", "html": { "source": "<section>…</section>" } }],
+    "settingsSections": [
+      { "id": "background-settings", "slot": "appearance.background", "page": "background", "order": 0 }
+    ]
+  }
+}
+```
+
+- `id`：`localIDPattern`，同插件内唯一。
+- `slot`：v1 只接受 `"appearance.background"`（设置中心「主题与配色 → 背景图片」）。槽位由宿主拥有，位置、标题与未安装时的安装提示不随插件变化。
+- `page`：必须引用本插件已声明的 page id。
+- `title` / `description`：可选，≤128 / ≤512 字节；宿主槽位已有固定文案时以宿主为准。
+- `order`：可选整数，`-1000..1000`，默认 0；同一槽位只允许一个提供者。
+- 最多 8 个设置区。
+- 未安装、停用或移除插件时，槽位仍显示原入口，并引导用户打开插件管理安装；已应用的背景由宿主继续绘制。
+
 ### 1.3 权限
 
 | 权限 | 作用 |
 |---|---|
-| `ui.pages` | 渲染 `pages` 并把页面导航挂到主窗口；声明了 `pages` 或存在非 `window` 目标的导航时缺失即校验失败 |
+| `ui.pages` | 渲染 `pages`、把页面导航挂到主窗口，并在设置中心声明的 `settingsSections` 位置渲染页面；声明了 `pages`、`settingsSections` 或存在非 `window` 目标的导航时缺失即校验失败 |
 | `ui.html-panel` | 允许声明 `html` 页面（复用现有权限语义；v1 起同时允许页面通过桥调用已授权宿主能力） |
 | `host.connections.read` | 读取脱敏后的保存连接列表 |
 | `host.metadata.read` | 读取已保存连接的数据库／表／列元数据 |
@@ -73,8 +96,10 @@
 | `host.files` | 允许页面桥调用 `files.pick` / `files.save` 弹出宿主原生文件/目录选择与保存对话框；插件自行完成文件 I/O |
 | `host.events` | 订阅宿主事件（偏好、插件生命周期、连接列表变化），通过长轮询取回 |
 | `host.clipboard` | 读写系统剪贴板纯文本（读 64 KiB、写 256 KiB 上限） |
+| `host.appearance.read` | 读取背景状态、内置图库目录与缩略图（页面桥，前端宿主能力） |
+| `host.appearance.write` | 修改背景、透明度、位置、启用开关并管理内置图库（页面桥，前端宿主能力） |
 
-- `ui.pages` 是页面与页面导航的前置条件；`host.*` 权限只影响对应能力调用，不隐式授予页面渲染。
+- `ui.pages` 是页面、页面导航与设置区的前置条件；`host.*` 权限只影响对应能力调用，不隐式授予页面渲染。
 - 全部导航都指向 `target: "window"` 时不需要 `ui.pages`：窗口目标只打开插件自己的窗口，与窗口连接动作同一套规则。
 - 未声明 `ui.pages` 的包仍可只使用旧的面板／窗口能力。
 - 只有处于 `running` 的插件才展示入口；静态包（无 backend）在运行时所有者启动后同样进入 `running`，只是没有子进程。
@@ -198,6 +223,7 @@ func (a *App) PluginPageCall(id, pageID, method, argumentsJSON string) connectio
 - 入口：
   1. 标题栏新增「插件」快捷菜单，列出所有 running 插件的 `navigation`（location=tools）：页面目标点击打开对应标签页，窗口目标打开清单声明的独立窗口；懒加载，首次打开菜单时读取，不改变启动时插件运行时初始化时机。
   2. 设置中心 →「插件」页每个插件卡展示其页面列表与「打开」按钮。
+  3. `settingsSections` 声明的页面嵌入宿主固定设置槽位（v1：`appearance.background`），不额外生成标签页。
 - 插件被禁用／移除／换代时：已打开页面显示不可用状态并停止桥调用；错误码 `not_running`。
 - 页面标签页标题使用 navigation.title；同一 (pluginID,pageID) 复用已有标签页。窗口目标不使用标签页，沿用插件窗口既有的复用语义（同一插件已有窗口时复用，不另开一个）。
 - 页面标签页**不跨重启恢复**：`plugin-page` 不在工作台 session snapshot 的恢复集合内，重启后需重新从菜单打开。
@@ -209,9 +235,11 @@ func (a *App) PluginPageCall(id, pageID, method, argumentsJSON string) connectio
 - **网络边界只覆盖主动请求**：CSP 阻止页面 fetch／XHR／WebSocket、外部子资源、表单提交与嵌套 frame，但**不阻止页面自我导航**。为此宿主为每个 frame 生成随机 `token` 并注入桥 closure；`gonavi:page-call` 必须携带该 token，缺失或不符的消息直接丢弃（不回 `page-result`，也不触发宿主调用）。注入脚本执行后自移除，且出站 `postMessage` 在页面脚本之前绑定，页面无法从 DOM 读回 token 或替换发送入口。
 - iframe 的 `load` 计数>1（srcdoc 初始加载之后再次 load）视为自导航逃逸：立即卸载 iframe、撤销桥并显示不可用态（`plugin.pages.unavailable` + `plugin.pages.error.navigation`）。
 - 因此页面仍可能通过自我导航把**已经获得的数据**带出（例如跳转外部 URL）；这是受信插件代码的边界，不是网络隔离承诺。`host.*` 返回的数据应理解为「暴露给已声明该权限的插件代码」，不是「绝不会离开进程」。
-- 注入运行时：`window.gonavi.call(method, args) -> Promise` 与 `window.gonavi.notify(message, type)`。
+- 注入运行时：`window.gonavi.call(method, args) -> Promise`、`window.gonavi.notify(message, type)` 与 `window.gonavi.resize(height)`。
+- `resize(height)` 只对嵌入 settingsSections 的页面生效：页面把自身内容高度报给宿主，宿主据此设置 iframe 高度（120–4000 px）；标签页里的页面始终占满工作台。
+- `appearance.*` 能力由**前端宿主窗口**执行（背景状态与图库适配器在主窗口），不经过 Go 页面网关；权限仍按清单校验。`appearance.background.set-custom` 的参数上限为 2 MiB，图片须是宿主可验证的 JPEG data URL（≤1.5M 字符）。
 - 消息：页面 → 宿主 `{type:"gonavi:page-call", id, token, method, arguments}`；宿主 → 页面 `{type:"gonavi:page-result", id, ok, value|error}`。
-- 宿主只接受 `event.source === iframe.contentWindow` 的消息；单页最多 8 个并发请求、每次调用 30s 超时、参数 ≤64 KiB；组件卸载后丢弃迟到响应。
+- 宿主只接受 `event.source === iframe.contentWindow` 的消息；单页最多 8 个并发请求、每次调用 30s 超时、参数 ≤64 KiB（`appearance.background.set-custom` 例外，上限 2 MiB）；组件卸载后丢弃迟到响应。
 - 限流：页面桥调用 30 次／10s 滑动窗口，`notify` 单独 10 次／10s；超限统一回 `plugin.pages.error.bridge`。
 - 声明式页面没有 `window.gonavi`：它只能通过 `button.command` 调用插件自己的命令。
 

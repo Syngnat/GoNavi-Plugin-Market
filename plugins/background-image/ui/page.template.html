@@ -1,0 +1,73 @@
+<section class="bg-section" id="root" aria-busy="false">
+  <div class="bg-row between">
+    <label class="bg-row" for="enabled" style="gap:8px">
+      <span class="bg-switch">
+        <input id="enabled" type="checkbox" aria-describedby="enabled-hint">
+        <span aria-hidden="true"></span>
+      </span>
+      <span id="enabled-label"></span>
+    </label>
+  </div>
+  <p class="bg-hint" id="enabled-hint"></p>
+
+  <div>
+    <button class="bg-btn small" id="gallery-toggle" type="button" aria-expanded="false" aria-controls="gallery"></button>
+  </div>
+
+  <div class="bg-gallery" id="gallery" hidden>
+    <div class="bg-gallery-head">
+      <span class="bg-gallery-title" id="gallery-title"></span>
+      <button class="bg-btn small" id="gallery-refresh" type="button"></button>
+    </div>
+    <p class="bg-hint" id="gallery-description"></p>
+    <div class="bg-alert" id="gallery-banner" hidden></div>
+    <div class="bg-hint" id="gallery-loading" hidden></div>
+    <p class="bg-hint" id="gallery-empty" hidden></p>
+    <div class="bg-gallery-grid" id="gallery-grid" role="list"></div>
+    <p class="bg-hint" id="gallery-credit"></p>
+  </div>
+
+  <p class="bg-hint" id="description"></p>
+
+  <div class="bg-position" id="position" hidden>
+    <div class="bg-position-preview" id="preview" role="img">
+      <img id="preview-image" alt="" draggable="false">
+    </div>
+    <span class="bg-name" id="image-name"></span>
+    <p class="bg-hint" id="position-hint"></p>
+    <div class="bg-axis">
+      <label for="pos-x" id="pos-x-label"></label>
+      <input id="pos-x" type="range" min="-100" max="100" step="0.1">
+      <output id="pos-x-out" for="pos-x"></output>
+    </div>
+    <div class="bg-axis">
+      <label for="pos-y" id="pos-y-label"></label>
+      <input id="pos-y" type="range" min="-100" max="100" step="0.1">
+      <output id="pos-y-out" for="pos-y"></output>
+    </div>
+    <div>
+      <button class="bg-btn small" id="position-center" type="button"></button>
+    </div>
+  </div>
+
+  <p class="bg-hint" id="empty" hidden></p>
+
+  <div class="bg-actions">
+    <button class="bg-btn" id="upload" type="button"></button>
+    <button class="bg-btn danger" id="remove" type="button" hidden></button>
+    <button class="bg-btn" id="reset" type="button"></button>
+  </div>
+  <input id="file" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" hidden>
+
+  <div class="bg-intensity">
+    <label for="opacity" id="opacity-label"></label>
+    <input id="opacity" type="range" min="5" max="30" step="1">
+    <output id="opacity-out" for="opacity"></output>
+  </div>
+
+  <div class="bg-alert error" id="error" role="alert" hidden></div>
+</section>
+
+<style>/*__STYLES__*/</style>
+<script>/*__LOCALES__*/</script>
+<script>/*__APP__*/</script>
