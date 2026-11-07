@@ -56,6 +56,17 @@ type artifactContributions struct {
 	Pages             []artifactPage             `json:"pages,omitempty"`
 	Navigation        []artifactNavigation       `json:"navigation,omitempty"`
 	ConnectionActions []artifactConnectionAction `json:"connectionActions,omitempty"`
+	SettingsSections  []artifactSettingsSection  `json:"settingsSections,omitempty"`
+}
+
+// artifactSettingsSection fills a host-owned settings slot with a declared page.
+type artifactSettingsSection struct {
+	ID          string `json:"id"`
+	Slot        string `json:"slot"`
+	Page        string `json:"page"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	Order       int    `json:"order,omitempty"`
 }
 
 type artifactConnectionAction struct {
