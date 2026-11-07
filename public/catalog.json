@@ -159,6 +159,75 @@
         "platform": "all",
         "version": "1.2.2"
       }
+    },
+    {
+      "id": "com.gonavi.background-image",
+      "name": "背景图片",
+      "description": "在设置中心「主题与配色 → 背景图片」原位管理工作台背景：上传自定义图片、启用开关、透明度与位置调整，并浏览、下载和管理内置图库。绘制与存储由宿主完成，插件未安装时保留入口并提示安装。",
+      "author": "GoNavi Project",
+      "publisherId": "gonavi",
+      "official": true,
+      "version": "1.0.0",
+      "category": "panel",
+      "minHostVersion": "1.2.3",
+      "platforms": [
+        "windows",
+        "macos",
+        "linux"
+      ],
+      "updatedAt": "2026-11-07T01:36:01Z",
+      "icon": "image",
+      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@background-image-v1.0.0",
+      "repoUrl": "https://github.com/Syngnat/GoNavi-Plugin-Market",
+      "contentDigest": "354b10470d2f096260082a14604f38ce9f16e59d6ce474f493d4d44d60b3a352",
+      "license": "Apache-2.0",
+      "artifact": {
+        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/background-image-v1.0.0/gonavi-plugin-background-image-1.0.0.zip",
+        "sha256": "17da0336d682e40534bae01eb064bcb5ff470b7cafb0d46abfc93a3e4a471e09",
+        "sizeBytes": 22957,
+        "platform": "all",
+        "version": "1.0.0"
+      },
+      "sourceId": "plugin-market-site",
+      "features": [
+        "设置中心原位置、原入口接管背景图片设置，随插件安装即时生效。",
+        "上传/更换自定义背景，支持 PNG/JPEG/WebP，自动压缩到 1920px。",
+        "启用开关、透明度（5%–30%）与拖动或滑杆定位，一键居中。",
+        "内置图库浏览、下载、切换、删除，展示作者与许可信息。",
+        "插件停用或卸载时保留入口并提示安装，已设置的背景继续由宿主绘制。"
+      ],
+      "permissions": [
+        {
+          "name": "提供设置页",
+          "key": "ui.pages",
+          "scope": "设置中心",
+          "granted": true
+        },
+        {
+          "name": "自定义页面界面",
+          "key": "ui.html-panel",
+          "scope": "沙箱页面",
+          "granted": true
+        },
+        {
+          "name": "读取背景状态",
+          "key": "host.appearance.read",
+          "scope": "背景图片",
+          "granted": true
+        },
+        {
+          "name": "修改背景与图库",
+          "key": "host.appearance.write",
+          "scope": "背景图片",
+          "granted": true
+        },
+        {
+          "name": "打开外部链接",
+          "key": "system.open-external",
+          "scope": "图库许可协议",
+          "granted": true
+        }
+      ]
     }
   ]
 }
