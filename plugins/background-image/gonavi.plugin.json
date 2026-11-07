@@ -7,6 +7,7 @@
   "description": "在设置中心「主题与配色 → 背景图片」中上传自定义背景、调节透明度与位置，并浏览、下载和管理内置图库。",
   "author": "GoNavi",
   "license": "Apache-2.0",
+  "minHostVersion": "1.2.3",
   "permissions": [
     "ui.pages",
     "ui.html-panel",

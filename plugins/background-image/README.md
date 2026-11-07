@@ -11,6 +11,8 @@
 
 从插件市场安装，或把本目录（构建后的 `plugin-dist/background-image`）作为本地包安装。
 
+最低宿主版本 `1.2.3`：`contributes.settingsSections` 与 `appearance.*` 能力从该版本开始提供。
+
 ## 构建
 
 ```bash
