@@ -513,7 +513,7 @@ export function PluginRatingSection({
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
                       <span className="font-medium break-all">
-                        {isMine ? '你' : `用户 ${rating.userId}`}
+                        {isMine ? '你' : rating.userName || `用户 ${rating.userId}`}
                       </span>
                       {!editing && (
                         <span className="text-copper text-xs tracking-wide" aria-label={`${rating.stars} 星`}>
@@ -625,7 +625,7 @@ export function PluginRatingSection({
                           <div key={reply.id}>
                             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                               <span className="font-medium text-muted">
-                                {account?.id === reply.userId ? '你' : `用户 ${reply.userId}`}
+                                {account?.id === reply.userId ? '你' : reply.userName || `用户 ${reply.userId}`}
                               </span>
                               <span className="text-muted">{relativeTime(reply.updatedAt)}</span>
                             </div>

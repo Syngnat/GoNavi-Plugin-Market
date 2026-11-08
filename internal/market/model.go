@@ -58,6 +58,7 @@ type CatalogQuery struct {
 type Rating struct {
 	ID        int64     `json:"id"`
 	UserID    string    `json:"userId"`
+	UserName  string    `json:"userName,omitempty"`
 	PluginID  string    `json:"pluginId"`
 	ParentID  *int64    `json:"parentId,omitempty"`
 	Stars     int       `json:"stars"`

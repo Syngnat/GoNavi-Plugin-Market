@@ -69,6 +69,7 @@ export interface PluginReview {
 export interface PluginRating {
   id: number;
   userId: string;
+  userName?: string;
   pluginId: string;
   parentId?: number;
   stars: number;

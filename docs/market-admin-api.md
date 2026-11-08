@@ -98,7 +98,7 @@ Approval/rejection requires pending_review; yank requires published. Repeated or
 
 ## Ratings and reports
 
-- GET /plugins/{id}/ratings lists visible top-level reviews. Each review carries an `id`; its optional `replies` array contains one-level replies. Replies have `parentId` and `stars:0` and never contribute to the aggregate.
+- GET /plugins/{id}/ratings lists visible top-level reviews. Each review carries an `id` and a display `userName` (the account's GitHub login; empty for accounts without one); its optional `replies` array contains one-level replies. Replies have `parentId` and `stars:0` and never contribute to the aggregate.
 - POST /plugins/{id}/ratings creates a review with {"stars":1..5,"body":"text","version":"1.0.0"}. Omit version to use the newest published version. Body is limited to 4,000 UTF-8 bytes. One account may create multiple reviews. The service derives `userId` from the authenticated session (website cookie or operator bearer token) and forbids author self-rating.
 - PUT /plugins/{id}/ratings/{ratingId} edits the caller's top-level review; DELETE /plugins/{id}/ratings/{ratingId} deletes it. The older plugin-scoped PUT/DELETE /plugins/{id}/rating routes remain for compatibility.
 - POST /plugins/{id}/ratings/{ratingId}/replies accepts {"body":"..."} and creates a reply. DELETE /plugins/{id}/ratings/{ratingId}/replies/{replyId} deletes the caller's own reply.

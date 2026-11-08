@@ -200,19 +200,25 @@ func TestHTTPRatingsCreateReplyEditDeleteAndModeration(t *testing.T) {
 	if first.ID == 0 || second.ID == first.ID {
 		t.Fatalf("multiple reviews were not created: %+v %+v", first, second)
 	}
+	if first.UserName != "reader" || second.UserName != "reader" {
+		t.Fatalf("review user names=%q/%q", first.UserName, second.UserName)
+	}
 	detail := decodeResponse[MarketPlugin](t, f.request("GET", "/plugins/acme.example", "", nil))
 	if detail.RatingCount != 2 || detail.RatingAverage != 3.5 {
 		t.Fatalf("aggregate=%+v", detail)
 	}
 
 	reply := decodeResponse[Rating](t, f.request("POST", ratingPath+"/"+strconv.FormatInt(first.ID, 10)+"/replies", "user", strings.NewReader(`{"body":"thanks"}`)))
-	if reply.ParentID == nil || *reply.ParentID != first.ID || reply.Stars != 0 {
+	if reply.ParentID == nil || *reply.ParentID != first.ID || reply.Stars != 0 || reply.UserName != "reader" {
 		t.Fatalf("reply=%+v", reply)
 	}
 	ratings := decodeResponse[[]Rating](t, f.request("GET", ratingPath, "", nil))
 	foundReply := false
 	for _, rating := range ratings {
 		if rating.ID == first.ID && len(rating.Replies) == 1 && rating.Replies[0].Body == "thanks" {
+			if rating.UserName != "reader" || rating.Replies[0].UserName != "reader" {
+				t.Fatalf("review user names=%q/%q", rating.UserName, rating.Replies[0].UserName)
+			}
 			foundReply = true
 		}
 	}

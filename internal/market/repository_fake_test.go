@@ -288,6 +288,7 @@ func (m *memoryRepo) CreateRating(ctx context.Context, a Account, r Rating) (Rat
 	m.nextRatingID++
 	r.ID = m.nextRatingID
 	r.UserID = a.ID
+	r.UserName = a.Login
 	r.ParentID = nil
 	r.CreatedAt = time.Now().UTC()
 	r.UpdatedAt = r.CreatedAt
@@ -321,6 +322,7 @@ func (m *memoryRepo) UpdateRating(ctx context.Context, a Account, ratingID int64
 			}
 		}
 	}
+	current.UserName = a.Login
 	current.Stars = r.Stars
 	current.Body = r.Body
 	current.Version = r.Version
@@ -376,7 +378,7 @@ func (m *memoryRepo) AddReply(ctx context.Context, a Account, pluginID string, p
 	m.nextRatingID++
 	parentCopy := parentID
 	now := time.Now().UTC()
-	r := Rating{ID: m.nextRatingID, UserID: a.ID, PluginID: pluginID, ParentID: &parentCopy,
+	r := Rating{ID: m.nextRatingID, UserID: a.ID, UserName: a.Login, PluginID: pluginID, ParentID: &parentCopy,
 		Stars: 0, Body: body, CreatedAt: now, UpdatedAt: now}
 	m.ratings[r.ID] = r
 	if m.moderated[a.ID+"/"+pluginID] {

@@ -8,12 +8,12 @@ import (
 	"github.com/lib/pq"
 )
 
-const ratingColumns = `id,user_id,plugin_id,parent_id,stars,body,version,created_at,updated_at`
+const ratingColumns = `r.id,r.user_id,COALESCE(u.login,''),r.plugin_id,r.parent_id,r.stars,r.body,r.version,r.created_at,r.updated_at`
 
 func scanRating(row scanner) (Rating, error) {
 	var r Rating
 	var parent sql.NullInt64
-	err := row.Scan(&r.ID, &r.UserID, &r.PluginID, &parent, &r.Stars, &r.Body, &r.Version, &r.CreatedAt, &r.UpdatedAt)
+	err := row.Scan(&r.ID, &r.UserID, &r.UserName, &r.PluginID, &parent, &r.Stars, &r.Body, &r.Version, &r.CreatedAt, &r.UpdatedAt)
 	if parent.Valid {
 		id := parent.Int64
 		r.ParentID = &id
@@ -26,9 +26,10 @@ func (p *Postgres) Ratings(ctx context.Context, id string) ([]Rating, error) {
 	if _, err := p.Plugin(ctx, id); err != nil {
 		return nil, err
 	}
-	rows, err := p.db.QueryContext(ctx, `SELECT `+ratingColumns+` FROM market_ratings
- WHERE plugin_id=$1 AND parent_id IS NULL AND NOT hidden AND NOT deleted
- ORDER BY updated_at DESC,id DESC LIMIT 100`, id)
+	rows, err := p.db.QueryContext(ctx, `SELECT `+ratingColumns+` FROM market_ratings r
+ LEFT JOIN market_users u ON u.id=r.user_id
+ WHERE r.plugin_id=$1 AND r.parent_id IS NULL AND NOT r.hidden AND NOT r.deleted
+ ORDER BY r.updated_at DESC,r.id DESC LIMIT 100`, id)
 	if err != nil {
 		return nil, repositoryError(err)
 	}
@@ -49,9 +50,10 @@ func (p *Postgres) Ratings(ctx context.Context, id string) ([]Rating, error) {
 	if len(ids) == 0 {
 		return result, nil
 	}
-	replies, err := p.db.QueryContext(ctx, `SELECT `+ratingColumns+` FROM market_ratings
- WHERE plugin_id=$1 AND parent_id = ANY($2) AND NOT hidden AND NOT deleted
- ORDER BY created_at,id`, id, pq.Array(ids))
+	replies, err := p.db.QueryContext(ctx, `SELECT `+ratingColumns+` FROM market_ratings r
+ LEFT JOIN market_users u ON u.id=r.user_id
+ WHERE r.plugin_id=$1 AND r.parent_id = ANY($2) AND NOT r.hidden AND NOT r.deleted
+ ORDER BY r.created_at,r.id`, id, pq.Array(ids))
 	if err != nil {
 		return nil, repositoryError(err)
 	}
@@ -109,6 +111,7 @@ func (p *Postgres) CreateRating(ctx context.Context, a Account, r Rating) (Ratin
 		return Rating{}, err
 	}
 	r.UserID = a.ID
+	r.UserName = a.Login
 	r.ParentID = nil
 	r.Version = version
 	err = tx.QueryRowContext(ctx, `INSERT INTO market_ratings(user_id,plugin_id,stars,body,version,hidden)
@@ -163,6 +166,7 @@ func (p *Postgres) UpdateRating(ctx context.Context, a Account, ratingID int64, 
 	}
 	r.ID = ratingID
 	r.UserID = a.ID
+	r.UserName = a.Login
 	r.ParentID = nil
 	r.Version = version
 	if err = tx.QueryRowContext(ctx, `UPDATE market_ratings SET stars=$1,body=$2,version=$3,updated_at=now()
@@ -255,7 +259,7 @@ func (p *Postgres) AddReply(ctx context.Context, a Account, pluginID string, par
 		return Rating{}, ErrNotFound
 	}
 	parent := parentID
-	r := Rating{UserID: a.ID, PluginID: pluginID, ParentID: &parent, Stars: 0, Body: body}
+	r := Rating{UserID: a.ID, UserName: a.Login, PluginID: pluginID, ParentID: &parent, Stars: 0, Body: body}
 	if err = tx.QueryRowContext(ctx, `INSERT INTO market_ratings(user_id,plugin_id,parent_id,stars,body,version,hidden)
  SELECT $1,$2,$3,0,$4,'',EXISTS(SELECT 1 FROM market_ratings
   WHERE user_id=$1 AND plugin_id=$2 AND hidden)
