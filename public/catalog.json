@@ -9,7 +9,7 @@
       "author": "GoNavi Project",
       "publisherId": "gonavi",
       "official": true,
-      "version": "1.0.4",
+      "version": "1.0.5",
       "category": "运维",
       "minHostVersion": "1.2.1",
       "platforms": [
@@ -17,17 +17,17 @@
         "macos",
         "linux"
       ],
-      "updatedAt": "2026-11-09T11:28:50Z",
+      "updatedAt": "2026-11-09T11:44:27Z",
       "icon": "dns",
-      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@nginx-inspector-v1.0.4",
+      "installSpec": "github:Syngnat/GoNavi-Plugin-Market@nginx-inspector-v1.0.5",
       "repoUrl": "https://github.com/Syngnat/GoNavi-Plugin-Market",
       "license": "Apache-2.0",
       "artifact": {
-        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/nginx-inspector-v1.0.4/gonavi-plugin-nginx-inspector-1.0.4.zip",
-        "sha256": "0b7679f71905c60651818dc88dd7ec6b307d95f9dfc45f64839f5e038ed66874",
-        "sizeBytes": 11302669,
+        "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/nginx-inspector-v1.0.5/gonavi-plugin-nginx-inspector-1.0.5.zip",
+        "sha256": "c90022435ed0d8e5d5926522f243739e34d142507895507d9938d193d031ef9d",
+        "sizeBytes": 11304958,
         "platform": "all",
-        "version": "1.0.4"
+        "version": "1.0.5"
       },
       "sourceId": "plugin-market-site",
       "features": [
