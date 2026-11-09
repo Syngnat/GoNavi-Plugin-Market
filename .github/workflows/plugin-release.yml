@@ -47,7 +47,9 @@ jobs:
             -output plugin-dist/nginx-inspector \
             -zip "plugin-dist/gonavi-plugin-nginx-inspector-${version}.zip"
           sha256sum plugin-dist/*.zip | tee plugin-dist/SHA256SUMS.txt
-          cp "plugin-dist/gonavi-plugin-nginx-inspector-${version}.zip" /tmp/nginx-inspector.zip
+          # Keep the published asset name: the catalog derives its download URL
+          # from it, and gh release create uses the local basename.
+          cp "plugin-dist/gonavi-plugin-nginx-inspector-${version}.zip" "/tmp/gonavi-plugin-nginx-inspector-${version}.zip"
           cp plugin-dist/SHA256SUMS.txt /tmp/SHA256SUMS.txt
 
       - name: Refresh market catalog
@@ -65,7 +67,7 @@ jobs:
           fi
           node scripts/update-plugin-catalog.mjs \
             --manifest plugins/nginx-inspector/gonavi.plugin.json \
-            --zip /tmp/nginx-inspector.zip
+            --zip "/tmp/gonavi-plugin-nginx-inspector-${version}.zip"
           if git diff --quiet -- public/catalog.json; then
             echo "catalog already current"
             exit 0
@@ -86,7 +88,7 @@ jobs:
             exit 1
           fi
           gh release create "$RELEASE_TAG" \
-            /tmp/nginx-inspector.zip \
+            "/tmp/gonavi-plugin-nginx-inspector-${version}.zip" \
             /tmp/SHA256SUMS.txt \
             --title "Nginx Inspector ${version}" \
             --notes-file "$notes"
