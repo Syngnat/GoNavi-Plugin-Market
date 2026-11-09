@@ -17,15 +17,15 @@
         "macos",
         "linux"
       ],
-      "updatedAt": "2026-11-09T10:23:07Z",
+      "updatedAt": "2026-11-09T10:24:26Z",
       "icon": "dns",
       "installSpec": "github:Syngnat/GoNavi-Plugin-Market@nginx-inspector-v1.0.2",
       "repoUrl": "https://github.com/Syngnat/GoNavi-Plugin-Market",
       "license": "Apache-2.0",
       "artifact": {
         "url": "https://github.com/Syngnat/GoNavi-Plugin-Market/releases/download/nginx-inspector-v1.0.2/gonavi-plugin-nginx-inspector-1.0.2.zip",
-        "sha256": "44cc0fb48daa746d853c6c74aa541f2e1e0984425978893507f3105f45c7bc9d",
-        "sizeBytes": 11303725,
+        "sha256": "687dc1700ed5dadd1e21801c1dfaf4cce28037f5fc3a6c9fa71d801e5e67f090",
+        "sizeBytes": 11302265,
         "platform": "all",
         "version": "1.0.2"
       },
