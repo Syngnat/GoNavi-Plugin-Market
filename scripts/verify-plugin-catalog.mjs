@@ -46,6 +46,21 @@ for (const item of catalog.items || []) {
   if (item.artifact && item.artifact.version !== item.version) {
     failures.push(`${item.id}: artifact.version ${item.artifact.version} != ${item.version}`);
   }
+  if (item.artifact) {
+    const url = String(item.artifact.url || '');
+    if (!url.includes(`/releases/download/${tag}/`)) {
+      failures.push(`${item.id}: artifact.url 未指向 Release ${tag}: ${url}`);
+    }
+    if (!url.endsWith(`-${item.version}.zip`)) {
+      failures.push(`${item.id}: artifact.url 文件名未以 -${item.version}.zip 结尾（gh release 用本地 basename 上传，改名会导致 404）: ${url}`);
+    }
+    if (!/^[0-9a-f]{64}$/.test(String(item.artifact.sha256 || ''))) {
+      failures.push(`${item.id}: artifact.sha256 不是 64 位小写十六进制`);
+    }
+    if (!(Number(item.artifact.sizeBytes) > 0)) {
+      failures.push(`${item.id}: artifact.sizeBytes 不是正数`);
+    }
+  }
   if (manifest.window && !(manifest.permissions || []).includes('ui.html-panel')) {
     failures.push(`${item.id}: 声明了 window 但 manifest permissions 缺少 ui.html-panel`);
   }
