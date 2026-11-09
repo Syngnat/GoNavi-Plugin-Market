@@ -37,7 +37,15 @@ for (const item of catalog.items || []) {
   if (!candidates.length) continue;
   const [dir, manifest] = candidates[0];
   if (manifest.version !== item.version) {
-    failures.push(`${item.id}: catalog ${item.version} != plugins/${dir} ${manifest.version}`);
+    // The release commit bumps the manifest before the tag build can derive the
+    // archive sha256, so the catalog is still one version behind until the
+    // release workflow writes it back. Treat "manifest ahead" as pending, but
+    // never allow the catalog to advertise a version the source has moved past.
+    if (semver(manifest.version) && semver(item.version) && gte(manifest.version, item.version)) {
+      notes.push(`${item.id}: manifest ${manifest.version} 待发布，catalog 仍为 ${item.version}`);
+    } else {
+      failures.push(`${item.id}: catalog ${item.version} != plugins/${dir} ${manifest.version}`);
+    }
   }
   const tag = `${dir}-v${item.version}`;
   if (!String(item.installSpec || '').endsWith('@' + tag)) {
