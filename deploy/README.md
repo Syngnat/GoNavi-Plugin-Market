@@ -39,6 +39,9 @@ deploy/publish-official-plugin.sh --plugin mongo-shell --tag mongo-shell-v1.0.4 
 `/api/v1/plugins` 校验版本与清单一致。`--dry-run` 只下载与校验。改完 `public/catalog.json`
 后仍需发布站点（CI 或 `deploy/publish-site.sh`），两者缺一：目录新了而接口还旧。
 
+`nginx-inspector` 的 `nginx-inspector-v*` tag 流水线已在 GitHub Release 创建后自动执行
+这条导入并回读校验；已入库的版本会跳过，手工命令保留给补历史版本、其他插件或流水线失败后重跑。
+
 ## 推送即发布（CI）
 
 `.github/workflows/deploy.yml` 在 `main` 上**测试通过后发布整套**：先 `deploy/publish-server.sh`

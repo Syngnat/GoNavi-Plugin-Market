@@ -92,3 +92,60 @@ jobs:
             /tmp/SHA256SUMS.txt \
             --title "Nginx Inspector ${version}" \
             --notes-file "$notes"
+
+  # The GitHub release and public/catalog.json are not the market itself: the
+  # live /api/v1 reads PostgreSQL. The periodic sync only follows a repository's
+  # latest release, so this monorepo's official plugins must be imported one tag
+  # at a time. Keep that step in the same tag pipeline or a release looks shipped
+  # while "check for updates" still sees the previous version.
+  market:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: Configure ssh
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+
+      - name: Check whether the market already serves this version
+        id: market
+        run: |
+          set -eu
+          version="${RELEASE_TAG#nginx-inspector-v}"
+          present=$(curl -fsS "https://plugin.gonavi.org/api/v1/plugins/com.gonavi.nginx-inspector/versions" \
+            | python3 -c 'import json,sys; print(any(v.get("version") == sys.argv[1] for v in json.load(sys.stdin)))' "$version" \
+            || printf 'False')
+          echo "live=${present} target=${version}"
+          if [ "$present" = "True" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Import into official market
+        if: steps.market.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SSH_KEY: /home/runner/.ssh/deploy_key
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          deploy/publish-official-plugin.sh \
+            --plugin nginx-inspector \
+            --tag "$RELEASE_TAG" \
+            --host "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            --port "${DEPLOY_PORT}" \
+            --reviewer 92659908
