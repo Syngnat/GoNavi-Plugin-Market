@@ -71,18 +71,16 @@ html, body {
   font-size: 11px;
 }
 .conn-block { padding: 0 8px 14px; border-bottom: 1px solid var(--hairline); margin-bottom: 10px; }
-.conn-status { display: flex; align-items: center; gap: 2px; }
+.conn-picker { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .conn-actions { display: flex; gap: 6px; margin-top: 6px; }
-.conn-block select {
-  width: 100%;
-  margin-top: 6px;
-}
+.conn-block select { width: 100%; min-width: 0; }
+.conn-picker select { flex: 1 1 0; width: auto; }
 .conn-dot {
+  flex: 0 0 auto;
   display: inline-block;
   width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--ink-faint);
-  margin-right: 6px;
 }
 .conn-dot.ok { background: var(--ok); }
 .conn-dot.bad { background: var(--bad); }

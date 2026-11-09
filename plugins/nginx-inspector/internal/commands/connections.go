@@ -53,7 +53,7 @@ func (r *Runtime) saveConnection(ctx context.Context, args json.RawMessage) (any
 		Username:      strings.TrimSpace(input.Username),
 		AuthType:      input.AuthType,
 		Password:      input.Password,
-		KeyPath:       strings.TrimSpace(input.KeyPath),
+		KeyPath:       store.NormalizeKeyPath(input.KeyPath),
 		KeyPassphrase: input.KeyPassphrase,
 		Fingerprint:   strings.TrimSpace(input.Fingerprint),
 	})

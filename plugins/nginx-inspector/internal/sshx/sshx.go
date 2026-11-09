@@ -158,7 +158,7 @@ func authMethods(prof store.Profile) ([]ssh.AuthMethod, *plugin.Error) {
 	case store.AuthPassword:
 		return []ssh.AuthMethod{ssh.Password(prof.Password)}, nil
 	case store.AuthKey:
-		key, err := os.ReadFile(prof.KeyPath)
+		key, err := os.ReadFile(store.NormalizeKeyPath(prof.KeyPath))
 		if err != nil {
 			return nil, rpcerr.E(rpcerr.CodeSSHAuthFailed, "read private key: "+err.Error())
 		}

@@ -97,7 +97,24 @@ func (s *Store) load() (file, error) {
 	if err := json.Unmarshal(raw, &data); err != nil {
 		return file{}, fmt.Errorf("decode profiles: %w", err)
 	}
+	for i := range data.Profiles {
+		data.Profiles[i].KeyPath = NormalizeKeyPath(data.Profiles[i].KeyPath)
+	}
 	return data, nil
+}
+
+// NormalizeKeyPath removes whitespace and the quotes Windows Explorer adds
+// when a file is copied with "Copy as path". Keeping the quotes would make
+// os.ReadFile look for a file whose name starts and ends with a quote.
+func NormalizeKeyPath(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if len(trimmed) >= 2 {
+		first, last := trimmed[0], trimmed[len(trimmed)-1]
+		if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+			trimmed = strings.TrimSpace(trimmed[1 : len(trimmed)-1])
+		}
+	}
+	return trimmed
 }
 
 func (s *Store) persist(data file) error {
@@ -160,6 +177,7 @@ func (s *Store) Save(p Profile) (Profile, error) {
 	if err != nil {
 		return Profile{}, err
 	}
+	p.KeyPath = NormalizeKeyPath(p.KeyPath)
 	var previous *Profile
 	if p.ID != "" {
 		for i := range data.Profiles {

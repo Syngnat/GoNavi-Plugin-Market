@@ -11,7 +11,7 @@ GoNavi 插件:通过 SSH 对远程 nginx 做**只读诊断**——配置结构�
 
 | 模块 | 说明 |
 |---|---|
-| 连接管理 | SSH 配置(密码/私钥)保存在本机插件数据目录,界面永不回显密码(仅 `hasPassword`/`hasKeyPassphrase`),私钥路径可直接调用宿主原生文件选择器选取本机文件,也可手动输入;编辑时留空即保留原凭据;首次连接记录服务器指纹(TOFU),指纹变化即拒绝,保存时省略 `fingerprint` 保持记录、显式传入才重新钉住。保存与删除属于写命令 |
+| 连接管理 | SSH 配置(密码/私钥)保存在本机插件数据目录,界面永不回显密码(仅 `hasPassword`/`hasKeyPassphrase`),私钥路径可直接调用宿主原生文件选择器选取本机文件,也可手动输入,保存时会自动去掉首尾引号(Windows“复制为路径”会带引号);编辑时留空即保留原凭据;首次连接记录服务器指纹(TOFU),指纹变化即拒绝,保存时省略 `fingerprint` 保持记录、显式传入才重新钉住。保存与删除属于写命令 |
 | 概览 | `nginx -V` 解析:版本、二进制、prefix、主配置、日志路径、systemd/容器环境;结果在插件进程内缓存约 10 分钟,可显式刷新 |
 | 配置 | 主配置 + include 递归展开(环形检测、64 文件/8 层上限),server/upstream/location 摘要,按文件查看内容;文件数即 `files.length`,超限或超长时展示 `truncated` |
 | 校验 | 远程执行 `nginx -t`,逐条解析报错的 file:line |
@@ -30,8 +30,8 @@ GoNavi → 标题栏插件按钮 → 插件市场/本地安装:选择发行 ZIP,
 或使用 CLI(先关闭桌面端插件运行时):
 
 ```sh
-gonavi plugin --root <data-root>/plugins inspect gonavi-plugin-nginx-inspector-1.0.4.zip
-gonavi plugin --root <data-root>/plugins install --digest <sha256> --trust gonavi-plugin-nginx-inspector-1.0.4.zip
+gonavi plugin --root <data-root>/plugins inspect gonavi-plugin-nginx-inspector-1.0.5.zip
+gonavi plugin --root <data-root>/plugins install --digest <sha256> --trust gonavi-plugin-nginx-inspector-1.0.5.zip
 gonavi plugin --root <data-root>/plugins enable com.gonavi.nginx-inspector
 ```
 
@@ -58,7 +58,7 @@ SDK 以伪版本引用 `github.com/Syngnat/GoNavi/sdk/go`,无其他第三方依�
 
 ```sh
 go test ./plugins/nginx-inspector/...
-go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.4.zip
+go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.5.zip
 ```
 
 `buildtool` 交叉编译 5 个平台(windows/amd64、linux/amd64、linux/arm64、

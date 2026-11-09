@@ -173,3 +173,33 @@ func anyJSONContains(v any, needle string) bool {
 	data, _ := jsonMarshal(v)
 	return contains(string(data), needle)
 }
+
+func TestKeyPathQuotesNormalized(t *testing.T) {
+	s := newTestStore(t)
+	saved, err := s.Save(Profile{
+		Name: "quoted", Host: "h", Port: 22, Username: "u", AuthType: AuthKey,
+		KeyPath: `"C:\keys\id_ed25519"`,
+	})
+	if err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if saved.KeyPath != `C:\keys\id_ed25519` {
+		t.Fatalf("save kept quotes: %q", saved.KeyPath)
+	}
+
+	// Existing profiles written before the fix must work without re-saving.
+	legacy := newTestStore(t)
+	if err := legacy.persist(file{Profiles: []Profile{{
+		ID: "legacy", Name: "legacy", Host: "h", Port: 22, Username: "u",
+		AuthType: AuthKey, KeyPath: `'C:\keys\id_ed25519'`,
+	}}}); err != nil {
+		t.Fatalf("persist legacy: %v", err)
+	}
+	got, ok, err := legacy.Get("legacy")
+	if err != nil || !ok {
+		t.Fatalf("get legacy: %v %v", ok, err)
+	}
+	if got.KeyPath != `C:\keys\id_ed25519` {
+		t.Fatalf("load kept quotes: %q", got.KeyPath)
+	}
+}

@@ -434,6 +434,8 @@ const ERROR_TEXT = {
     RELOAD_BLOCKED: "nginx -t 未通过,已拒绝重载",
     RELOAD_CONFIRMATION_REQUIRED: "缺少确认标记",
     CERT_UNREADABLE: "证书文件不可读,无法解析",
+    bridge_request_failed: "请求未完成：请检查 SSH 连接与私钥路径（路径不要带引号），再试一次",
+    window_revoked: "插件窗口已失效，请关闭后重新打开",
   },
   "en-US": {
     INVALID_ARGS: "Invalid arguments",
@@ -453,6 +455,8 @@ const ERROR_TEXT = {
     RELOAD_BLOCKED: "nginx -t failed; reload refused",
     RELOAD_CONFIRMATION_REQUIRED: "Confirmation flag missing",
     CERT_UNREADABLE: "Certificate file is unreadable and could not be parsed",
+    bridge_request_failed: "Request failed: check the SSH connection and key path (no surrounding quotes), then retry",
+    window_revoked: "The plugin window is no longer valid; close and reopen it",
   },
 };
 
@@ -692,7 +696,7 @@ function renderConnSelect() {
   const select = $("#conn-select");
   select.setAttribute("aria-label", t("conn"));
   const options = state.connections.map(function (c) {
-    return el("option", { value: c.id }, c.name + " (" + c.host + ")");
+    return el("option", { value: c.id }, c.name);
   });
   select.replaceChildren(
     el("option", { value: "" }, "— " + t("addConn") + " —"),
@@ -733,12 +737,10 @@ function refreshConnMeta() {
     testButton.onclick = function () { testCurrentConnection(); };
   }
   if (!conn) {
-    $("#conn-label").textContent = t("noConn");
     dot.className = "conn-dot";
     meta.textContent = "";
     return;
   }
-  $("#conn-label").textContent = conn.name;
   meta.textContent = conn.username + "@" + conn.host + ":" + conn.port;
   if (conn.fingerprint) meta.textContent += "\n" + t("fingerprint") + ": " + conn.fingerprint;
   const cached = state.testCache.get(conn.id);
@@ -1509,6 +1511,18 @@ function confirmDelete(conn) {
   ]);
 }
 
+function cleanKeyPath(value) {
+  let path = String(value || "").trim();
+  if (path.length >= 2) {
+    const first = path[0];
+    const last = path[path.length - 1];
+    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      path = path.slice(1, -1).trim();
+    }
+  }
+  return path;
+}
+
 function parsePort(raw) {
   const text = String(raw == null ? "" : raw).trim();
   if (!/^[0-9]+$/.test(text)) return null;
@@ -1558,9 +1572,10 @@ function connForm(existing) {
     try {
       const path = await window.gonaviPlugin.pickFile({ title: t("keyFilePickTitle") });
       if (path) {
-        keyPathInput.value = path;
+        const cleaned = cleanKeyPath(path);
+        keyPathInput.value = cleaned;
         keyPathInput.focus();
-        keyPathInput.setSelectionRange(path.length, path.length);
+        keyPathInput.setSelectionRange(cleaned.length, cleaned.length);
       }
     } catch {
       formError.textContent = t("keyFilePickFailed");
@@ -1654,7 +1669,8 @@ function connForm(existing) {
       if (authSelect.value === "password") {
         if (passwordInput.value) payload.password = passwordInput.value;
       } else {
-        payload.keyPath = keyPathInput.value.trim();
+        payload.keyPath = cleanKeyPath(keyPathInput.value);
+        keyPathInput.value = payload.keyPath;
         if (keyPassInput.value) payload.keyPassphrase = keyPassInput.value;
       }
       saveButton.disabled = true;

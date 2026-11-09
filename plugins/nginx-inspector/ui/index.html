@@ -16,11 +16,10 @@
     <aside class="rail" aria-label="Nginx Inspector">
       <div class="brand"><span class="brand-name">Nginx Inspector</span><small id="brand-sub"></small></div>
       <div class="conn-block">
-        <div class="conn-status">
+        <div class="conn-picker">
           <span id="conn-dot" class="conn-dot" aria-hidden="true"></span>
-          <span id="conn-label"></span>
+          <select id="conn-select" aria-label="连接"></select>
         </div>
-        <select id="conn-select" aria-label="连接"></select>
         <div class="conn-actions">
           <button type="button" id="conn-test" class="mini">测试</button>
         </div>
