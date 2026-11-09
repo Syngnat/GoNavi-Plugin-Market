@@ -151,6 +151,24 @@ func fileCommands(files map[string][]byte) func(string) (string, string, int) {
 			return string(data), "", 0
 		case strings.HasPrefix(command, "head -c 2 "):
 			return "31 0a", "", 0
+		case strings.HasPrefix(command, "head -c "):
+			fields := strings.Fields(command)
+			if len(fields) != 4 {
+				return "", "unsupported head: " + command, 127
+			}
+			count, err := strconv.Atoi(fields[2])
+			if err != nil || count < 0 {
+				return "", "bad head count", 1
+			}
+			path := unquoteShellPath(fields[3])
+			data, ok := files[path]
+			if !ok {
+				return missing(path)
+			}
+			if count > len(data) {
+				count = len(data)
+			}
+			return string(data[:count]), "", 0
 		case strings.HasPrefix(command, "tail -c "):
 			fields := strings.Fields(command)
 			if len(fields) < 4 {
@@ -204,7 +222,7 @@ func newFakeRuntime(t *testing.T, host string, port int) (*Runtime, string) {
 	if err != nil {
 		t.Fatalf("save profile: %v", err)
 	}
-	runtime := &Runtime{store: st, pool: sshx.NewPool(st), info: map[string]*HostInfo{}}
+	runtime := &Runtime{store: st, pool: sshx.NewPool(st), info: map[string]*HostInfo{}, trees: map[string]cachedTree{}}
 	runtime.info[profile.ID] = &HostInfo{
 		Found: true, Binary: "/usr/sbin/nginx", Prefix: "/etc/nginx",
 		ConfPath:     "/etc/nginx/nginx.conf",

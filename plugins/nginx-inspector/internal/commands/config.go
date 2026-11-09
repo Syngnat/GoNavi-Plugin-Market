@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -111,6 +112,51 @@ type loadedTree struct {
 	dropped int
 }
 
+// treeCacheTTL bounds how stale a config.tree response may be when a page does
+// not ask for refresh. Two minutes keeps navigation snappy while still picking
+// up edits made outside the plugin.
+const treeCacheTTL = 2 * time.Minute
+
+type cachedTree struct {
+	loaded *loadedTree
+	at     time.Time
+}
+
+// invalidateTree drops the cached merged config for one profile. It is called
+// whenever the profile, host discovery or effective configuration may change.
+func (r *Runtime) invalidateTree(profileID string) {
+	r.treeMu.Lock()
+	delete(r.trees, profileID)
+	r.treeMu.Unlock()
+}
+
+// loadTreeCached serves config.tree, certs.list, logs and upstreams from one
+// shared parse per profile. refresh bypasses and replaces the cached copy, so
+// the UI can force a re-read without waiting for the TTL.
+func (r *Runtime) loadTreeCached(ctx context.Context, profileID string, refresh bool) (*loadedTree, *plugin.Error) {
+	if refresh {
+		r.invalidateTree(profileID)
+	} else {
+		r.treeMu.Lock()
+		entry, ok := r.trees[profileID]
+		r.treeMu.Unlock()
+		if ok && time.Since(entry.at) < treeCacheTTL {
+			return entry.loaded, nil
+		}
+	}
+	loaded, perr := r.loadTree(ctx, profileID)
+	if perr != nil {
+		return nil, perr
+	}
+	r.treeMu.Lock()
+	if r.trees == nil {
+		r.trees = map[string]cachedTree{}
+	}
+	r.trees[profileID] = cachedTree{loaded: loaded, at: time.Now()}
+	r.treeMu.Unlock()
+	return loaded, nil
+}
+
 func (r *Runtime) loadTree(ctx context.Context, profileID string) (*loadedTree, *plugin.Error) {
 	info, perr := r.ensureInfo(ctx, profileID)
 	if perr != nil {
@@ -120,13 +166,44 @@ func (r *Runtime) loadTree(ctx context.Context, profileID string) (*loadedTree, 
 	if perr != nil {
 		return nil, perr
 	}
+	// nginx -T prints every file it parsed in one round trip. That turns a cold
+	// 28-file tree from dozens of SSH commands into one; any failure (old nginx,
+	// permission error, truncated dump) falls through to the per-file reader.
+	if loaded, ok := r.loadTreeFromDump(ctx, profile, info); ok {
+		return loaded, nil
+	}
+	return buildTree(ctx, r.pool, profile, info)
+}
+
+// loadTreeFromDump parses nginx -T output into the same loadedTree the per-file
+// path builds. ok is false when the dump is unusable for any reason.
+func (r *Runtime) loadTreeFromDump(ctx context.Context, profile store.Profile, info *HostInfo) (*loadedTree, bool) {
+	result, perr := r.pool.Run(ctx, profile, info.quotedBinary()+" -T", 20*time.Second, sshx.MaxOutputBytes)
+	if perr != nil || result.ExitCode != 0 || result.Truncated {
+		return nil, false
+	}
+	files, ok := parseConfigDump(result.Stdout)
+	if !ok {
+		return nil, false
+	}
+	loaded, perr := buildTree(ctx, &dumpReader{files: files}, profile, info)
+	if perr != nil {
+		return nil, false
+	}
+	return loaded, true
+}
+
+// buildTree reads the main file through reader, expands includes and fills in
+// the parsed summary. reader is the SSH pool in production and a local dump in
+// the nginx -T fast path.
+func buildTree(ctx context.Context, reader configReader, profile store.Profile, info *HostInfo) (*loadedTree, *plugin.Error) {
 	tree := &ConfigTree{
 		MainPath: info.ConfPath, Prefix: info.Prefix, Version: info.Version,
 		Files: []ConfigFileInfo{}, Servers: []ServerInfo{}, Upstreams: []UpstreamInfo{},
 	}
 	loaded := &loadedTree{tree: tree, budget: maxTreeNodes, stack: map[string]bool{info.ConfPath: true}}
 
-	main, perr := r.pool.ReadFile(ctx, profile, info.ConfPath, maxConfigFileBytes)
+	main, perr := reader.ReadFile(ctx, profile, info.ConfPath, maxConfigFileBytes)
 	if perr != nil {
 		return nil, perr
 	}
@@ -140,7 +217,7 @@ func (r *Runtime) loadTree(ctx context.Context, profileID string) (*loadedTree, 
 	}
 	tree.Files = append(tree.Files, mainInfo)
 
-	merged, perr := expandIncludes(ctx, r.pool, profile, info, directives, 0, loaded)
+	merged, perr := expandIncludes(ctx, reader, profile, info, directives, 0, loaded)
 	if perr != nil {
 		return nil, perr
 	}
@@ -246,6 +323,13 @@ type configReader interface {
 	Output(ctx context.Context, prof store.Profile, command string, timeout time.Duration) (string, *plugin.Error)
 }
 
+// includeMatcher is implemented by readers that already know every file nginx
+// parsed (the -T dump), so include globs resolve locally instead of spawning a
+// shell for each pattern. handled=false falls back to Output and the shell.
+type includeMatcher interface {
+	MatchInclude(pattern string) ([]string, bool)
+}
+
 // expandIncludes returns a merged copy where every include directive is
 // replaced by the included file's directives; block children are expanded in
 // place. Only the active recursion stack is de-duplicated, matching
@@ -343,6 +427,11 @@ func resolveInclude(ctx context.Context, reader configReader, profile store.Prof
 	if len(resolved) > 4096 || strings.ContainsAny(resolved, "\x00\n\r") {
 		return nil, rpcerr.E(rpcerr.CodeInvalidArgs, "include path is empty or too long")
 	}
+	if matcher, ok := reader.(includeMatcher); ok {
+		if targets, handled := matcher.MatchInclude(resolved); handled {
+			return targets, nil
+		}
+	}
 	if !strings.ContainsAny(resolved, "*?[") {
 		return []string{resolved}, nil
 	}
@@ -369,6 +458,84 @@ func resolveInclude(ctx context.Context, reader configReader, profile store.Prof
 		}
 	}
 	return targets, nil
+}
+
+const configDumpMarker = "# configuration file "
+
+// parseConfigDump splits nginx -T output into one entry per parsed file. The
+// marker is emitted by nginx as "# configuration file <absolute path>:" and the
+// file body follows until the next marker. ok is false when no section was
+// found, which sends the caller back to the per-file reader.
+func parseConfigDump(dump string) (map[string]string, bool) {
+	files := map[string]string{}
+	current := ""
+	var body strings.Builder
+	flush := func() {
+		if current != "" {
+			files[current] = body.String()
+		}
+		body.Reset()
+	}
+	for _, line := range strings.SplitAfter(dump, "\n") {
+		trimmed := strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
+		if strings.HasPrefix(trimmed, configDumpMarker) && strings.HasSuffix(trimmed, ":") {
+			flush()
+			current = ""
+			filePath := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, configDumpMarker), ":"))
+			if strings.HasPrefix(filePath, "/") && !strings.ContainsAny(filePath, "\x00\n\r") {
+				current = filePath
+			}
+			continue
+		}
+		if current != "" {
+			body.WriteString(line)
+		}
+	}
+	flush()
+	return files, len(files) > 0
+}
+
+// dumpReader serves the files nginx -T reported. Include globs are matched
+// locally against those exact paths, so the fast path needs no remote shell.
+type dumpReader struct {
+	files map[string]string
+}
+
+func (d *dumpReader) ReadFile(ctx context.Context, prof store.Profile, filePath string, maxBytes int64) (sshx.ReadResult, *plugin.Error) {
+	content, ok := d.files[filePath]
+	if !ok {
+		return sshx.ReadResult{}, rpcerr.E(rpcerr.CodeFileUnreadable, "config dump does not contain "+filePath)
+	}
+	result := sshx.ReadResult{Path: filePath, Content: content, SizeBytes: int64(len(content))}
+	if maxBytes > 0 && int64(len(result.Content)) > maxBytes {
+		result.Content = result.Content[:maxBytes]
+		result.Truncated = true
+	}
+	return result, nil
+}
+
+func (d *dumpReader) Output(ctx context.Context, prof store.Profile, command string, timeout time.Duration) (string, *plugin.Error) {
+	return "", rpcerr.E(rpcerr.CodeExecFailed, "config dump reader cannot run remote shell commands")
+}
+
+// MatchInclude resolves one cleaned absolute include pattern against the dump
+// paths. A literal pattern is always returned so a missing file still surfaces
+// as an unreadable include instead of disappearing.
+func (d *dumpReader) MatchInclude(pattern string) ([]string, bool) {
+	if !strings.ContainsAny(pattern, "*?[") {
+		return []string{pattern}, true
+	}
+	matches := make([]string, 0, 8)
+	for filePath := range d.files {
+		if ok, err := path.Match(pattern, filePath); err == nil && ok {
+			matches = append(matches, filePath)
+		}
+	}
+	sort.Strings(matches)
+	if len(matches) > maxIncludeFiles+1 {
+		matches = matches[:maxIncludeFiles+1]
+	}
+	return matches, true
 }
 
 // globIncludeCommand builds the remote POSIX sh command that expands one
@@ -439,11 +606,12 @@ func dedupe(values []string) []string {
 func (r *Runtime) configTree(ctx context.Context, args json.RawMessage) (any, error) {
 	input, perr := decodeArgs[struct {
 		ConnectionID string `json:"connectionId"`
+		Refresh      bool   `json:"refresh,omitempty"`
 	}](args)
 	if perr != nil {
 		return nil, perr
 	}
-	loaded, perr := r.loadTree(ctx, input.ConnectionID)
+	loaded, perr := r.loadTreeCached(ctx, input.ConnectionID, input.Refresh)
 	if perr != nil {
 		return nil, perr
 	}
@@ -537,5 +705,9 @@ func (r *Runtime) configValidate(ctx context.Context, args json.RawMessage) (any
 	if perr != nil {
 		return nil, perr
 	}
-	return r.validateConfig(ctx, input.ConnectionID)
+	result, perr := r.validateConfig(ctx, input.ConnectionID)
+	if perr != nil {
+		return nil, perr
+	}
+	return result, nil
 }

@@ -75,6 +75,7 @@ func (e *HostKeyError) Error() string { return "server host key changed" }
 // Pool caches one SSH client per profile id.
 type Pool struct {
 	mu      sync.Mutex
+	dialMu  sync.Mutex // serializes dials so concurrent callers share one connection
 	clients map[string]*ssh.Client
 	mems    map[string]string // in-memory fingerprints when the store is unavailable
 	st      *store.Store
@@ -183,6 +184,14 @@ func authMethods(prof store.Profile) ([]ssh.AuthMethod, *plugin.Error) {
 
 // Client returns a live SSH client for the profile, dialing when needed.
 func (p *Pool) Client(ctx context.Context, prof store.Profile) (*ssh.Client, *plugin.Error) {
+	if c, ok := p.cached(prof.ID); ok {
+		return c, nil
+	}
+	// The config pages read several certificates in parallel. Without this
+	// gate every worker would dial its own connection on a cold pool, and a
+	// burst of SSH handshakes can be rejected by MaxStartups.
+	p.dialMu.Lock()
+	defer p.dialMu.Unlock()
 	if c, ok := p.cached(prof.ID); ok {
 		return c, nil
 	}
@@ -475,23 +484,23 @@ func (p *Pool) Output(ctx context.Context, prof store.Profile, command string, t
 	return result.Stdout, nil
 }
 
-// ReadFile reads a remote file through cat with a byte cap. The path must be
-// absolute and is single-quoted before it reaches the remote shell.
+// ReadFile reads a remote file with a byte cap. The path must be absolute and
+// is single-quoted before it reaches the remote shell. One head command does
+// the whole read: the old implementation ran wc first and cat second, doubling
+// SSH round trips for every config include and certificate. When the file is
+// longer than the cap, one extra wc supplies the exact size for the UI.
 func (p *Pool) ReadFile(ctx context.Context, prof store.Profile, path string, maxBytes int64) (ReadResult, *plugin.Error) {
 	if !strings.HasPrefix(path, "/") || len(path) > 4096 || strings.ContainsAny(path, "\x00\n\r") {
 		return ReadResult{}, rpcerr.E(rpcerr.CodeInvalidArgs, "remote path must be absolute")
 	}
 	quoted := ShellQuote(path)
-	sizeRun, perr := p.Run(ctx, prof, "wc -c < "+quoted, 10*time.Second, 4096)
-	if perr != nil {
-		return ReadResult{}, perr
+	command := "cat " + quoted
+	limit := int64(0)
+	if maxBytes > 0 {
+		limit = maxBytes + 1
+		command = "head -c " + strconv.FormatInt(limit, 10) + " " + quoted
 	}
-	if sizeRun.ExitCode != 0 {
-		return ReadResult{}, rpcerr.E(rpcerr.CodeFileUnreadable, "remote file is not readable: "+path,
-			map[string]string{"stderr": truncateText(strings.TrimSpace(sizeRun.Stderr), 256)})
-	}
-	size, _ := strconv.ParseInt(strings.TrimSpace(sizeRun.Stdout), 10, 64)
-	result, perr := p.Run(ctx, prof, "cat "+quoted, DefaultExecTimeout, maxBytes+1)
+	result, perr := p.Run(ctx, prof, command, DefaultExecTimeout, limit)
 	if perr != nil {
 		return ReadResult{}, perr
 	}
@@ -501,7 +510,17 @@ func (p *Pool) ReadFile(ctx context.Context, prof store.Profile, path string, ma
 	}
 	content := result.Stdout
 	truncated := result.Truncated || (maxBytes > 0 && int64(len(content)) > maxBytes)
-	if truncated && int64(len(content)) > maxBytes {
+	size := int64(len(content))
+	if truncated {
+		// head stops at the cap, so the returned bytes are not the file size.
+		// A single wc is only paid on the truncated path to keep cold reads fast.
+		if sizeRun, sizeErr := p.Run(ctx, prof, "wc -c < "+quoted, 10*time.Second, 4096); sizeErr == nil && sizeRun.ExitCode == 0 {
+			if exact, parseErr := strconv.ParseInt(strings.TrimSpace(sizeRun.Stdout), 10, 64); parseErr == nil {
+				size = exact
+			}
+		}
+	}
+	if maxBytes > 0 && int64(len(content)) > maxBytes {
 		content = content[:maxBytes]
 	}
 	return ReadResult{Path: path, Content: content, SizeBytes: size, Truncated: truncated}, nil

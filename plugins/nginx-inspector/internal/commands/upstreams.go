@@ -72,7 +72,7 @@ func (r *Runtime) upstreamsCheck(ctx context.Context, args json.RawMessage) (any
 	if perr != nil {
 		return nil, perr
 	}
-	loaded, perr := r.loadTree(ctx, input.ConnectionID)
+	loaded, perr := r.loadTreeCached(ctx, input.ConnectionID, false)
 	if perr != nil {
 		return nil, perr
 	}
@@ -249,7 +249,7 @@ func splitAddress(address string) (string, int, bool) {
 		// "host:weight" style mistakes are not addresses.
 		return "", 0, false
 	}
-	if host == "" {
+	if host == "" || port < 1 || port > 65535 {
 		return "", 0, false
 	}
 	return host, port, true

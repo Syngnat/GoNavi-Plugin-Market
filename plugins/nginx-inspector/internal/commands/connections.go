@@ -62,6 +62,7 @@ func (r *Runtime) saveConnection(ctx context.Context, args json.RawMessage) (any
 	}
 	r.pool.Invalidate(saved.ID)
 	r.invalidateInfo(saved.ID)
+	r.invalidateTree(saved.ID)
 	return map[string]any{"connection": maskedOne(saved)}, nil
 }
 
@@ -80,6 +81,7 @@ func (r *Runtime) deleteConnection(ctx context.Context, args json.RawMessage) (a
 	}
 	r.pool.Invalidate(input.ID)
 	r.invalidateInfo(input.ID)
+	r.invalidateTree(input.ID)
 	return map[string]any{"deleted": input.ID}, nil
 }
 

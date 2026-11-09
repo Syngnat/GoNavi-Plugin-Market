@@ -5,13 +5,18 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/ngxconf"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/sshx"
+	plugin "github.com/Syngnat/GoNavi/sdk/go"
 )
 
-const maxCertFileBytes = 1 << 20
+const (
+	maxCertFileBytes = 1 << 20
+	certReadWorkers  = 8
+)
 
 // CertificateInfo is one reviewed certificate file. File is the resolved
 // absolute path (relative ssl_certificate values are joined to the nginx
@@ -62,7 +67,7 @@ func (r *Runtime) certsList(ctx context.Context, args json.RawMessage) (any, err
 	if perr != nil {
 		return nil, perr
 	}
-	loaded, perr := r.loadTree(ctx, input.ConnectionID)
+	loaded, perr := r.loadTreeCached(ctx, input.ConnectionID, false)
 	if perr != nil {
 		return nil, perr
 	}
@@ -77,7 +82,43 @@ func (r *Runtime) certsList(ctx context.Context, args json.RawMessage) (any, err
 	refs := collectSSLCertificates(info, loaded.directives)
 	report := &CertificateReport{Certificates: []CertificateInfo{}}
 	now := time.Now()
-	for _, ref := range refs {
+
+	// Certificate reads are independent, so eight workers hide the per-command
+	// SSH latency on hosts with many vhosts. Results stay indexed by ref order
+	// so the response remains stable and counts do not depend on completion order.
+	type certRead struct {
+		result sshx.ReadResult
+		perr   *plugin.Error
+	}
+	reads := make([]certRead, len(refs))
+	indices := make([]int, 0, len(refs))
+	for i := range refs {
+		if refs[i].Reason == "" {
+			indices = append(indices, i)
+		}
+	}
+	jobs := make(chan int, len(indices))
+	for _, index := range indices {
+		jobs <- index
+	}
+	close(jobs)
+	workers := certReadWorkers
+	if len(indices) < workers {
+		workers = len(indices)
+	}
+	var wait sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		wait.Add(1)
+		go func() {
+			defer wait.Done()
+			for index := range jobs {
+				reads[index].result, reads[index].perr = r.pool.ReadFile(ctx, profile, refs[index].Resolved, maxCertFileBytes)
+			}
+		}()
+	}
+	wait.Wait()
+
+	for i, ref := range refs {
 		entry := CertificateInfo{Path: ref.Raw, File: ref.Resolved}
 		if ref.Reason != "" {
 			entry.Readable = false
@@ -86,15 +127,14 @@ func (r *Runtime) certsList(ctx context.Context, args json.RawMessage) (any, err
 			report.Certificates = append(report.Certificates, entry)
 			continue
 		}
-		read, perr := r.pool.ReadFile(ctx, profile, ref.Resolved, maxCertFileBytes)
-		if perr != nil {
-			entry.Reason = "file is not readable by the SSH user: " + perr.Message
+		if reads[i].perr != nil {
+			entry.Reason = "file is not readable by the SSH user: " + reads[i].perr.Message
 			report.Unreadable++
 			report.Certificates = append(report.Certificates, entry)
 			continue
 		}
 		entry.Readable = true
-		cert, err := sshx.ParseCertificatePEM([]byte(read.Content))
+		cert, err := sshx.ParseCertificatePEM([]byte(reads[i].result.Content))
 		if err != nil {
 			entry.ParseError = true
 			entry.ParseErrorText = err.Error()

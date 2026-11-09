@@ -56,6 +56,7 @@ func (r *Runtime) hostInfo(ctx context.Context, args json.RawMessage) (any, erro
 			return cached, nil
 		}
 	}
+	r.invalidateTree(profile.ID)
 	info, perr := r.discover(ctx, profile)
 	if perr != nil {
 		return nil, perr
@@ -286,6 +287,7 @@ func (r *Runtime) ensureInfo(ctx context.Context, profileID string) (*HostInfo, 
 	if perr != nil {
 		return nil, perr
 	}
+	r.invalidateTree(profile.ID)
 	info, perr := r.discover(ctx, profile)
 	if perr != nil {
 		return nil, perr

@@ -232,6 +232,9 @@ func (r *Runtime) serviceReload(ctx context.Context, args json.RawMessage) (any,
 	if len(alerts) > 0 || !errorLogChecked {
 		status = "unknown"
 	}
+	// A reload re-reads the config, so the next tree/certs/logs call must not
+	// serve the pre-reload parse.
+	r.invalidateTree(input.ConnectionID)
 	return map[string]any{
 		"method": method, "command": command, "output": output, "validated": true,
 		"unit": unit, "status": status, "fallbackUsed": fallbackUsed,

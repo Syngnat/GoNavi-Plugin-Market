@@ -17,6 +17,7 @@ const STRINGS = {
     noConn: "未选择连接",
     addConn: "新建连接…",
     manage: "连接管理",
+    connections: "SSH 连接",
     overview: "概览",
     config: "配置",
     validate: "校验",
@@ -32,8 +33,14 @@ const STRINGS = {
     notFound: "远程机器上未找到 nginx 可执行文件",
     configTitle: "配置结构",
     configSub: "主配置与 include 展开;点击文件名查看内容",
+    configRefresh: "刷新配置",
+    configRefreshing: "正在刷新配置…",
+    configLoading: "正在读取 {name} 的 nginx 配置…",
+    configSlowHint: "首次读取可能需要几秒。",
+    configRefreshUnsupported: "当前后端不支持强制刷新,已读取缓存。",
+    retry: "重试",
     servers: "server 块",
-    upstreams: "upstream 块",
+    upstreamBlocks: "upstream 块",
     files: "文件",
     includedFiles: "包含文件",
     locations: "locations",
@@ -46,6 +53,11 @@ const STRINGS = {
     validateFail: "校验失败",
     serviceTitle: "服务状态",
     serviceSub: "systemd / pid 文件状态;reload 前强制先校验",
+    stateActive: "运行中",
+    stateInactive: "已停止",
+    stateFailed: "失败",
+    stateUnknown: "未知",
+    reloadHint: "先执行 nginx -t,失败不会重载。",
     reload: "重载 nginx",
     reloadConfirmTitle: "确认重载 nginx?",
     reloadConfirmBody: "将先执行 nginx -t,通过后才会重载。生产环境请确认当前流量窗口。",
@@ -55,6 +67,11 @@ const STRINGS = {
     reloadBlocked: "nginx -t 未通过,已拒绝重载",
     logsTitle: "日志",
     logsSub: "tail 最近的日志;支持正则过滤与搜索",
+    logSource: "日志来源",
+    resolvingPath: "正在解析路径…",
+    sourceConfig: "config",
+    sourceNginxV: "nginx -V",
+    sourceExplicit: "explicit",
     errorLog: "error.log",
     accessLog: "access.log",
     refresh: "刷新",
@@ -65,6 +82,11 @@ const STRINGS = {
     searchPattern: "搜索(POSIX ERE)",
     statsTitle: "访问统计",
     statsSub: "对日志尾部窗口做聚合分析",
+    totalRequests: "总请求",
+    requests5xx: "5xx 请求",
+    avgRequest: "平均请求耗时",
+    avgUpstream: "平均上游耗时",
+    analyzedVsRequested: "实际分析 / 请求窗口",
     statusCodes: "状态码",
     statusClasses: "状态分类",
     methods: "请求方法",
@@ -73,6 +95,9 @@ const STRINGS = {
     avgMs: "平均(ms)",
     certsTitle: "TLS 证书",
     certsSub: "解析配置中引用的 ssl_certificate 文件",
+    certsTotal: "证书总数",
+    certsLoading: "正在读取证书…",
+    certsEmpty: "配置里没有找到 ssl_certificate。",
     expiringSoon: "即将过期",
     expired: "已过期",
     days: "天",
@@ -83,6 +108,8 @@ const STRINGS = {
     notAfter: "到期时间",
     upstreamsTitle: "上游健康",
     upstreamsSub: "从远程主机对 upstream server 发起 TCP 探测",
+    upstreamProbe: "正在从 {name} 探测 upstream…",
+    upstreamsEmpty: "配置里没有 upstream 块。",
     check: "探测",
     address: "地址",
     latency: "延迟",
@@ -92,8 +119,8 @@ const STRINGS = {
     backup: "backup",
     disabled: "已禁用",
     connTitle: "连接管理",
-    connectionsTitle: "连接管理",
-    connectionsSub: "SSH 连接配置保存在本机插件数据目录,密码不回传到界面",
+    connectionsTitle: "SSH 连接",
+    connectionsSub: "插件使用这里的 SSH 账号读取远程 nginx 配置和日志,并执行只读命令。凭据只保存在本机插件数据目录,不会上传。左侧选中的连接作用于所有页签。",
     connSub: "SSH 连接配置保存在本机插件数据目录,密码不回传到界面",
     name: "名称",
     host: "主机",
@@ -120,6 +147,8 @@ const STRINGS = {
     deleted: "已删除",
     testOk: "连接成功",
     connHintPassword: "首次连接会记录服务器指纹(TOFU);指纹变化时连接会被拒绝。仅在测试或保存时才会建立 SSH 连接。",
+    connPermissionsTitle: "远端必需权限",
+    connPermissions: "读取 /etc/nginx、/var/log/nginx 和证书目录;执行 nginx、systemctl。插件不会写入配置或修改文件。",
     passwordUnchangedHint: "留空表示不修改已保存的密码。",
     passphraseUnchangedHint: "留空表示不修改已保存的私钥口令。",
     actions: "操作",
@@ -174,6 +203,7 @@ const STRINGS = {
     truncatedMark: "(已截断)",
     configTruncated: "配置树已截断:文件数、节点预算或 include 深度超过上限,下面的结果不完整。",
     fileTruncated: "文件超过读取上限,仅显示前缀内容。",
+    fileIncludedTimes: "被 include {count} 次",
     includeUnresolved: "include 未匹配到任何文件,配置可能遗漏",
     includeUnreadable: "include 文件不可读",
     tailTruncated: "tail 输出超过远端命令输出上限,显示的是前缀而不是完整尾部。",
@@ -198,6 +228,7 @@ const STRINGS = {
     noConn: "No connection",
     addConn: "New connection…",
     manage: "Connections",
+    connections: "SSH connections",
     overview: "Overview",
     config: "Config",
     validate: "Validate",
@@ -213,8 +244,14 @@ const STRINGS = {
     notFound: "nginx binary was not found on the remote machine",
     configTitle: "Configuration structure",
     configSub: "Main config with includes expanded; click a file to view it",
+    configRefresh: "Refresh config",
+    configRefreshing: "Refreshing configuration…",
+    configLoading: "Reading nginx configuration from {name}…",
+    configSlowHint: "The first read may take a few seconds.",
+    configRefreshUnsupported: "This backend does not support forced refresh; loaded the cached configuration.",
+    retry: "Retry",
     servers: "server blocks",
-    upstreams: "upstream blocks",
+    upstreamBlocks: "upstream blocks",
     files: "Files",
     includedFiles: "Included files",
     locations: "locations",
@@ -227,6 +264,11 @@ const STRINGS = {
     validateFail: "Validation failed",
     serviceTitle: "Service status",
     serviceSub: "systemd / pid file status; reload always validates first",
+    stateActive: "Active",
+    stateInactive: "Inactive",
+    stateFailed: "Failed",
+    stateUnknown: "Unknown",
+    reloadHint: "Runs nginx -t first; a failed test blocks the reload.",
     reload: "Reload nginx",
     reloadConfirmTitle: "Reload nginx?",
     reloadConfirmBody: "nginx -t runs first; the reload is refused when it fails. Confirm the traffic window for production.",
@@ -236,6 +278,11 @@ const STRINGS = {
     reloadBlocked: "nginx -t failed; reload refused",
     logsTitle: "Logs",
     logsSub: "Tail recent entries; filter by regex and search",
+    logSource: "Log source",
+    resolvingPath: "Resolving path…",
+    sourceConfig: "config",
+    sourceNginxV: "nginx -V",
+    sourceExplicit: "explicit",
     errorLog: "error.log",
     accessLog: "access.log",
     refresh: "Refresh",
@@ -246,6 +293,11 @@ const STRINGS = {
     searchPattern: "Search (POSIX ERE)",
     statsTitle: "Access statistics",
     statsSub: "Aggregate analysis over the tail window of the access log",
+    totalRequests: "Requests",
+    requests5xx: "5xx responses",
+    avgRequest: "Avg request",
+    avgUpstream: "Avg upstream",
+    analyzedVsRequested: "Analyzed / requested",
     statusCodes: "Status codes",
     statusClasses: "Status classes",
     methods: "Methods",
@@ -254,6 +306,9 @@ const STRINGS = {
     avgMs: "avg (ms)",
     certsTitle: "TLS certificates",
     certsSub: "Parses ssl_certificate files referenced by the config",
+    certsTotal: "Certificates",
+    certsLoading: "Reading certificates…",
+    certsEmpty: "No ssl_certificate found in the configuration.",
     expiringSoon: "Expiring soon",
     expired: "Expired",
     days: "days",
@@ -264,6 +319,8 @@ const STRINGS = {
     notAfter: "Not after",
     upstreamsTitle: "Upstream health",
     upstreamsSub: "TCP probes from the remote host to each upstream server",
+    upstreamProbe: "Probing upstreams from {name}…",
+    upstreamsEmpty: "No upstream blocks in the configuration.",
     check: "Probe",
     address: "Address",
     latency: "Latency",
@@ -273,8 +330,8 @@ const STRINGS = {
     backup: "backup",
     disabled: "disabled",
     connTitle: "Connections",
-    connectionsTitle: "Connections",
-    connectionsSub: "Profiles are stored in the local plugin data directory; passwords never come back to the UI",
+    connectionsTitle: "SSH connections",
+    connectionsSub: "The plugin uses these SSH accounts to read remote nginx configuration and logs and to run read-only commands. Credentials stay in the local plugin data directory and are never uploaded. The connection selected on the left applies to every tab.",
     connSub: "Profiles are stored in the local plugin data directory; passwords never come back to the UI",
     name: "Name",
     host: "Host",
@@ -301,6 +358,8 @@ const STRINGS = {
     deleted: "Deleted",
     testOk: "Connection OK",
     connHintPassword: "The first connection records the server fingerprint (TOFU); a changed fingerprint is rejected. SSH is only dialed from Test or Save.",
+    connPermissionsTitle: "Required remote access",
+    connPermissions: "Read /etc/nginx, /var/log/nginx and certificate directories; run nginx and systemctl. The plugin never writes configuration or modifies files.",
     passwordUnchangedHint: "Leave empty to keep the saved password.",
     passphraseUnchangedHint: "Leave empty to keep the saved key passphrase.",
     actions: "Actions",
@@ -355,6 +414,7 @@ const STRINGS = {
     truncatedMark: "(truncated)",
     configTruncated: "The config tree is truncated: the file, node-budget or include-depth limit was reached, so the results below are incomplete.",
     fileTruncated: "The file exceeded the read limit; only the prefix is shown.",
+    fileIncludedTimes: "included {count} times",
     includeUnresolved: "include matched no files; the configuration may be incomplete",
     includeUnreadable: "included file is unreadable",
     tailTruncated: "The tail output hit the remote command limit; this is the prefix, not the newest lines.",
@@ -375,6 +435,13 @@ const STRINGS = {
 
 const LOCALE = (navigator.language || "en-US").toLowerCase().startsWith("zh") ? "zh-CN" : "en-US";
 const t = (key) => (STRINGS[LOCALE] && STRINGS[LOCALE][key]) || STRINGS["en-US"][key] || key;
+function tf(key, vars) {
+  let text = t(key);
+  for (const [name, value] of Object.entries(vars || {})) {
+    text = text.split("{" + name + "}").join(String(value));
+  }
+  return text;
+}
 
 /* ---------------- bridge ---------------- */
 
@@ -800,10 +867,11 @@ function factsList(pairs) {
   return dl;
 }
 
-function table(headers, rows) {
+function table(headers, rows, className) {
   const thead = el("thead", {}, el("tr", {}, headers.map(function (h, i) {
     return el("th", { scope: "col", class: i > 0 && /ms|count|#|days/i.test(h) ? "num" : "", text: h });
   })));
+  const tableClass = className ? " " + className : "";
   const tbody = el("tbody");
   for (const row of rows) {
     tbody.append(el("tr", {}, row.map(function (cell) {
@@ -811,10 +879,38 @@ function table(headers, rows) {
       return el("td", { class: typeof cell === "number" ? "num" : "", text: String(cell) });
     })));
   }
-  return el("table", {}, [thead, tbody]);
+  return el("table", { class: tableClass.trim() }, [thead, tbody]);
 }
 
 function pill(text, cls) { return el("span", { class: "pill " + cls, text: text }); }
+
+function loadingBox(text) {
+  return el("div", { class: "load-box", role: "status", "aria-live": "polite" }, [
+    el("span", { class: "load-dot", "aria-hidden": "true" }),
+    el("span", { text: text }),
+  ]);
+}
+
+function kpi(label, value, valueClass) {
+  const box = el("div", { class: "kpi" });
+  box.append(el("div", { class: "kpi-label", text: label }));
+  const val = el("div", { class: "kpi-value" + (valueClass ? " " + valueClass : "") });
+  if (value instanceof Node) val.append(value);
+  else val.textContent = value == null || value === "" ? "-" : String(value);
+  box.append(val);
+  return box;
+}
+
+function kpiGrid(items) {
+  return el("div", { class: "kpi-grid" }, items.map(function (item) {
+    return kpi(item[0], item[1], item[2]);
+  }));
+}
+
+function connName() {
+  const conn = currentConn();
+  return conn ? conn.name : t("noConn");
+}
 
 /* ---------------- sections ---------------- */
 
@@ -934,10 +1030,88 @@ function renderNodes(nodes) {
 }
 
 async function renderConfig(main, generation) {
-  const tree = await call("config.tree", { connectionId: state.connectionId });
-  if (!current(generation)) return;
-  const files = Array.isArray(tree.files) ? tree.files : [];
   const parts = sectionHeader("configTitle", "configSub");
+  const refreshButton = el("button", { class: "primary", text: t("configRefresh") });
+  const status = el("div");
+  const body = el("div");
+  parts.push(el("div", { class: "row" }, [refreshButton]), status, body);
+  main.replaceChildren(...parts);
+
+  let seq = 0;
+  let slowTimer = null;
+  function clearSlow() {
+    if (slowTimer) { clearTimeout(slowTimer); slowTimer = null; }
+  }
+  function showLoading(refresh) {
+    clearSlow();
+    status.replaceChildren();
+    const box = loadingBox(refresh ? t("configRefreshing") : tf("configLoading", { name: connName() }));
+    const hint = el("p", { class: "load-hint" });
+    box.append(hint);
+    status.append(box);
+    const localSeq = seq;
+    const localGen = generation;
+    slowTimer = setTimeout(function () {
+      if (current(localGen) && localSeq === seq) hint.textContent = t("configSlowHint");
+    }, 8000);
+  }
+  async function load(refresh) {
+    const gen = state.generation;
+    const local = ++seq;
+    refreshButton.disabled = true;
+    body.replaceChildren();
+    showLoading(refresh);
+    try {
+      let tree;
+      try {
+        const args = { connectionId: state.connectionId };
+        if (refresh) args.refresh = true;
+        tree = await call("config.tree", args);
+      } catch (err) {
+        // Backends before 1.0.6 reject the refresh flag; fall back to the
+        // cached tree and tell the user instead of leaving the page broken.
+        if (!refresh || err.code !== "INVALID_ARGS") throw err;
+        tree = await call("config.tree", { connectionId: state.connectionId });
+        if (current(gen) && local === seq) toast(t("configRefreshUnsupported"), true);
+      }
+      if (!current(gen) || local !== seq) return;
+      clearSlow();
+      status.replaceChildren();
+      body.replaceChildren(...renderConfigBody(tree, gen));
+    } catch (err) {
+      if (!current(gen) || local !== seq) return;
+      clearSlow();
+      const retry = el("button", { text: t("retry"), onclick: function () { load(false); } });
+      status.replaceChildren(el("div", { class: "alert bad" }, [
+        el("div", { text: errorText(err) }),
+        el("div", { class: "row" }, [retry]),
+      ]));
+    } finally {
+      if (current(gen) && local === seq) refreshButton.disabled = false;
+    }
+  }
+  refreshButton.onclick = function () { load(true); };
+  load(false);
+}
+
+function renderConfigBody(tree, generation) {
+  const rawFiles = Array.isArray(tree.files) ? tree.files : [];
+  // nginx parses the same snippet every time another branch includes it, so
+  // the backend reports one entry per include occurrence. List each path once
+  // and annotate repeats instead of rendering identical file panels.
+  const fileOccurrences = new Map();
+  const seenFiles = new Set();
+  const files = [];
+  for (const file of rawFiles) {
+    const key = file && file.path ? file.path : "";
+    if (key) {
+      fileOccurrences.set(key, (fileOccurrences.get(key) || 0) + 1);
+      if (seenFiles.has(key)) continue;
+      seenFiles.add(key);
+    }
+    files.push(file);
+  }
+  const parts = [];
   parts.push(factsList([
     [t("confPath"), tree.mainPath, true],
     [t("prefix"), tree.prefix, true],
@@ -970,9 +1144,9 @@ async function renderConfig(main, generation) {
       (u.file || tree.mainPath) + ":" + u.line,
     ];
   });
-  parts.push(el("h2", { text: t("upstreams") + " (" + (tree.upstreams || []).length + ")" }));
+  parts.push(el("h2", { text: t("upstreamBlocks") + " (" + (tree.upstreams || []).length + ")" }));
   parts.push(upstreamRows.length
-    ? table([t("upstreams"), t("serverLabel"), t("fileLine")], upstreamRows)
+    ? table([t("upstreamBlocks"), t("serverLabel"), t("fileLine")], upstreamRows)
     : el("div", { class: "empty", text: "-" }));
 
   parts.push(el("h2", { text: t("files") + " (" + files.length + ")" }));
@@ -989,8 +1163,11 @@ async function renderConfig(main, generation) {
     for (let i = 1; i < files.length; i++) {
       const f = files[i];
       const details = el("details", { class: "file" });
+      const times = fileOccurrences.get(f.path) || 1;
       const summary = el("summary", {
-        text: f.path + " (" + fmtBytes(f.sizeBytes) + ")" + (f.truncated ? " " + t("truncatedMark") : ""),
+        text: f.path + " (" + fmtBytes(f.sizeBytes) + ")"
+          + (times > 1 ? " · " + tf("fileIncludedTimes", { count: times }) : "")
+          + (f.truncated ? " " + t("truncatedMark") : ""),
       });
       summary.addEventListener("click", function () {
         // View content on expand.
@@ -1020,7 +1197,7 @@ async function renderConfig(main, generation) {
       parts.push(details);
     }
   }
-  main.replaceChildren(...parts);
+  return parts;
 }
 
 /* ----- validate ----- */
@@ -1062,27 +1239,68 @@ function renderValidation(result) {
 
 /* ----- service ----- */
 
+function serviceStateLabel(state) {
+  const keys = { active: "stateActive", inactive: "stateInactive", failed: "stateFailed" };
+  return t(keys[state] || "stateUnknown");
+}
+
+function serviceMetaItem(label, value) {
+  return el("span", { class: "service-meta-item" }, [
+    el("span", { class: "service-meta-label", text: label }),
+    el("b", { text: value }),
+  ]);
+}
+
 async function renderService(main, generation) {
-  const status = await call("service.status", { connectionId: state.connectionId });
-  if (!current(generation)) return;
   const parts = sectionHeader("serviceTitle", "serviceSub");
-  const statePill = status.state === "active" ? pill(status.state, "ok")
-    : status.state === "inactive" ? pill(status.state, "dim")
-    : pill(status.state || "unknown", "warn");
-  const facts = [
-    [t("version"), status.version, true],
-    [t("state"), statePill],
-    [t("pid"), status.pid ? String(status.pid) : "-"],
-    [t("uptime"), status.uptime || "-"],
+  const out = el("div", {}, [loadingBox(t("loading"))]);
+  parts.push(out);
+  main.replaceChildren(...parts);
+
+  let status;
+  try {
+    status = await call("service.status", { connectionId: state.connectionId });
+  } catch (err) {
+    if (current(generation)) out.replaceChildren(el("div", { class: "alert bad", text: errorText(err) }));
+    return;
+  }
+  if (!current(generation)) return;
+  status = status || {};
+
+  const nodes = [];
+  if (status.found === false) nodes.push(el("div", { class: "alert bad", text: t("notFound") }));
+
+  const stateClass = status.state === "active" ? "ok"
+    : status.state === "failed" ? "bad"
+    : status.state === "inactive" ? "dim" : "warn";
+  const statePill = pill(serviceStateLabel(status.state), stateClass);
+  statePill.classList.add("lg");
+
+  nodes.push(el("section", { class: "service-summary" }, [
+    el("div", { class: "service-state" }, statePill),
+    el("div", { class: "service-version" }, [
+      el("span", { class: "service-version-label", text: "nginx" }),
+      el("b", { text: status.version || "-" }),
+    ]),
+    el("div", { class: "service-meta" }, [
+      serviceMetaItem(t("pid"), status.pid ? String(status.pid) : "-"),
+      serviceMetaItem(t("uptime"), status.uptime || "-"),
+      status.hostname ? serviceMetaItem(t("hostname"), status.hostname) : null,
+    ].filter(Boolean)),
+  ]));
+
+  nodes.push(kpiGrid([
     [t("systemd"), status.systemd ? t("yes") : t("no")],
-    [t("docker"), status.docker ? t("yes") : t("no")],
-  ];
-  if (status.unit) facts.push([t("unit"), status.unit, true]);
-  parts.push(factsList(facts));
+    [t("container"), status.docker ? t("yes") : t("no")],
+    [t("unit"), status.unit || "-"],
+    [t("binary"), status.binary || "-", "mono"],
+  ]));
+
   const button = el("button", { class: "primary", text: t("reload") });
   button.onclick = function () { confirmReload(button); };
-  parts.push(el("div", { class: "row" }, [button]));
-  main.replaceChildren(...parts);
+  nodes.push(el("div", { class: "row" }, [button]));
+  nodes.push(el("p", { class: "field-note", text: t("reloadHint") }));
+  out.replaceChildren(...nodes);
 }
 
 function confirmReload(button) {
@@ -1121,6 +1339,16 @@ function confirmReload(button) {
 
 /* ----- logs ----- */
 
+function sourceLabel(source) {
+  const key = {
+    "config": "sourceConfig",
+    "binary-default": "sourceNginxV",
+    "nginx-v": "sourceNginxV",
+    "explicit": "sourceExplicit",
+  }[String(source).toLowerCase()];
+  return key ? t(key) : source;
+}
+
 async function renderLogs(main, generation) {
   const parts = sectionHeader("logsTitle", "logsSub");
   const kindSelect = el("select", {}, [
@@ -1138,9 +1366,21 @@ async function renderLogs(main, generation) {
   const tailNotice = el("div");
   const out = el("pre", { class: "log", text: "" });
   const searchOut = el("div");
+  const sourceBox = el("section", { class: "log-source", "aria-live": "polite" });
+  const sourceHead = el("div", { class: "log-source-head" });
+  const sourcePath = el("div", { class: "log-source-path mono" });
+  const sourceNote = el("div", { class: "log-source-note" });
+  sourceBox.append(el("div", { class: "log-source-title", text: t("logSource") }), sourceHead, sourcePath, sourceNote);
+
+  function resetSource() {
+    sourceHead.textContent = connName() + " · " + (kindSelect.value === "access" ? t("accessLog") : t("errorLog")) + " · " + t("resolvingPath");
+    sourcePath.textContent = "";
+    sourceNote.textContent = "";
+  }
 
   async function doTail() {
     const gen = state.generation;
+    resetSource();
     meta.textContent = "";
     tailNotice.replaceChildren();
     out.textContent = t("loading");
@@ -1152,18 +1392,24 @@ async function renderLogs(main, generation) {
         filter: filterInput.value,
       });
       if (!current(gen)) return;
-      const metaParts = res.path ? [res.path] : [];
-      if (res.source) metaParts.push(t("source") + ": " + res.source);
+      sourceHead.textContent = connName() + " · " + (kindSelect.value === "access" ? t("accessLog") : t("errorLog"));
+      sourcePath.textContent = res.path || "";
+      const sourceBits = [];
+      if (res.source) sourceBits.push(t("source") + ": " + sourceLabel(res.source));
+      if (res.note) sourceBits.push(t("note") + ": " + res.note);
+      sourceNote.textContent = sourceBits.join(" · ");
+      const metaParts = [];
       if (res.totalLines != null && res.totalLines >= 0) metaParts.push(t("totalLines") + ": " + res.totalLines);
       if (res.windowStartLine > 0) metaParts.push(t("windowStart") + ": " + res.windowStartLine);
       metaParts.push(res.matched + "/" + res.scanned, fmtBytes(res.sizeBytes));
       if (res.level) metaParts.push(t("level") + ": " + res.level);
       meta.textContent = metaParts.join(" · ");
       if (res.truncated) tailNotice.append(el("div", { class: "alert bad", text: t("tailTruncated") }));
-      if (res.note) tailNotice.append(el("div", { class: "alert", text: res.note }));
       out.textContent = (res.lines || []).join("\n") || "-";
     } catch (err) {
       if (!current(gen)) return;
+      sourcePath.textContent = "";
+      sourceNote.textContent = errorText(err);
       meta.textContent = "";
       out.textContent = errorText(err);
     }
@@ -1207,10 +1453,12 @@ async function renderLogs(main, generation) {
 
   refreshButton.onclick = doTail;
   searchButton.onclick = doSearch;
+  kindSelect.addEventListener("change", doTail);
   searchInput.addEventListener("keydown", function (e) { if (e.key === "Enter") doSearch(); });
   filterInput.addEventListener("keydown", function (e) { if (e.key === "Enter") doTail(); });
 
   parts.push(
+    sourceBox,
     el("div", { class: "row" }, [
       kindSelect,
       el("label", { text: t("lines") }),
@@ -1237,10 +1485,19 @@ function clampLines(raw) {
 /* ----- stats ----- */
 
 function countTable(entries, label) {
-  const rows = (entries || []).map(function (e) {
-    return [e.value, e.count, e.avgMs != null ? Number(e.avgMs.toFixed(1)) : ""];
+  const list = entries || [];
+  // Only top paths carry a per-entry average; keep the other panels to two
+  // columns instead of showing an empty "avg (ms)" column everywhere.
+  const showAvg = list.some(function (e) { return numOrNull(e.avgMs) != null; });
+  const rows = list.map(function (e) {
+    const avg = numOrNull(e.avgMs);
+    return showAvg
+      ? [e.value, e.count, avg != null ? Number(avg.toFixed(1)) : ""]
+      : [e.value, e.count];
   });
-  return table([label, t("count"), t("avgMs")], rows);
+  if (!rows.length) rows.push(showAvg ? ["-", "-", "-"] : ["-", "-"]);
+  const headers = showAvg ? [label, t("count"), t("avgMs")] : [label, t("count")];
+  return table(headers, rows, "compact");
 }
 
 // Newer backends report the bytes actually analyzed; older ones only echo the
@@ -1251,7 +1508,7 @@ function analyzedBytes(stats) {
   return numOrNull(stats.windowBytes);
 }
 
-function timingRow(stats, kind) {
+function timingStats(stats, kind) {
   const nestedKey = kind === "upstream" ? "upstreamTime" : "requestTime";
   const avgKeys = kind === "upstream" ? ["avgUpstreamMs"] : ["avgRequestMs"];
   const maxKeys = kind === "upstream" ? ["maxUpstreamMs"] : ["maxRequestMs"];
@@ -1267,9 +1524,7 @@ function timingRow(stats, kind) {
   if (avg == null) avg = firstNumber(stats, avgKeys);
   if (max == null) max = firstNumber(stats, maxKeys);
   if (avg == null && max == null) return null;
-  let value = fmtMs(avg) + " / " + fmtMs(max);
-  if (samples != null) value += " (n=" + samples + ")";
-  return [t(nestedKey), value];
+  return { avg: avg, max: max, samples: samples };
 }
 
 async function renderStats(main, generation) {
@@ -1285,44 +1540,59 @@ async function renderStats(main, generation) {
 
   async function run() {
     const gen = state.generation;
-    out.replaceChildren(el("div", { class: "skel", text: t("loading") }));
+    out.replaceChildren(loadingBox(t("loading")));
     try {
       const requestedArg = Number(bytesSelect.value);
       const s = await call("access.stats", { connectionId: state.connectionId, bytes: requestedArg });
       if (!current(gen)) return;
       const analyzed = analyzedBytes(s);
       const requested = numOrNull(s.requestedBytes) != null ? s.requestedBytes : requestedArg;
-      const truncated = s.truncated === true;
-      const samples = s.requestTime && numOrNull(s.requestTime.samples);
-      const facts = [
-        [t("pathLabel"), s.path, true],
-        [t("requestedBytes"), fmtBytes(requested)],
-        [t("analyzedBytes"), fmtBytes(analyzed)],
-        [t("scanned"), s.parsed + "/" + s.total],
-        [t("unparsed"), String(s.unparsed != null ? s.unparsed : Math.max(0, s.total - s.parsed))],
-        ["5xx", String(countOf(s.classes, "5xx"))],
-        [t("timeRange"), fmtTime(s.timeFrom) + " → " + fmtTime(s.timeTo)],
-      ];
-      const upstreamTiming = timingRow(s, "upstream");
-      if (upstreamTiming) facts.push(upstreamTiming);
-      const requestTiming = timingRow(s, "request");
-      if (requestTiming) facts.push(requestTiming);
+      const total = numOrNull(s.total);
+      const parsed = numOrNull(s.parsed);
+      const unparsed = numOrNull(s.unparsed) != null
+        ? s.unparsed
+        : (total != null && parsed != null ? Math.max(0, total - parsed) : null);
+      const five = countOf(s.classes, "5xx");
+      const fiveRate = total != null && total > 0 ? (five / total) * 100 : null;
+      const requestTiming = timingStats(s, "request");
+      const upstreamTiming = timingStats(s, "upstream");
 
-      const grid = el("div");
-      grid.append(el("h2", { text: t("statsTitle") }), factsList(facts));
-      if (s.gzipUnsupported) grid.append(el("div", { class: "alert bad", text: t("gzipUnsupported") }));
-      if (truncated) grid.append(el("div", { class: "alert bad", text: t("statsTruncated") }));
-      grid.append(
-        el("h2", { text: t("statusCodes") }), countTable(s.statuses, t("statusCode")),
-        el("h2", { text: t("statusClasses") }), countTable(s.classes, t("classLabel")),
-        el("h2", { text: t("methods") }), countTable(s.methods, t("methodLabel")),
-        el("h2", { text: t("topIPs") }), countTable(s.topIPs, t("ipLabel")),
-        el("h2", { text: t("topPaths") }), countTable(s.topPaths, t("pathLabel"))
-      );
-      if (samples != null) {
-        grid.append(el("p", { class: "sub", text: t("requestTime") + ": n=" + samples }));
+      const kpis = [
+        [t("totalRequests"), total != null ? String(total) : "-"],
+        [t("requests5xx"), five + (fiveRate != null ? " · " + fiveRate.toFixed(1) + "%" : "")],
+        [t("avgRequest"), requestTiming ? fmtMs(requestTiming.avg) : "-"],
+        [t("avgUpstream"), upstreamTiming ? fmtMs(upstreamTiming.avg) : "-"],
+        [t("analyzedVsRequested"), fmtBytes(analyzed) + " / " + fmtBytes(requested)],
+      ];
+
+      const metaBits = [];
+      if (s.path) metaBits.push(s.path);
+      metaBits.push(t("timeRange") + ": " + fmtTime(s.timeFrom) + " → " + fmtTime(s.timeTo));
+      if (total != null) metaBits.push(t("scanned") + ": " + (parsed != null ? parsed : 0) + "/" + total);
+      if (unparsed != null) metaBits.push(t("unparsed") + ": " + unparsed);
+      if (requestTiming && requestTiming.samples != null) metaBits.push(t("requestTime") + ": n=" + requestTiming.samples);
+      if (upstreamTiming && upstreamTiming.samples != null) metaBits.push(t("upstreamTime") + ": n=" + upstreamTiming.samples);
+
+      const panels = [
+        [t("statusCodes"), false, countTable(s.statuses, t("statusCode"))],
+        [t("statusClasses"), false, countTable(s.classes, t("classLabel"))],
+        [t("methods"), false, countTable(s.methods, t("methodLabel"))],
+        [t("topIPs"), false, countTable(s.topIPs, t("ipLabel"))],
+        [t("topPaths"), true, countTable(s.topPaths, t("pathLabel"))],
+      ];
+      const grid = el("div", { class: "stat-grid" });
+      for (const panel of panels) {
+        grid.append(el("section", { class: "stat-panel" + (panel[1] ? " wide" : "") }, [
+          el("h3", { text: panel[0] }),
+          panel[2],
+        ]));
       }
-      out.replaceChildren(grid);
+
+      const nodes = [kpiGrid(kpis), el("p", { class: "sub stat-meta", text: metaBits.join(" · ") })];
+      if (s.gzipUnsupported) nodes.push(el("div", { class: "alert bad", text: t("gzipUnsupported") }));
+      if (s.truncated === true) nodes.push(el("div", { class: "alert bad", text: t("statsTruncated") }));
+      nodes.push(grid);
+      out.replaceChildren(...nodes);
     } catch (err) {
       if (!current(gen)) return;
       out.replaceChildren(el("div", { class: "alert bad", text: errorText(err) }));
@@ -1343,10 +1613,40 @@ function countOf(entries, value) {
 /* ----- certs ----- */
 
 async function renderCerts(main, generation) {
-  const report = await call("certs.list", { connectionId: state.connectionId });
-  if (!current(generation)) return;
   const parts = sectionHeader("certsTitle", "certsSub");
+  const out = el("div", {}, [loadingBox(t("certsLoading"))]);
+  parts.push(out);
+  main.replaceChildren(...parts);
+
+  let report;
+  try {
+    report = await call("certs.list", { connectionId: state.connectionId });
+  } catch (err) {
+    if (!current(generation)) return;
+    out.replaceChildren(el("div", { class: "alert bad", text: errorText(err) }));
+    return;
+  }
+  if (!current(generation)) return;
+  report = report || {};
   const certificates = Array.isArray(report.certificates) ? report.certificates : [];
+  const countBy = function (fn) { return certificates.filter(fn).length; };
+  const total = report.total != null ? report.total : certificates.length;
+  const expiringSoon = report.expiringSoon != null
+    ? report.expiringSoon
+    : countBy(function (c) { return c.expiringSoon === true; });
+  const expired = report.expired != null
+    ? report.expired
+    : countBy(function (c) {
+      return c.expired === true || (c.readable !== false && !c.parseError && !c.skipped && c.daysLeft != null && c.daysLeft <= 0);
+    });
+  const unreadable = report.unreadable != null
+    ? report.unreadable
+    : countBy(function (c) { return c.readable === false && !c.parseError && !c.skipped; });
+  const skipped = report.skipped != null ? report.skipped : countBy(function (c) { return c.skipped === true; });
+  const parseErrors = report.parseErrors != null
+    ? report.parseErrors
+    : countBy(function (c) { return c.parseError === true; });
+
   const rows = certificates.map(function (c) {
     let status;
     if (c.skipped) status = pill(t("skipped"), "dim");
@@ -1357,26 +1657,28 @@ async function renderCerts(main, generation) {
     else status = pill((c.daysLeft != null ? c.daysLeft : "-") + t("days"), "ok");
     const note = c.reason || c.parseErrorText || c.skipReason || c.error || (c.skipped ? t("skippedNote") : "");
     return [
-      c.file && c.file !== c.path ? c.path + " → " + c.file : c.path,
-      (c.domains || []).join(", ") || "-",
+      c.file && c.file !== c.path ? c.path + " → " + c.file : (c.path || c.file || "-"),
+      (Array.isArray(c.domains) ? c.domains.join(", ") : (c.domains || "")) || c.commonName || "-",
       c.issuer || "-",
       fmtTime(c.notAfter),
       status,
       note,
     ];
   });
-  const summary = [];
-  if (report.expiringSoon) summary.push(t("expiringSoon") + ": " + report.expiringSoon);
-  if (report.expired) summary.push(t("expired") + ": " + report.expired);
-  if (report.unreadable) summary.push(t("unreadable") + ": " + report.unreadable);
-  if (report.parseErrors) summary.push(t("parseError") + ": " + report.parseErrors);
-  if (report.skipped) summary.push(t("skipped") + ": " + report.skipped);
-  if (summary.length) parts.push(el("div", { class: "alert", text: summary.join(" · ") }));
-  if (report.truncated) parts.push(el("div", { class: "alert bad", text: t("truncated") }));
-  parts.push(rows.length
-    ? table([t("files"), t("domains"), t("issuer"), t("notAfter"), "", t("note")], rows)
-    : el("div", { class: "empty", text: "-" }));
-  main.replaceChildren(...parts);
+
+  const nodes = [kpiGrid([
+    [t("certsTotal"), String(total)],
+    [t("expiringSoon"), String(expiringSoon)],
+    [t("expired"), String(expired)],
+    [t("unreadable"), String(unreadable)],
+    [t("skipped"), String(skipped)],
+  ])];
+  if (parseErrors) nodes.push(el("div", { class: "alert bad", text: t("parseError") + ": " + parseErrors }));
+  if (report.truncated) nodes.push(el("div", { class: "alert bad", text: t("truncated") }));
+  nodes.push(rows.length
+    ? table([t("files"), t("domains"), t("issuer"), t("notAfter"), t("state"), t("note")], rows, "compact")
+    : el("div", { class: "empty", text: t("certsEmpty") }));
+  out.replaceChildren(...nodes);
 }
 
 /* ----- upstreams ----- */
@@ -1385,16 +1687,27 @@ async function renderUpstreams(main, generation) {
   const parts = sectionHeader("upstreamsTitle", "upstreamsSub");
   const button = el("button", { class: "primary", text: t("check") });
   const out = el("div");
-  button.onclick = async function () {
+
+  async function run() {
     const gen = state.generation;
     button.disabled = true;
-    out.replaceChildren(el("div", { class: "skel", text: t("loading") }));
+    out.replaceChildren(loadingBox(tf("upstreamProbe", { name: connName() })));
     try {
-      const check = await call("upstreams.check", { connectionId: state.connectionId });
+      const result = await call("upstreams.check", { connectionId: state.connectionId });
       if (!current(gen)) return;
+      const check = result || {};
+      const upstreams = Array.isArray(check.upstreams) ? check.upstreams : [];
+      if (!upstreams.length) {
+        out.replaceChildren(el("div", { class: "empty", text: t("upstreamsEmpty") }));
+        return;
+      }
+      const members = [];
+      for (const u of upstreams) {
+        for (const m of u.servers || []) members.push(m);
+      }
       const rows = [];
       let skippedMembers = 0;
-      for (const u of check.upstreams || []) {
+      for (const u of upstreams) {
         for (const m of u.servers || []) {
           const skipped = m.alive == null || m.skipped === true;
           if (skipped) skippedMembers++;
@@ -1408,18 +1721,20 @@ async function renderUpstreams(main, generation) {
           rows.push([u.name, m.address, (m.params || []).join(" "), el("span", { class: "pills" }, pills), note]);
         }
       }
-      const skippedTotal = check.skipped != null ? check.skipped : skippedMembers;
-      const summaryParts = [
-        t("alive") + ": " + check.alive,
-        t("down") + ": " + check.down,
-        t("skipped") + ": " + skippedTotal,
-      ];
-      if (check.backup != null) summaryParts.push(t("backup") + ": " + check.backup);
+      const countAlive = check.alive != null ? check.alive : members.filter(function (m) { return m.alive === true; }).length;
+      const countDown = check.down != null ? check.down : members.filter(function (m) { return m.alive === false; }).length;
+      const countSkipped = check.skipped != null ? check.skipped : skippedMembers;
+      const countBackup = check.backup != null ? check.backup : members.filter(function (m) { return m.backup === true; }).length;
       out.replaceChildren(
+        kpiGrid([
+          [t("alive"), String(countAlive), "ok"],
+          [t("down"), String(countDown), "bad"],
+          [t("skipped"), String(countSkipped)],
+          [t("backup"), String(countBackup)],
+        ]),
         rows.length
-          ? table([t("upstreams"), t("address"), t("paramsLabel"), "", t("note")], rows)
-          : el("div", { class: "empty", text: "-" }),
-        el("p", { class: "sub", text: summaryParts.join(" · ") })
+          ? table([t("upstreamBlocks"), t("address"), t("paramsLabel"), t("state"), t("note")], rows, "compact")
+          : el("div", { class: "empty", text: "-" })
       );
     } catch (err) {
       if (!current(gen)) return;
@@ -1427,15 +1742,22 @@ async function renderUpstreams(main, generation) {
     } finally {
       button.disabled = false;
     }
-  };
+  }
+
+  button.onclick = run;
   parts.push(el("div", { class: "row" }, [button]), out);
   main.replaceChildren(...parts);
+  run();
 }
 
 /* ----- connections ----- */
 
 async function renderConnections(main) {
   const parts = sectionHeader("connectionsTitle", "connectionsSub");
+  parts.push(el("section", { class: "info-block" }, [
+    el("h3", { text: t("connPermissionsTitle") }),
+    el("p", { text: t("connPermissions") }),
+  ]));
   parts.push(el("div", { class: "alert", text: t("connHintPassword") }));
   const list = el("div");
   for (const c of state.connections) {

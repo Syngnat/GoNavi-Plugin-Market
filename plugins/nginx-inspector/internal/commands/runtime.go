@@ -22,6 +22,11 @@ type Runtime struct {
 	store  *store.Store
 	pool   *sshx.Pool
 	info   map[string]*HostInfo // cached nginx discovery per profile
+
+	// trees caches the merged config for a profile; config.tree, certs.list,
+	// logs and upstreams would otherwise re-read every include on each call.
+	treeMu sync.Mutex
+	trees  map[string]cachedTree
 }
 
 // NewRuntime opens the profile store. A missing user-config directory only
@@ -32,7 +37,7 @@ func NewRuntime() *Runtime {
 	if err == nil {
 		st = store.Open(path)
 	}
-	return &Runtime{store: st, pool: sshx.NewPool(st), info: map[string]*HostInfo{}}
+	return &Runtime{store: st, pool: sshx.NewPool(st), info: map[string]*HostInfo{}, trees: map[string]cachedTree{}}
 }
 
 // SetLocale records the host locale for future responses.

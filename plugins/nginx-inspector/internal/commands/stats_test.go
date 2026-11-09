@@ -101,6 +101,9 @@ func TestSplitAddress(t *testing.T) {
 		{"$upstream:80", "", 0, false},
 		{"", "", 0, false},
 		{"host:notaport", "", 0, false},
+		{"host:0", "", 0, false},
+		{"host:65536", "", 0, false},
+		{"host:65535", "host", 65535, true},
 	}
 	for _, c := range cases {
 		host, port, ok := splitAddress(c.in)

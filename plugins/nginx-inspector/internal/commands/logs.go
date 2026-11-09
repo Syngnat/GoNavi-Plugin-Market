@@ -68,7 +68,7 @@ func (r *Runtime) logTarget(ctx context.Context, connectionID string, info *Host
 	if kind == "access" {
 		name = "access_log"
 	}
-	if loaded, perr := r.loadTree(ctx, connectionID); perr == nil {
+	if loaded, perr := r.loadTreeCached(ctx, connectionID, false); perr == nil {
 		if directive := configuredLogDirective(loaded.directives, name); directive != nil {
 			target := logTargetFromDirective(info, directive, kind)
 			if target.Path != "" || target.Note != "" {
