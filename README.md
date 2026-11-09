@@ -25,9 +25,9 @@ GoNavi 插件市场官网（plugin.gonavi.org）：浏览与安装 GoNavi 插件
 
 - 源码:`plugins/<name>/`(manifest + 后端 + `ui/` + `skills/`),模板参考 `plugins/nginx-inspector/`。
 - 构建:仓库根 `go run ./cmd/buildtool -manifest plugins/<name>/gonavi.plugin.json -output plugin-dist/<name> -zip plugin-dist/<name>-<ver>.zip`(产物进 `plugin-dist/`,与站点 `dist/` 互不混淆;5 平台二进制打进单 ZIP)。
-- 发布:tag `<插件名>-v<semver>`(如 `nginx-inspector-v1.0.0`),一 Release 一 ZIP;安装引用 `github:Syngnat/GoNavi-Plugin-Market@<tag>`(**必须带 @tag**,无 tag 解析 latest 会拿错 release)。
-- 上架:`public/catalog.json` 增补条目,前提是 Release 已建、直链可下载、SHA-256 真实。
-- 验证:`go test ./plugins/...`;宿主侧静态检查与 CLI 闭环见 `release-notes/`。
+- 发布:tag `<插件名>-v<semver>`(如 `nginx-inspector-v1.0.0`),一 Release 一 ZIP;安装引用 `github:Syngnat/GoNavi-Plugin-Market@<tag>`(**必须带 @tag**,无 tag 解析 latest 会拿错 release)。推 tag 后 `.github/workflows/plugin-release.yml` 会构建五平台 ZIP 并创建 Release,需要先提交 `release-notes/nginx-inspector-<version>.md`。
+- 上架:`public/catalog.json` 增补条目,前提是 Release 已建、直链可下载、SHA-256 真实;改完跑 `node scripts/verify-plugin-catalog.mjs` 校验版本、installSpec、`ui.html-panel` 与 artifact 版本一致性。
+- 验证:`go test ./plugins/nginx-inspector/...`;`.github/workflows/plugins.yml` 在插件改动时跑 gofmt/vet/test 与目录一致性检查,宿主侧闭环见 `release-notes/`。
 
 ## 开发
 

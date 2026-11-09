@@ -45,8 +45,14 @@ func TestAnalyzeAccessLog(t *testing.T) {
 	if stats.TimeFrom == "" || stats.TimeTo == "" || stats.TimeFrom >= stats.TimeTo {
 		t.Fatalf("time window = %s..%s", stats.TimeFrom, stats.TimeTo)
 	}
-	if stats.Path == "/var/log/nginx/access.log" && stats.WindowBytes != 4096 {
-		t.Fatalf("path/window wrong")
+	if stats.Path != "/var/log/nginx/access.log" {
+		t.Fatalf("path = %q", stats.Path)
+	}
+	if stats.RequestedBytes != 4096 || stats.WindowBytes != int64(len(sampleAccessLog)) || stats.AnalyzedBytes != stats.WindowBytes {
+		t.Fatalf("window mismatch: requested=%d window=%d analyzed=%d content=%d", stats.RequestedBytes, stats.WindowBytes, stats.AnalyzedBytes, len(sampleAccessLog))
+	}
+	if stats.RequestTime.Samples != 4 || stats.UpstreamTime.Samples != 4 {
+		t.Fatalf("timing samples request=%d upstream=%d", stats.RequestTime.Samples, stats.UpstreamTime.Samples)
 	}
 	// /api/users appears with upstream times twice: 0.045 + 1.200 → avg ≈ 622.5ms
 	found := false

@@ -2,29 +2,43 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
+  <!-- The panel only ever loads its own bundle: no remote code, no inline
+       script/style. The only fetch is the host bridge at
+       /__gonavi/plugin-window/, which is same-origin (see pluginWindow/protocol.ts
+       in the host), so connect-src stays at 'self' rather than 'none'. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
   <title>Nginx Inspector</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <a class="skip" id="skip" href="#main">跳到主内容</a>
   <div id="app">
-    <aside class="rail">
-      <div class="brand">Nginx Inspector<small id="brand-sub"></small></div>
+    <aside class="rail" aria-label="Nginx Inspector">
+      <div class="brand"><span class="brand-name">Nginx Inspector</span><small id="brand-sub"></small></div>
       <div class="conn-block">
-        <span id="conn-dot" class="conn-dot"></span><span id="conn-label"></span>
-        <select id="conn-select"></select>
+        <div class="conn-status">
+          <span id="conn-dot" class="conn-dot" aria-hidden="true"></span>
+          <span id="conn-label"></span>
+        </div>
+        <select id="conn-select" aria-label="连接"></select>
+        <div class="conn-actions">
+          <button type="button" id="conn-test" class="mini">测试</button>
+        </div>
         <div class="conn-meta" id="conn-meta"></div>
       </div>
-      <nav id="nav"></nav>
+      <nav id="nav" aria-label="主分区"></nav>
       <div class="spacer"></div>
       <div class="foot" id="foot"></div>
     </aside>
-    <main class="main" id="main"></main>
+    <main class="main" id="main" tabindex="-1"></main>
   </div>
 
-  <div id="toast"></div>
+  <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
-  <div id="modal-backdrop">
-    <div id="modal"></div>
+  <div id="modal-backdrop" aria-hidden="true">
+    <div id="modal" role="dialog" aria-modal="true" tabindex="-1"></div>
   </div>
 
   <script src="app.js"></script>

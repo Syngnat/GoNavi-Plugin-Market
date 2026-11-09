@@ -3,21 +3,52 @@ package commands
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/sshx"
 )
 
 const probeTimeout = 3 * time.Second
 const probeWorkers = 8
+const probeOverallTimeout = 20 * time.Second
 
-// UpstreamCheck is the upstreams.check response.
+// UpstreamCheck is the upstreams.check response. Down counts primary members
+// only; backup members are reported through Backup so a healthy backup pool
+// does not look like a degraded primary pool.
 type UpstreamCheck struct {
-	Upstreams []UpstreamInfo `json:"upstreams"`
-	Alive     int            `json:"alive"`
-	Down      int            `json:"down"`
-	Skipped   int            `json:"skipped"`
+	Upstreams []UpstreamCheckInfo `json:"upstreams"`
+	Alive     int                 `json:"alive"`
+	Down      int                 `json:"down"`
+	Backup    int                 `json:"backup"`
+	Skipped   int                 `json:"skipped"`
+}
+
+// UpstreamCheckInfo mirrors config.tree's upstream entries and adds the
+// per-member probe verdict fields owned by this command.
+type UpstreamCheckInfo struct {
+	Name    string                `json:"name"`
+	File    string                `json:"file,omitempty"`
+	Line    int                   `json:"line"`
+	Servers []UpstreamMemberCheck `json:"servers,omitempty"`
+}
+
+// UpstreamMemberCheck is one upstream member with its probe verdict.
+// Disabled marks a member configured with "down" (never probed), Backup marks
+// a backup member (probed but counted separately), and SkipReason explains
+// why a member was not probed at all.
+type UpstreamMemberCheck struct {
+	Address    string   `json:"address"`
+	Params     []string `json:"params,omitempty"`
+	Line       int      `json:"line"`
+	Alive      *bool    `json:"alive,omitempty"`
+	LatencyMs  *int64   `json:"latencyMs,omitempty"`
+	Backup     bool     `json:"backup,omitempty"`
+	Disabled   bool     `json:"disabled,omitempty"`
+	SkipReason string   `json:"skipReason,omitempty"`
 }
 
 type probeTarget struct {
@@ -25,6 +56,13 @@ type probeTarget struct {
 	member   int
 	host     string
 	port     int
+	backup   bool
+}
+
+type probeOutcome struct {
+	latencyMs  int64
+	skipped    bool
+	skipReason string
 }
 
 func (r *Runtime) upstreamsCheck(ctx context.Context, args json.RawMessage) (any, error) {
@@ -38,45 +76,92 @@ func (r *Runtime) upstreamsCheck(ctx context.Context, args json.RawMessage) (any
 	if perr != nil {
 		return nil, perr
 	}
-	var targets []probeTarget
+	check := &UpstreamCheck{Upstreams: make([]UpstreamCheckInfo, 0, len(loaded.tree.Upstreams))}
 	for i := range loaded.tree.Upstreams {
-		for j := range loaded.tree.Upstreams[i].Servers {
-			host, port, ok := splitAddress(loaded.tree.Upstreams[i].Servers[j].Address)
-			if !ok {
-				loaded.tree.Upstreams[i].Servers[j].Alive = nil
+		source := &loaded.tree.Upstreams[i]
+		info := UpstreamCheckInfo{Name: source.Name, File: source.File, Line: source.Line}
+		info.Servers = make([]UpstreamMemberCheck, 0, len(source.Servers))
+		for j := range source.Servers {
+			server := source.Servers[j]
+			info.Servers = append(info.Servers, UpstreamMemberCheck{
+				Address: server.Address, Params: server.Params, Line: server.Line,
+				Backup:   hasParam(server.Params, "backup"),
+				Disabled: hasParam(server.Params, "down"),
+			})
+		}
+		check.Upstreams = append(check.Upstreams, info)
+	}
+
+	var targets []probeTarget
+	for i := range check.Upstreams {
+		for j := range check.Upstreams[i].Servers {
+			member := &check.Upstreams[i].Servers[j]
+			if member.Disabled {
 				continue
 			}
-			targets = append(targets, probeTarget{upstream: i, member: j, host: host, port: port})
+			if member.Backup {
+				check.Backup++
+			}
+			host, port, ok := splitAddress(member.Address)
+			if !ok {
+				member.SkipReason = probeSkipReason(member.Address)
+				check.Skipped++
+				continue
+			}
+			targets = append(targets, probeTarget{
+				upstream: i, member: j, host: host, port: port, backup: member.Backup,
+			})
 		}
 	}
 	results := make([]probeOutcome, len(targets))
 	probeAll(ctx, r, input.ConnectionID, targets, results)
 
-	check := &UpstreamCheck{Upstreams: loaded.tree.Upstreams}
-	for i, target := range targets {
+	for i := range targets {
+		target := targets[i]
 		outcome := results[i]
+		member := &check.Upstreams[target.upstream].Servers[target.member]
 		if outcome.skipped {
+			member.SkipReason = outcome.skipReason
 			check.Skipped++
 			continue
 		}
-		member := &check.Upstreams[target.upstream].Servers[target.member]
 		alive := outcome.latencyMs >= 0
 		member.Alive = &alive
 		if alive {
 			latency := outcome.latencyMs
 			member.LatencyMs = &latency
 			check.Alive++
-		} else {
+			continue
+		}
+		if !target.backup {
 			check.Down++
 		}
 	}
-	// Members never targeted (variable or unix addresses) stay Alive=nil.
 	return check, nil
 }
 
-type probeOutcome struct {
-	latencyMs int64
-	skipped   bool
+// probeSkipReason explains why an address is not probeable.
+func probeSkipReason(address string) string {
+	trimmed := strings.TrimSpace(address)
+	switch {
+	case trimmed == "":
+		return "empty address"
+	case strings.HasPrefix(trimmed, "unix:"):
+		return "unix socket addresses cannot be probed over SSH"
+	case strings.Contains(trimmed, "$"):
+		return "address contains a variable and cannot be resolved"
+	default:
+		return "address is not a host:port pair"
+	}
+}
+
+func hasParam(params []string, name string) bool {
+	for _, param := range params {
+		if param == name {
+			return true
+		}
+	}
+	return false
 }
 
 func probeAll(ctx context.Context, r *Runtime, connectionID string, targets []probeTarget, results []probeOutcome) {
@@ -86,25 +171,47 @@ func probeAll(ctx context.Context, r *Runtime, connectionID string, targets []pr
 	profile, perr := r.profile(connectionID)
 	if perr != nil {
 		for i := range results {
-			results[i].skipped = true
+			results[i] = probeOutcome{skipped: true, skipReason: "connection profile is unavailable: " + perr.Message}
 		}
 		return
 	}
+	probeCtx, cancel := context.WithTimeout(ctx, probeOverallTimeout)
+	defer cancel()
 	sem := make(chan struct{}, probeWorkers)
 	var wg sync.WaitGroup
-	for i, target := range targets {
+	for i := range targets {
 		wg.Add(1)
-		go func(i int, target probeTarget) {
+		go func(index int) {
 			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			latency, perr := r.pool.Probe(ctx, profile, target.host, target.port, probeTimeout)
-			if perr != nil {
-				results[i] = probeOutcome{skipped: true}
+			select {
+			case sem <- struct{}{}:
+			case <-probeCtx.Done():
+				results[index] = probeOutcome{skipped: true, skipReason: "probe deadline exceeded"}
 				return
 			}
-			results[i] = probeOutcome{latencyMs: latency}
-		}(i, target)
+			defer func() { <-sem }()
+			target := targets[index]
+			latency, reason, perr := r.pool.Probe(probeCtx, profile, target.host, target.port, probeTimeout)
+			switch {
+			case perr != nil:
+				if errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
+					results[index] = probeOutcome{skipped: true, skipReason: "probe deadline exceeded"}
+					return
+				}
+				results[index] = probeOutcome{skipped: true, skipReason: "SSH probe failed: " + perr.Message}
+			case latency < 0:
+				if reason == sshx.ProbeForwardingDisabled {
+					results[index] = probeOutcome{
+						skipped:    true,
+						skipReason: "TCP forwarding is disabled on this SSH server (AllowTcpForwarding no)",
+					}
+					return
+				}
+				results[index] = probeOutcome{latencyMs: -1}
+			default:
+				results[index] = probeOutcome{latencyMs: latency}
+			}
+		}(i)
 	}
 	wg.Wait()
 }

@@ -1,8 +1,9 @@
 # GoNavi Plugin: Nginx Inspector
 
 GoNavi 插件:通过 SSH 对远程 nginx 做**只读诊断**——配置结构、`nginx -t` 校验、
-错误/访问日志、访问统计、TLS 证书到期检查、上游健康探测。唯一的写命令是
-`service.reload`,且强制先通过 `nginx -t` 并要求显式确认。
+错误/访问日志、访问统计、TLS 证书到期检查、上游健康探测。写命令只有三条:
+`connections.save`、`connections.delete` 与 `service.reload`;后者强制先通过
+`nginx -t` 并要求显式确认。其余 12 条命令均为只读。
 
 插件 ID:`com.gonavi.nginx-inspector`(Apache-2.0)。
 
@@ -10,16 +11,16 @@ GoNavi 插件:通过 SSH 对远程 nginx 做**只读诊断**——配置结构�
 
 | 模块 | 说明 |
 |---|---|
-| 连接管理 | SSH 配置(密码/私钥)保存在本机插件数据目录,界面永不回显密码;首次连接记录服务器指纹(TOFU),指纹变化即拒绝 |
-| 概览 | `nginx -V` 解析:版本、二进制、prefix、主配置、日志路径、systemd/容器环境 |
-| 配置 | 主配置 + include 递归展开(环形检测、64 文件/8 层上限),server/upstream/location 摘要,按文件查看内容 |
+| 连接管理 | SSH 配置(密码/私钥)保存在本机插件数据目录,界面永不回显密码(仅 `hasPassword`/`hasKeyPassphrase`),编辑时留空即保留原凭据;首次连接记录服务器指纹(TOFU),指纹变化即拒绝,保存时省略 `fingerprint` 保持记录、显式传入才重新钉住。保存与删除属于写命令 |
+| 概览 | `nginx -V` 解析:版本、二进制、prefix、主配置、日志路径、systemd/容器环境;结果在插件进程内缓存约 10 分钟,可显式刷新 |
+| 配置 | 主配置 + include 递归展开(环形检测、64 文件/8 层上限),server/upstream/location 摘要,按文件查看内容;文件数即 `files.length`,超限或超长时展示 `truncated` |
 | 校验 | 远程执行 `nginx -t`,逐条解析报错的 file:line |
-| 服务 | 状态(systemd/pid/uptime);reload 带 `nginx -t` 门禁 + 显式确认 |
-| 日志 | error/access tail(≤1000 行)+ 本地正则过滤 + 远程 grep 搜索(≤50 MB 窗口) |
-| 访问统计 | combined 格式聚合:状态码/分类、方法、Top IP、Top 路径(含平均上游耗时)、时间窗、吞吐 |
-| 证书 | 解析配置引用的 `ssl_certificate`(X.509),标记 ≤30 天到期/已过期/不可读 |
-| 上游 | 从远程主机对每个 upstream server 做 TCP 探测(并发 ≤8,3 秒超时) |
-| Agent | `ai.tools` 将命令暴露给 GoNavi Agent;`ai.skills` 提供 `nginx-triage` 技能文档 |
+| 服务 | 状态(systemd/pid/uptime);reload 带 `nginx -t` 门禁 + 显式确认,回执区分 `applied`(error_log 无 emerg/alert)与 `unknown` |
+| 日志 | error/access tail(≤1000 行,可按 error_log 级别)+ 本地正则过滤 + 远程 grep 搜索(≤50 MB 窗口);展示日志来源(`source`)、说明(`note`)、总行数与窗口起始行,命中行号、窗口字节偏移可追溯,截断有提示 |
+| 访问统计 | combined 格式聚合:状态码/分类、方法、Top IP、Top 路径(含平均耗时)、时间范围;区分"请求窗口"与"实际分析字节",gzip 日志标记为不支持解析 |
+| 证书 | 解析配置引用的 `ssl_certificate`(X.509,相对路径按 prefix 解析,同时展示原始路径与解析后文件),标记 ≤30 天到期/已过期/不可读/解析失败(含原因)/跳过 |
+| 上游 | 从远程主机对每个 upstream server 做 TCP 探测(并发 ≤8,3 秒超时);unix socket、变量地址或配置中已 `down` 的成员标记为跳过,backup/disabled 单独展示 |
+| 界面 | 独立 HTML 窗口(无外部资源、CSP 限制为同源脚本/样式);切页使用代际令牌防止旧响应覆盖新页面,切换页签不会触发 SSH 连接测试 |
 
 ## 安装
 
@@ -29,8 +30,8 @@ GoNavi → 标题栏插件按钮 → 插件市场/本地安装:选择发行 ZIP,
 或使用 CLI(先关闭桌面端插件运行时):
 
 ```sh
-gonavi plugin --root <data-root>/plugins inspect gonavi-plugin-nginx-1.0.0.zip
-gonavi plugin --root <data-root>/plugins install --digest <sha256> --trust gonavi-plugin-nginx-1.0.0.zip
+gonavi plugin --root <data-root>/plugins inspect gonavi-plugin-nginx-inspector-1.0.1.zip
+gonavi plugin --root <data-root>/plugins install --digest <sha256> --trust gonavi-plugin-nginx-inspector-1.0.1.zip
 gonavi plugin --root <data-root>/plugins enable com.gonavi.nginx-inspector
 ```
 
@@ -41,6 +42,7 @@ gonavi plugin --root <data-root>/plugins enable com.gonavi.nginx-inspector
 | `ai.tools` | 将命令暴露给 Agent(写命令仍需逐次审批) |
 | `ai.skills` | 提供 nginx-triage 技能文档(显式加载) |
 | `host.log` | 写有界诊断日志 |
+| `ui.html-panel` | 打开独立 HTML 插件窗口(`ui/index.html`,本地静态资源) |
 
 插件进程拥有当前用户的全部 OS 权限;进程隔离与限额是可靠性边界,不是安全沙箱。
 请在信任前审查源码与权限清单。
@@ -56,7 +58,7 @@ SDK 以伪版本引用 `github.com/Syngnat/GoNavi/sdk/go`,无其他第三方依�
 
 ```sh
 go test ./plugins/nginx-inspector/...
-go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.0.zip
+go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.1.zip
 ```
 
 `buildtool` 交叉编译 5 个平台(windows/amd64、linux/amd64、linux/arm64、
@@ -73,7 +75,7 @@ internal/sshx/           # SSH 连接池、TOFU 指纹、有界命令执行、SF
 internal/ngxconf/        # nginx 配置词法/递归下降解析器
 internal/store/          # 连接配置持久化(0600,掩码回传,读 GONAVI_PLUGIN_DATA)
 internal/rpcerr/         # 稳定错误码 → plugin.Error
-ui/                      # 独立插件窗口(原生 HTML/JS,无外部资源)
+ui/                      # 独立插件窗口(原生 HTML/JS,无外部资源,含 CSP)
 skills/nginx-triage/     # Agent 技能文档
 ```
 
@@ -81,4 +83,6 @@ skills/nginx-triage/     # Agent 技能文档
 
 - **不写配置文件**:GUI 配置生成/写回是另一个量级的工程与生产风险,本插件定位诊断。
 - **不读私钥内容回传**;密码仅在保存与拨号时存在于插件进程内存。
-- 日志读取全部有字节/行数上限,响应恒小于 1 MiB 协议帧。
+- **路径白名单**:读取仅限 nginx prefix、日志与证书目录,越界返回 `PATH_NOT_ALLOWED`。
+- 日志与配置读取全部有字节/行数上限(单文件 ≤512 KiB、tail ≤1000 行),响应中的
+  `truncated` 会如实回传并在界面上提示,避免静默截断。

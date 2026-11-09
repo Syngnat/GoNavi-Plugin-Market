@@ -16,6 +16,68 @@ func newTestStore(t *testing.T) *Store {
 	return Open(filepath.Join(t.TempDir(), "connections.json"))
 }
 
+func TestSaveMergesEmptySecrets(t *testing.T) {
+	s := newTestStore(t)
+	saved, err := s.Save(Profile{Name: "prod", Host: "h", Port: 22, Username: "u", AuthType: AuthKey, KeyPath: "/keys/id", KeyPassphrase: "pp"})
+	if err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if err := s.SetFingerprint(saved.ID, "SHA256:abc"); err != nil {
+		t.Fatalf("fingerprint: %v", err)
+	}
+	// A rename submits no secrets at all; the stored passphrase and TOFU
+	// fingerprint must survive.
+	renamed, err := s.Save(Profile{ID: saved.ID, Name: "prod-renamed", Host: "h", Port: 22, Username: "u", AuthType: AuthKey, KeyPath: "/keys/id"})
+	if err != nil {
+		t.Fatalf("rename save: %v", err)
+	}
+	if renamed.Name != "prod-renamed" {
+		t.Fatalf("rename not applied: %+v", renamed)
+	}
+	got, ok, err := s.Get(saved.ID)
+	if err != nil || !ok {
+		t.Fatalf("get: %v %v", ok, err)
+	}
+	if got.KeyPassphrase != "pp" {
+		t.Fatalf("key passphrase was wiped: %q", got.KeyPassphrase)
+	}
+	if got.Fingerprint != "SHA256:abc" {
+		t.Fatalf("fingerprint was wiped: %q", got.Fingerprint)
+	}
+
+	// Password auth: an empty submitted password keeps the stored one.
+	pw, err := s.Save(Profile{Name: "pw", Host: "h", Port: 22, Username: "u", AuthType: AuthPassword, Password: "secret"})
+	if err != nil {
+		t.Fatalf("save password: %v", err)
+	}
+	pw.Name = "pw2"
+	pw.Password = ""
+	if _, err := s.Save(pw); err != nil {
+		t.Fatalf("save without password: %v", err)
+	}
+	gotPw, _, _ := s.Get(pw.ID)
+	if gotPw.Password != "secret" {
+		t.Fatalf("password was wiped: %q", gotPw.Password)
+	}
+
+	// An explicit new fingerprint still replaces the old one.
+	gotPw.Fingerprint = "SHA256:new"
+	if _, err := s.Save(gotPw); err != nil {
+		t.Fatalf("save fingerprint: %v", err)
+	}
+	final, _, _ := s.Get(pw.ID)
+	if final.Fingerprint != "SHA256:new" {
+		t.Fatalf("fingerprint update lost: %q", final.Fingerprint)
+	}
+}
+
+func TestSaveUnknownID(t *testing.T) {
+	s := newTestStore(t)
+	if _, err := s.Save(Profile{ID: "missing", Name: "n", Host: "h", Port: 22, Username: "u", AuthType: AuthPassword, Password: "p"}); err == nil {
+		t.Fatalf("save with unknown id should fail")
+	}
+}
+
 func TestSaveListDelete(t *testing.T) {
 	s := newTestStore(t)
 	saved, err := s.Save(Profile{Name: "prod", Host: "10.0.0.1", Port: 22, Username: "deploy", AuthType: AuthPassword, Password: "secret"})

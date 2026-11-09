@@ -20,6 +20,7 @@ type connectionInput struct {
 	Password      string `json:"password,omitempty"`
 	KeyPath       string `json:"keyPath,omitempty"`
 	KeyPassphrase string `json:"keyPassphrase,omitempty"`
+	Fingerprint   string `json:"fingerprint,omitempty"`
 }
 
 func (r *Runtime) listConnections(ctx context.Context, args json.RawMessage) (any, error) {
@@ -54,6 +55,7 @@ func (r *Runtime) saveConnection(ctx context.Context, args json.RawMessage) (any
 		Password:      input.Password,
 		KeyPath:       strings.TrimSpace(input.KeyPath),
 		KeyPassphrase: input.KeyPassphrase,
+		Fingerprint:   strings.TrimSpace(input.Fingerprint),
 	})
 	if err != nil {
 		return nil, rpcerr.E(rpcerr.CodeInvalidArgs, err.Error())

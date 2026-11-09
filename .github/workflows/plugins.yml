@@ -1,0 +1,57 @@
+name: Plugins
+
+# Guards the official plugins that live in this repository. The market site and
+# the server keep their own workflows; plugin code is still part of the same
+# module, so a plugin change must build and pass its tests before release.
+on:
+  push:
+    paths:
+      - 'plugins/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'scripts/verify-plugin-catalog.mjs'
+      - '.github/workflows/plugins.yml'
+  pull_request:
+    paths:
+      - 'plugins/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'scripts/verify-plugin-catalog.mjs'
+      - '.github/workflows/plugins.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  nginx-inspector:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: gofmt
+        run: |
+          files="$(gofmt -l plugins/nginx-inspector)"
+          if [ -n "$files" ]; then
+            echo "gofmt required for:"
+            echo "$files"
+            exit 1
+          fi
+      - name: vet
+        run: go vet ./plugins/nginx-inspector/...
+      - name: test
+        run: go test ./plugins/nginx-inspector/...
+      - name: build
+        run: go build ./plugins/nginx-inspector/...
+
+  catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: manifest and catalog consistency
+        run: node scripts/verify-plugin-catalog.mjs

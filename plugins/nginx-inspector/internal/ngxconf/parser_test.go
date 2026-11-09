@@ -1,6 +1,9 @@
 package ngxconf
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseBasic(t *testing.T) {
 	content := `# top comment
@@ -157,5 +160,198 @@ func TestWalkStopsAtLocations(t *testing.T) {
 	directives, _ := Parse("t.conf", content)
 	if got := FindServers(directives); len(got) != 1 {
 		t.Fatalf("FindServers should not descend into location blocks: %d", len(got))
+	}
+}
+func TestParseHashInsideWord(t *testing.T) {
+	directives, err := Parse("t.conf", "proxy_pass http://backend/#fragment;\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(directives) != 1 || len(directives[0].Args) != 1 {
+		t.Fatalf("tree = %+v", directives)
+	}
+	if got := directives[0].Args[0].Value; got != "http://backend/#fragment" {
+		t.Fatalf("hash inside word = %q", got)
+	}
+}
+
+func TestParseHashAfterSpaceStartsComment(t *testing.T) {
+	directives, err := Parse("t.conf", "listen 80; # trailing comment\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(directives) != 1 || len(directives[0].Args) != 1 {
+		t.Fatalf("comment leaked into args: %+v", directives)
+	}
+}
+
+func TestParseRegexKeepsBackslash(t *testing.T) {
+	directives, err := Parse("t.conf", "location ~ \\.php$ {\n    fastcgi_pass unix:/run/php.sock;\n}\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(directives) != 1 || len(directives[0].Args) != 2 {
+		t.Fatalf("tree = %+v", directives)
+	}
+	if got := directives[0].Args[1].Value; got != "\\.php$" {
+		t.Fatalf("regex escape = %q, want %q", got, "\\.php$")
+	}
+}
+
+func TestParseQuoteFollowedByText(t *testing.T) {
+	directives, err := Parse("t.conf", "if ($http_user_agent ~* \"bot\") {\n    return 403;\n}\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(directives) != 1 || len(directives[0].Args) != 3 {
+		t.Fatalf("tree = %+v", directives)
+	}
+	want := []string{"($http_user_agent", "~*", "bot)"}
+	for i, expected := range want {
+		if got := directives[0].Args[i].Value; got != expected {
+			t.Fatalf("arg %d = %q, want %q", i, got, expected)
+		}
+	}
+	if !directives[0].Args[2].Quoted {
+		t.Fatalf("quoted flag lost on %+v", directives[0].Args[2])
+	}
+	if len(directives[0].Block) != 1 || directives[0].Block[0].Name != "return" {
+		t.Fatalf("block = %+v", directives[0].Block)
+	}
+}
+
+func TestParseEscapesInsideQuotes(t *testing.T) {
+	directives, err := Parse("t.conf", "add_header X \"a\\tb\";\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got := directives[0].Args[1].Value; got != "a\tb" {
+		t.Fatalf("quoted escape = %q, want a tab", got)
+	}
+}
+
+func TestSimpleDirectiveCarriesFile(t *testing.T) {
+	directives, err := Parse("nginx.conf", "worker_processes 1;\n")
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if directives[0].File != "nginx.conf" {
+		t.Fatalf("simple directive file = %q", directives[0].File)
+	}
+}
+
+func TestCompleteBoundaryStopsAfterLastDirective(t *testing.T) {
+	content := "user nginx;\nhttp {\n    server {\n        listen 80;\n        proxy_pass http://a/#frag;\n        client_max"
+	want := strings.Index(content, "#frag;") + len("#frag;")
+	if got := CompleteBoundary(content); got != want {
+		t.Fatalf("boundary = %d, want %d", got, want)
+	}
+}
+
+func TestCompleteBoundaryIgnoresQuotedSemicolon(t *testing.T) {
+	content := "add_header X \"a;b\";\nserver"
+	want := len("add_header X \"a;b\";")
+	if got := CompleteBoundary(content); got != want {
+		t.Fatalf("boundary = %d, want %d", got, want)
+	}
+}
+
+func TestParsePartialKeepsParsedPrefix(t *testing.T) {
+	directives, err := ParsePartial("t.conf", "worker_processes 1;\n}\n")
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if len(directives) != 1 || directives[0].Name != "worker_processes" {
+		t.Fatalf("prefix = %+v", directives)
+	}
+	if !strings.Contains(err.Error(), "unbalanced") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestParsePartialRetainsOpenBlock(t *testing.T) {
+	directives, err := ParsePartial("t.conf", "http {\n    server {\n        listen 80;\n")
+	if err == nil {
+		t.Fatal("expected an end-of-file error")
+	}
+	if !strings.Contains(err.Error(), "unexpected end of file") {
+		t.Fatalf("error = %v", err)
+	}
+	if len(directives) != 1 || directives[0].Name != "http" || len(directives[0].Block) != 1 {
+		t.Fatalf("partial tree = %+v", directives)
+	}
+	inner := directives[0].Block[0]
+	if inner.Name != "server" || len(inner.Block) != 1 || inner.Block[0].Name != "listen" {
+		t.Fatalf("partial block = %+v", inner)
+	}
+}
+
+func TestFindServersSkipsUpstreamAndMail(t *testing.T) {
+	content := "http {\n    upstream pool {\n        server 10.0.0.1:8080;\n    }\n    server {\n        listen 80;\n        location / {\n            proxy_pass http://pool;\n        }\n    }\n}\nmail {\n    server {\n        listen 25;\n    }\n}\n"
+	directives, err := Parse("t.conf", content)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	servers := FindServers(directives)
+	if len(servers) != 1 {
+		t.Fatalf("servers = %d, want 1", len(servers))
+	}
+	if got := ListenAddresses(servers[0]); len(got) != 1 || got[0] != "80" {
+		t.Fatalf("server listen = %v", got)
+	}
+}
+
+func TestServerEnabledReadsListenParameters(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want bool
+	}{
+		{"plain listener with certificate", "server {\n    listen 80;\n    ssl_certificate /etc/ssl/a.pem;\n}\n", false},
+		{"ssl parameter", "server {\n    listen 443 ssl;\n}\n", true},
+		{"quic parameter", "server {\n    listen 443 quic reuseport;\n}\n", true},
+		{"http2 only", "server {\n    listen 8443 http2;\n}\n", false},
+		{"explicit address with ssl", "server {\n    listen 192.0.2.1:443 ssl default_server;\n}\n", true},
+	}
+	for _, c := range cases {
+		directives, err := Parse("t.conf", c.src)
+		if err != nil {
+			t.Fatalf("%s: parse: %v", c.name, err)
+		}
+		servers := FindServers(directives)
+		if len(servers) != 1 {
+			t.Fatalf("%s: servers = %d", c.name, len(servers))
+		}
+		if got := ServerEnabled(servers[0]); got != c.want {
+			t.Fatalf("%s: ServerEnabled = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestLocationPathDropsModifiers(t *testing.T) {
+	content := "server {\n" +
+		"    location = /exact { root /a; }\n" +
+		"    location ^~ /static/ { root /b; }\n" +
+		"    location ~ \\.php$ { fastcgi_pass unix:/run/php.sock; }\n" +
+		"    location ~* \\.(jpg|png)$ { expires 1d; }\n" +
+		"    location /plain { proxy_pass http://pool; }\n" +
+		"}\n"
+	directives, err := Parse("t.conf", content)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	servers := FindServers(directives)
+	if len(servers) != 1 {
+		t.Fatalf("servers = %d", len(servers))
+	}
+	locations := FindLocations(servers[0])
+	want := []string{"/exact", "/static/", "\\.php$", "\\.(jpg|png)$", "/plain"}
+	if len(locations) != len(want) {
+		t.Fatalf("locations = %d, want %d", len(locations), len(want))
+	}
+	for i, expected := range want {
+		if got := LocationPath(locations[i]); got != expected {
+			t.Fatalf("location %d path = %q, want %q", i, got, expected)
+		}
 	}
 }

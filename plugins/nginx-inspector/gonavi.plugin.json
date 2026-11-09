@@ -7,7 +7,7 @@
   "description": "Read-only nginx diagnostics over SSH: config tree with include expansion, nginx -t validation, gated reload, error/access log tailing and search, access log statistics, TLS certificate expiry review and upstream health probes.",
   "author": "GoNavi",
   "license": "Apache-2.0",
-  "minHostVersion": "1.1.5",
+  "minHostVersion": "1.2.1",
   "permissions": ["ai.tools", "ai.skills", "host.log", "ui.html-panel"],
   "permissionNotes": {
     "ai.tools": "Exposes the nginx diagnostics commands to the GoNavi Agent. Write commands (connection edits, service reload) still require explicit approval.",
@@ -230,7 +230,7 @@
             },
             {
               "type": "alert",
-              "text": "Reload is the only write command. It refuses to run when nginx -t reports errors and requires explicit confirmation."
+              "text": "connections.save, connections.delete and service.reload are the only write commands. Reload refuses to run when nginx -t reports errors and requires explicit confirmation."
             }
           ]
         }

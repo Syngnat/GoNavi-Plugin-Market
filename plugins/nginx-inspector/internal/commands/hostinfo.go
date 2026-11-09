@@ -3,7 +3,7 @@ package commands
 import (
 	"context"
 	"encoding/json"
-	"regexp"
+	"path"
 	"strings"
 	"time"
 
@@ -12,6 +12,10 @@ import (
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/store"
 	plugin "github.com/Syngnat/GoNavi/sdk/go"
 )
+
+// hostInfoTTL bounds how long a discovery result is reused. nginx can be
+// upgraded or moved while the plugin is open, so the cache must expire.
+const hostInfoTTL = 10 * time.Minute
 
 // HostInfo is the discovered nginx installation of one remote machine.
 type HostInfo struct {
@@ -25,13 +29,12 @@ type HostInfo struct {
 	PIDPath      string `json:"pidPath,omitempty"`
 	Systemd      bool   `json:"systemd"`
 	Docker       bool   `json:"docker"`
+	Container    bool   `json:"container"`
 	Kernel       string `json:"kernel,omitempty"`
 	Hostname     string `json:"hostname,omitempty"`
 	Locale       string `json:"locale,omitempty"`
 	DiscoveredAt string `json:"discoveredAt,omitempty"`
 }
-
-var versionRegex = regexp.MustCompile(`nginx/(\S+)`)
 
 func (r *Runtime) hostInfo(ctx context.Context, args json.RawMessage) (any, error) {
 	input, perr := decodeArgs[struct {
@@ -49,7 +52,7 @@ func (r *Runtime) hostInfo(ctx context.Context, args json.RawMessage) (any, erro
 		r.mu.Lock()
 		cached := r.info[profile.ID]
 		r.mu.Unlock()
-		if cached != nil {
+		if infoFresh(cached) {
 			return cached, nil
 		}
 	}
@@ -64,79 +67,210 @@ func (r *Runtime) hostInfo(ctx context.Context, args json.RawMessage) (any, erro
 	return info, nil
 }
 
+func infoFresh(info *HostInfo) bool {
+	if info == nil {
+		return false
+	}
+	discovered, err := time.Parse(time.RFC3339, info.DiscoveredAt)
+	if err != nil {
+		return false
+	}
+	return time.Since(discovered) < hostInfoTTL
+}
+
+// discoveryScript collects the binary, the two version outputs, the service
+// environment and the machine facts in one SSH round trip. Values are emitted
+// under @@ markers because -V output contains spaces and can span lines.
+const discoveryScript = `BIN=$(command -v nginx 2>/dev/null)
+if [ -z "$BIN" ]; then
+  for p in /usr/local/openresty/nginx/sbin/nginx /usr/local/openresty/bin/openresty /opt/homebrew/opt/openresty/nginx/sbin/nginx /usr/local/nginx/sbin/nginx /usr/sbin/nginx /usr/local/sbin/nginx /usr/local/bin/nginx /opt/homebrew/bin/nginx /opt/nginx/sbin/nginx; do
+    if [ -x "$p" ]; then BIN="$p"; break; fi
+  done
+fi
+echo "@@BIN"
+echo "$BIN"
+if [ -n "$BIN" ]; then
+  echo "@@V"
+  "$BIN" -v 2>&1
+  echo "@@VV"
+  "$BIN" -V 2>&1
+fi
+echo "@@SYS"
+if [ -d /run/systemd/system ]; then echo yes; else echo no; fi
+echo "@@DOCKER"
+if [ -f /.dockerenv ] || [ -f /run/.containerenv ]; then echo yes; else echo no; fi
+echo "@@CGROUP"
+cat /proc/1/cgroup 2>/dev/null
+echo "@@KERNEL"
+uname -sr
+echo "@@HOST"
+uname -n`
+
+var discoveryMarkers = []string{"@@BIN", "@@V", "@@VV", "@@SYS", "@@DOCKER", "@@CGROUP", "@@KERNEL", "@@HOST"}
+
 // discover probes the remote machine for the nginx binary, version, paths
 // and service environment. It never fails when nginx is absent: Found=false
 // is a valid result so the overview can still show machine facts.
 func (r *Runtime) discover(ctx context.Context, profile store.Profile) (*HostInfo, *plugin.Error) {
 	info := &HostInfo{DiscoveredAt: time.Now().UTC().Format(time.RFC3339)}
-	binary := ""
-	if out, perr := r.pool.Output(ctx, profile, "command -v nginx 2>/dev/null", 10*time.Second); perr == nil {
-		binary = strings.TrimSpace(out)
+	out, perr := r.pool.Output(ctx, profile, discoveryScript, 20*time.Second)
+	if perr != nil {
+		return nil, perr
 	}
-	if binary == "" {
-		candidates := []string{
-			"/usr/sbin/nginx", "/usr/local/nginx/sbin/nginx", "/usr/local/sbin/nginx",
-			"/usr/local/bin/nginx", "/opt/nginx/sbin/nginx", "/opt/homebrew/bin/nginx",
-		}
-		for _, candidate := range candidates {
-			out, perr := r.pool.Output(ctx, profile, "test -x "+sshx.ShellQuote(candidate)+" && echo yes", 5*time.Second)
-			if perr == nil && strings.TrimSpace(out) == "yes" {
-				binary = candidate
-				break
-			}
-		}
+	sections := splitDiscoveryOutput(out)
+	if binary := strings.TrimSpace(sections["@@BIN"]); binary != "" {
+		info.Found = true
+		info.Binary = binary
 	}
-	if binary == "" {
-		return r.basicInfo(ctx, profile, info)
-	}
-	info.Found = true
-	info.Binary = binary
-	quoted := sshx.ShellQuote(binary)
-
-	if out, perr := r.pool.Output(ctx, profile, quoted+" -v 2>&1", 10*time.Second); perr == nil {
-		if m := versionRegex.FindStringSubmatch(out); m != nil {
-			info.Version = m[1]
+	if info.Found {
+		info.Version = parseNginxVersion(sections["@@V"])
+		if info.Version == "" {
+			info.Version = parseNginxVersion(sections["@@VV"])
 		}
-	}
-	if out, perr := r.pool.Output(ctx, profile, quoted+" -V 2>&1", 10*time.Second); perr == nil {
-		for _, arg := range strings.Fields(out) {
-			switch {
-			case strings.HasPrefix(arg, "--prefix="):
-				info.Prefix = strings.TrimPrefix(arg, "--prefix=")
-			case strings.HasPrefix(arg, "--conf-path="):
-				info.ConfPath = strings.TrimPrefix(arg, "--conf-path=")
-			case strings.HasPrefix(arg, "--error-log-path="):
-				info.ErrorLogPath = strings.TrimPrefix(arg, "--error-log-path=")
-			case strings.HasPrefix(arg, "--http-log-path="):
-				info.HTTPLogPath = strings.TrimPrefix(arg, "--http-log-path=")
-			case strings.HasPrefix(arg, "--pid-path="):
-				info.PIDPath = strings.TrimPrefix(arg, "--pid-path=")
-			}
-		}
+		configured := parseConfigureArgs(sections["@@VV"])
+		info.Prefix = configured["prefix"]
+		info.ConfPath = configured["conf-path"]
+		info.ErrorLogPath = configured["error-log-path"]
+		info.HTTPLogPath = configured["http-log-path"]
+		info.PIDPath = configured["pid-path"]
 	}
 	if info.ConfPath == "" {
-		info.ConfPath = "/etc/nginx/nginx.conf"
+		if info.Prefix != "" {
+			info.ConfPath = path.Join(info.Prefix, "conf", "nginx.conf")
+		} else {
+			info.ConfPath = "/etc/nginx/nginx.conf"
+		}
 	}
 	if info.Prefix == "" {
 		info.Prefix = "/etc/nginx"
 	}
-	return r.basicInfo(ctx, profile, info)
+	if info.HTTPLogPath == "" && info.Found {
+		info.HTTPLogPath = path.Join(info.Prefix, "logs", "access.log")
+	}
+	if info.ErrorLogPath == "" && info.Found {
+		info.ErrorLogPath = path.Join(info.Prefix, "logs", "error.log")
+	}
+	if info.PIDPath == "" && info.Found {
+		info.PIDPath = path.Join(info.Prefix, "logs", "nginx.pid")
+	}
+	info.Systemd = strings.TrimSpace(sections["@@SYS"]) == "yes"
+	info.Docker = strings.TrimSpace(sections["@@DOCKER"]) == "yes"
+	cgroup := strings.ToLower(sections["@@CGROUP"])
+	for _, marker := range []string{"docker", "kubepods", "containerd", "lxc", "podman"} {
+		if strings.Contains(cgroup, marker) {
+			info.Docker = true
+			break
+		}
+	}
+	info.Container = info.Docker
+	info.Kernel = strings.TrimSpace(sections["@@KERNEL"])
+	info.Hostname = strings.TrimSpace(sections["@@HOST"])
+	return info, nil
 }
 
-func (r *Runtime) basicInfo(ctx context.Context, profile store.Profile, info *HostInfo) (*HostInfo, *plugin.Error) {
-	if out, perr := r.pool.Output(ctx, profile, "test -d /run/systemd/system && echo yes || echo no", 5*time.Second); perr == nil {
-		info.Systemd = strings.TrimSpace(out) == "yes"
+// splitDiscoveryOutput slices the @@-delimited output into sections.
+func splitDiscoveryOutput(out string) map[string]string {
+	sections := map[string]string{}
+	current := ""
+	var lines []string
+	flush := func() {
+		if current != "" {
+			sections[current] = strings.Join(lines, "\n")
+		}
 	}
-	if out, perr := r.pool.Output(ctx, profile, "test -f /.dockerenv && echo yes || echo no", 5*time.Second); perr == nil {
-		info.Docker = strings.TrimSpace(out) == "yes"
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		marker := ""
+		for _, candidate := range discoveryMarkers {
+			if line == candidate {
+				marker = candidate
+				break
+			}
+		}
+		if marker != "" {
+			flush()
+			current = marker
+			lines = nil
+			continue
+		}
+		if current != "" {
+			lines = append(lines, line)
+		}
 	}
-	if out, perr := r.pool.Output(ctx, profile, "uname -sr", 5*time.Second); perr == nil {
-		info.Kernel = strings.TrimSpace(out)
+	flush()
+	return sections
+}
+
+// parseNginxVersion handles nginx, OpenResty and Tengine version banners.
+func parseNginxVersion(out string) string {
+	for _, field := range strings.Fields(out) {
+		lower := strings.ToLower(field)
+		for _, prefix := range []string{"nginx/", "openresty/", "tengine/"} {
+			if strings.HasPrefix(lower, prefix) {
+				return strings.TrimSuffix(field[len(prefix):], ",")
+			}
+		}
 	}
-	if out, perr := r.pool.Output(ctx, profile, "uname -n", 5*time.Second); perr == nil {
-		info.Hostname = strings.TrimSpace(out)
+	return ""
+}
+
+// parseConfigureArgs extracts --key=value tokens from "nginx -V", honouring
+// single/double quotes so --prefix='/a b' stays one value.
+func parseConfigureArgs(out string) map[string]string {
+	values := map[string]string{}
+	for _, token := range splitShellTokens(out) {
+		if !strings.HasPrefix(token, "--") {
+			continue
+		}
+		key, value, ok := strings.Cut(strings.TrimPrefix(token, "--"), "=")
+		if !ok || value == "" {
+			continue
+		}
+		switch key {
+		case "prefix", "conf-path", "error-log-path", "http-log-path", "pid-path", "lock-path", "sbin-path":
+			values[key] = value
+		}
 	}
-	return info, nil
+	return values
+}
+
+// splitShellTokens splits a command line into tokens using shell quoting
+// rules. It deliberately does not expand variables.
+func splitShellTokens(s string) []string {
+	var tokens []string
+	var current strings.Builder
+	var quote rune
+	escaped := false
+	flush := func() {
+		if current.Len() > 0 {
+			tokens = append(tokens, current.String())
+			current.Reset()
+		}
+	}
+	for _, r := range s {
+		switch {
+		case escaped:
+			current.WriteRune(r)
+			escaped = false
+		case r == rune(92) && quote != rune(39): // backslash outside single quotes
+			escaped = true
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				current.WriteRune(r)
+			}
+		case r == rune(39) || r == rune(34):
+			quote = r
+		case r == rune(32) || r == rune(9) || r == rune(13) || r == rune(10):
+			flush()
+			flush()
+		default:
+			current.WriteRune(r)
+		}
+	}
+	flush()
+	return tokens
 }
 
 // ensureInfo returns cached or freshly discovered host info and fails when
@@ -145,12 +279,8 @@ func (r *Runtime) ensureInfo(ctx context.Context, profileID string) (*HostInfo, 
 	r.mu.Lock()
 	cached := r.info[profileID]
 	r.mu.Unlock()
-	if cached != nil {
-		info, perr := requireFound(cached)
-		if perr != nil {
-			return nil, perr
-		}
-		return info, nil
+	if infoFresh(cached) {
+		return requireFound(cached)
 	}
 	profile, perr := r.profile(profileID)
 	if perr != nil {

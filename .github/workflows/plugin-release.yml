@@ -1,0 +1,92 @@
+name: Plugin Release
+
+# One tag per plugin release. The tag is the install spec the market points at,
+# so the archive built here must be the one attached to that tag's release.
+# This job is also the only writer of the archive-derived catalog fields
+# (version, installSpec, sha256, sizeBytes): they must describe the archive
+# this run just built, not a hand-copied hash from someone's laptop.
+on:
+  push:
+    tags:
+      - 'nginx-inspector-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)publish, e.g. nginx-inspector-v1.0.1'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Build five-platform package
+        run: |
+          set -eu
+          version="${RELEASE_TAG#nginx-inspector-v}"
+          manifest_version=$(python3 -c "import json;print(json.load(open('plugins/nginx-inspector/gonavi.plugin.json'))['version'])")
+          if [ "$manifest_version" != "$version" ]; then
+            echo "tag version $version does not match manifest version $manifest_version"
+            exit 1
+          fi
+          go run ./cmd/buildtool \
+            -manifest plugins/nginx-inspector/gonavi.plugin.json \
+            -output plugin-dist/nginx-inspector \
+            -zip "plugin-dist/gonavi-plugin-nginx-inspector-${version}.zip"
+          sha256sum plugin-dist/*.zip | tee plugin-dist/SHA256SUMS.txt
+          cp "plugin-dist/gonavi-plugin-nginx-inspector-${version}.zip" /tmp/nginx-inspector.zip
+          cp plugin-dist/SHA256SUMS.txt /tmp/SHA256SUMS.txt
+
+      - name: Refresh market catalog
+        run: |
+          set -eu
+          version="${RELEASE_TAG#nginx-inspector-v}"
+          git config user.name "gonavi-release-bot"
+          git config user.email "release-bot@users.noreply.github.com"
+          git fetch --depth=1 origin main
+          git checkout -B main FETCH_HEAD
+          main_version=$(python3 -c "import json;print(json.load(open('plugins/nginx-inspector/gonavi.plugin.json'))['version'])")
+          if [ "$main_version" != "$version" ]; then
+            echo "main carries manifest $main_version but the tag is $version; tag main before releasing"
+            exit 1
+          fi
+          node scripts/update-plugin-catalog.mjs \
+            --manifest plugins/nginx-inspector/gonavi.plugin.json \
+            --zip /tmp/nginx-inspector.zip
+          if git diff --quiet -- public/catalog.json; then
+            echo "catalog already current"
+            exit 0
+          fi
+          git add public/catalog.json
+          git commit -m "chore(market): publish nginx-inspector ${version}"
+          git push origin main
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          version="${RELEASE_TAG#nginx-inspector-v}"
+          notes="release-notes/nginx-inspector-${version}.md"
+          if [ ! -f "$notes" ]; then
+            echo "missing release notes: $notes"
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" \
+            /tmp/nginx-inspector.zip \
+            /tmp/SHA256SUMS.txt \
+            --title "Nginx Inspector ${version}" \
+            --notes-file "$notes"

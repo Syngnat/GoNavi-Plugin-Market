@@ -1,0 +1,8 @@
+# Keep Go sources LF so gofmt output is stable across Windows checkouts.
+*.go text eol=lf
+*.mod text eol=lf
+*.sum text eol=lf
+*.sh text eol=lf
+*.zip binary
+*.png binary
+*.jpg binary

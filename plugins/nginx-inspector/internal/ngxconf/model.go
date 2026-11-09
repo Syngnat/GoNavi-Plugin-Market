@@ -1,7 +1,5 @@
 package ngxconf
 
-import "strings"
-
 // Walk visits every directive depth-first, including block bodies.
 func Walk(directives []Directive, visit func(d *Directive) bool) {
 	for i := range directives {
@@ -27,13 +25,15 @@ func FindByName(directives []Directive, name string) []*Directive {
 	return out
 }
 
-// FindServers returns server blocks (http and stream contexts).
+// FindServers returns server blocks (http and stream contexts). It does not
+// descend into blocks where "server" means something else: location bodies,
+// upstream blocks (their server entries are upstream members) and the mail
+// module, which would otherwise show up as phantom http servers.
 func FindServers(directives []Directive) []*Directive {
 	var out []*Directive
 	Walk(directives, func(d *Directive) bool {
-		// Do not descend into nested location blocks: a "server" directive
-		// there is not an http server.
-		if d.Name == "location" {
+		switch d.Name {
+		case "location", "upstream", "mail":
 			return false
 		}
 		if d.Name == "server" {
@@ -124,19 +124,27 @@ func AllDirectiveArgs(directives []Directive, name string) []string {
 	return out
 }
 
-// ServerEnabled reports whether the server listens on TLS based on listen
-// parameters or ssl_certificate presence.
+// ServerEnabled reports whether the server listens on TLS. Only the listen
+// parameters "ssl" and "quic" switch a listener to TLS; nginx merely warns
+// about an ssl_certificate on a plaintext listener, so a certificate is a hint
+// (exposed through the certificate list), never proof of TLS.
 func ServerEnabled(server *Directive) bool {
-	for _, d := range server.Block {
-		if d.Name == "listen" {
-			for _, a := range d.Args {
-				if a.Value == "ssl" {
-					return true
-				}
+	for i := range server.Block {
+		d := &server.Block[i]
+		if d.Name != "listen" {
+			continue
+		}
+		for j, a := range d.Args {
+			if j == 0 {
+				continue // the first argument is the address, not a parameter
+			}
+			switch a.Value {
+			case "ssl", "quic":
+				return true
 			}
 		}
 	}
-	return len(FindByName(server.Block, "ssl_certificate")) > 0
+	return false
 }
 
 // UpstreamServer is one member entry of an upstream block.
@@ -163,16 +171,16 @@ func ProxyPass(location *Directive) string {
 	return FirstDirective(location.Block, "proxy_pass")
 }
 
-// LocationPath returns the location's match pattern (first argument without
-// modifiers like "=" or "^~").
+// LocationPath returns the location's match pattern without its leading
+// modifier ("=", "~", "~*" or "^~"), which nginx syntax keeps as a separate
+// argument. A regex location therefore yields the pattern, not the operator.
 func LocationPath(location *Directive) string {
-	for _, a := range location.Args {
-		if strings.HasPrefix(a.Value, "/") || strings.HasPrefix(a.Value, "~") || a.Value == "=" || a.Value == "^~" {
-			return a.Value
+	for i := range location.Args {
+		switch location.Args[i].Value {
+		case "=", "~", "~*", "^~":
+			continue
 		}
-	}
-	if len(location.Args) > 0 {
-		return location.Args[len(location.Args)-1].Value
+		return location.Args[i].Value
 	}
 	return ""
 }

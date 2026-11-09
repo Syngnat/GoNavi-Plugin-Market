@@ -29,6 +29,21 @@ const (
 	DefaultExecTimeout = 20 * time.Second
 	// MaxOutputBytes caps stdout/stderr of one remote command.
 	MaxOutputBytes = 2 << 20
+	// keepaliveInterval probes an idle cached connection. A NAT or firewall
+	// that drops idle sessions otherwise surfaces as a mid-command EOF.
+	keepaliveInterval = 30 * time.Second
+	keepaliveTimeout  = 5 * time.Second
+	keepaliveFailures = 3
+)
+
+// Probe reasons reported by Pool.Probe besides success.
+const (
+	// ProbeUnreachable means the remote host refused or timed out the TCP
+	// connection to the member; this is a normal "down" answer.
+	ProbeUnreachable = "unreachable"
+	// ProbeForwardingDisabled means sshd refused the direct-tcpip channel,
+	// which is what AllowTcpForwarding no looks like from the client side.
+	ProbeForwardingDisabled = "tcp-forwarding-disabled"
 )
 
 // ExecResult carries one bounded remote command outcome.
@@ -176,7 +191,64 @@ func (p *Pool) Client(ctx context.Context, prof store.Profile) (*ssh.Client, *pl
 		return nil, perr
 	}
 	p.remember(prof.ID, client)
+	p.startKeepalive(prof.ID, client)
 	return client, nil
+}
+
+// startKeepalive keeps a cached connection warm and evicts it after three
+// failed keepalives, so the next command dials afresh instead of reusing a
+// half-open socket. The goroutine exits when the client is closed.
+func (p *Pool) startKeepalive(id string, client *ssh.Client) {
+	closed := make(chan struct{})
+	go func() {
+		_ = client.Wait()
+		close(closed)
+	}()
+	go func() {
+		ticker := time.NewTicker(keepaliveInterval)
+		defer ticker.Stop()
+		failures := 0
+		for {
+			select {
+			case <-closed:
+				return
+			case <-ticker.C:
+				if p.keepaliveOnce(client) {
+					failures = 0
+					continue
+				}
+				failures++
+				if failures >= keepaliveFailures {
+					p.Invalidate(id)
+					return
+				}
+			}
+		}
+	}()
+}
+
+// keepaliveOnce sends one keepalive request with a bounded wait. The request
+// goroutine can stay blocked until the connection closes; callers only reach
+// that state after the connection is already considered dead.
+func (p *Pool) keepaliveOnce(client *ssh.Client) bool {
+	type reply struct {
+		ok  bool
+		err error
+	}
+	done := make(chan reply, 1)
+	go func() {
+		ok, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
+		done <- reply{ok: ok, err: err}
+	}()
+	select {
+	case res := <-done:
+		// Any reply means the transport is alive. Some servers answer
+		// keepalive@openssh.com with REQUEST_FAILURE, which is not a dead
+		// connection and must not evict a healthy client.
+		return res.err == nil
+	case <-time.After(keepaliveTimeout):
+		return false
+	}
 }
 
 func (p *Pool) dial(ctx context.Context, prof store.Profile) (*ssh.Client, *plugin.Error) {
@@ -212,10 +284,25 @@ func (p *Pool) dial(ctx context.Context, prof store.Profile) (*ssh.Client, *plug
 		}
 		done <- handshake{client: ssh.NewClient(conn, chans, reqs)}
 	}()
+	handshakeTimer := time.NewTimer(DialTimeout)
+	defer handshakeTimer.Stop()
 	select {
 	case <-ctx.Done():
 		_ = conn.Close()
+		go func() {
+			if res := <-done; res.client != nil {
+				_ = res.client.Close()
+			}
+		}()
 		return nil, rpcerr.E(rpcerr.CodeSSHTimeout, "SSH handshake canceled")
+	case <-handshakeTimer.C:
+		_ = conn.Close()
+		go func() {
+			if res := <-done; res.client != nil {
+				_ = res.client.Close()
+			}
+		}()
+		return nil, rpcerr.E(rpcerr.CodeSSHTimeout, "SSH handshake timed out")
 	case res := <-done:
 		if res.err != nil {
 			_ = conn.Close()
@@ -269,8 +356,22 @@ func retryable(err error) bool {
 }
 
 // Run executes one remote command with bounded output. A nonzero remote exit
-// is returned as result, not as an error.
+// is returned as result, not as an error. Transport errors on a cached client
+// are retried once on a fresh connection, so Run is only for idempotent
+// commands (reads, probes, status queries).
 func (p *Pool) Run(ctx context.Context, prof store.Profile, command string, timeout time.Duration, limit int64) (ExecResult, *plugin.Error) {
+	return p.run(ctx, prof, command, timeout, limit, true)
+}
+
+// RunOnce executes one remote command without the reconnect-and-retry step.
+// Commands with side effects must use it: after a timeout or a dropped
+// connection the command may already have reached the remote host, and
+// replaying it would repeat the effect.
+func (p *Pool) RunOnce(ctx context.Context, prof store.Profile, command string, timeout time.Duration, limit int64) (ExecResult, *plugin.Error) {
+	return p.run(ctx, prof, command, timeout, limit, false)
+}
+
+func (p *Pool) run(ctx context.Context, prof store.Profile, command string, timeout time.Duration, limit int64, retry bool) (ExecResult, *plugin.Error) {
 	if timeout <= 0 {
 		timeout = DefaultExecTimeout
 	}
@@ -283,7 +384,7 @@ func (p *Pool) Run(ctx context.Context, prof store.Profile, command string, time
 		if err == nil {
 			return result, nil
 		}
-		if !retryable(err) {
+		if !retry || !retryable(err) {
 			return ExecResult{}, rpcerr.FromCode(err)
 		}
 		p.Invalidate(prof.ID)
@@ -318,11 +419,11 @@ func runOnce(ctx context.Context, client *ssh.Client, command string, timeout ti
 	select {
 	case <-ctx.Done():
 		_ = session.Close()
-		<-done
+		awaitSession(done)
 		return ExecResult{}, ctx.Err()
 	case <-timer.C:
 		_ = session.Close()
-		<-done
+		awaitSession(done)
 		return ExecResult{}, fmt.Errorf("remote command timed out after %s", timeout)
 	case waitErr = <-done:
 	}
@@ -342,6 +443,16 @@ func runOnce(ctx context.Context, client *ssh.Client, command string, timeout ti
 		ExitCode: 0, Truncated: stdout.truncated,
 		DurationMs: time.Since(start).Milliseconds(),
 	}, nil
+}
+
+// awaitSession bounds the wait for ssh.Session.Run to unwind after Close.
+// A black-holed TCP connection can keep the channel bookkeeping blocked, and
+// a diagnostic handler must never hang on it forever.
+func awaitSession(done <-chan error) {
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+	}
 }
 
 // Output runs a command and requires a zero exit status.
@@ -397,19 +508,32 @@ func (p *Pool) ReadFile(ctx context.Context, prof store.Profile, path string, ma
 }
 
 // Probe dials one TCP address from the remote host. It returns the round
-// trip in milliseconds on success, -1 when the target is unreachable
-// (timeout or refused, which are normal answers, not errors) and a
-// plugin.Error only when the SSH transport itself fails.
-func (p *Pool) Probe(ctx context.Context, prof store.Profile, host string, port int, timeout time.Duration) (int64, *plugin.Error) {
+// trip in milliseconds on success, -1 plus a reason when the member does not
+// answer, and a plugin.Error only when the SSH transport itself fails.
+//
+// A late connection is always closed: when the deadline wins the race the
+// dial goroutine may still deliver a live conn afterwards, and abandoning it
+// would leak a forwarded socket on the remote sshd.
+func (p *Pool) Probe(ctx context.Context, prof store.Profile, host string, port int, timeout time.Duration) (int64, string, *plugin.Error) {
 	client, perr := p.Client(ctx, prof)
 	if perr != nil {
-		return -1, perr
+		return -1, "", perr
+	}
+	if timeout <= 0 {
+		timeout = 3 * time.Second
 	}
 	type outcome struct {
 		conn net.Conn
 		err  error
 	}
 	done := make(chan outcome, 1)
+	closeLate := func() {
+		go func() {
+			if res := <-done; res.conn != nil {
+				_ = res.conn.Close()
+			}
+		}()
+	}
 	start := time.Now()
 	go func() {
 		conn, err := client.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
@@ -419,16 +543,30 @@ func (p *Pool) Probe(ctx context.Context, prof store.Profile, host string, port 
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
-		return -1, rpcerr.E(rpcerr.CodeSSHTimeout, "probe canceled")
+		closeLate()
+		return -1, "", rpcerr.E(rpcerr.CodeSSHTimeout, "probe canceled")
 	case <-timer.C:
-		return -1, nil
+		closeLate()
+		return -1, ProbeUnreachable, nil
 	case res := <-done:
-		if res.err != nil {
-			return -1, nil
+		if res.conn != nil {
+			_ = res.conn.Close()
 		}
-		_ = res.conn.Close()
-		return time.Since(start).Milliseconds(), nil
+		if res.err != nil {
+			return -1, probeFailureReason(res.err), nil
+		}
+		return time.Since(start).Milliseconds(), "", nil
 	}
+}
+
+// probeFailureReason distinguishes a forwarding policy denial (which makes
+// every member "skipped" rather than "down") from an ordinary refusal.
+func probeFailureReason(err error) string {
+	var openErr *ssh.OpenChannelError
+	if errors.As(err, &openErr) && openErr.Reason == ssh.Prohibited {
+		return ProbeForwardingDisabled
+	}
+	return ProbeUnreachable
 }
 
 // ShellQuote single-quotes a value for safe interpolation into a remote shell command.
@@ -444,10 +582,26 @@ func truncateText(s string, max int) string {
 }
 
 // ParseCertificatePEM extracts the first X.509 certificate from PEM content.
+// A certificate file may start with a PRIVATE KEY or DH PARAMETERS block, so
+// every block is visited until a CERTIFICATE is found.
 func ParseCertificatePEM(content []byte) (*x509.Certificate, error) {
-	block, _ := pem.Decode(content)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, errors.New("no CERTIFICATE block found")
+	rest := content
+	for {
+		block, remaining := pem.Decode(rest)
+		if block == nil {
+			return nil, errors.New("no CERTIFICATE block found")
+		}
+		rest = remaining
+		if block.Type != "CERTIFICATE" {
+			if len(rest) == 0 {
+				return nil, errors.New("no CERTIFICATE block found")
+			}
+			continue
+		}
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		return cert, nil
 	}
-	return x509.ParseCertificate(block.Bytes)
 }

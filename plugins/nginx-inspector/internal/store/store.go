@@ -148,14 +148,32 @@ func (s *Store) Get(id string) (Profile, bool, error) {
 }
 
 // Save validates and upserts a profile, assigning id and timestamps.
+//
+// Updates merge secrets field by field: an empty password, key passphrase or
+// fingerprint keeps the stored value. The window never receives the secret
+// back, so a UI that only submits changed fields (renaming a connection, for
+// example) must not wipe the credential or the TOFU fingerprint.
 func (s *Store) Save(p Profile) (Profile, error) {
-	if err := validate(p); err != nil {
-		return Profile{}, err
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	data, err := s.load()
 	if err != nil {
+		return Profile{}, err
+	}
+	var previous *Profile
+	if p.ID != "" {
+		for i := range data.Profiles {
+			if data.Profiles[i].ID == p.ID {
+				previous = &data.Profiles[i]
+				break
+			}
+		}
+		if previous == nil {
+			return Profile{}, fmt.Errorf("profile %s not found", p.ID)
+		}
+		mergeSecrets(&p, *previous)
+	}
+	if err := validate(p); err != nil {
 		return Profile{}, err
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -169,24 +187,29 @@ func (s *Store) Save(p Profile) (Profile, error) {
 		p.UpdatedAt = now
 		data.Profiles = append(data.Profiles, p)
 	} else {
-		found := false
-		for i := range data.Profiles {
-			if data.Profiles[i].ID == p.ID {
-				p.CreatedAt = data.Profiles[i].CreatedAt
-				p.UpdatedAt = now
-				data.Profiles[i] = p
-				found = true
-				break
-			}
-		}
-		if !found {
-			return Profile{}, fmt.Errorf("profile %s not found", p.ID)
-		}
+		p.CreatedAt = previous.CreatedAt
+		p.UpdatedAt = now
+		*previous = p
 	}
 	if err := s.persist(data); err != nil {
 		return Profile{}, err
 	}
 	return p, nil
+}
+
+// mergeSecrets fills empty secret fields from the stored profile. Only
+// secrets behave this way: ordinary fields such as name, host and key path
+// are always replaced by the submitted value.
+func mergeSecrets(next *Profile, previous Profile) {
+	if next.Password == "" {
+		next.Password = previous.Password
+	}
+	if next.KeyPassphrase == "" {
+		next.KeyPassphrase = previous.KeyPassphrase
+	}
+	if next.Fingerprint == "" {
+		next.Fingerprint = previous.Fingerprint
+	}
 }
 
 // Delete removes one profile by id.
@@ -264,6 +287,9 @@ func validate(p Profile) error {
 	}
 	if len(p.Password) > 1024 || len(p.KeyPath) > 1024 || len(p.KeyPassphrase) > 1024 {
 		return fmt.Errorf("credential field exceeds 1024 bytes")
+	}
+	if len(p.Fingerprint) > 256 {
+		return fmt.Errorf("fingerprint exceeds 256 bytes")
 	}
 	switch p.AuthType {
 	case AuthPassword:

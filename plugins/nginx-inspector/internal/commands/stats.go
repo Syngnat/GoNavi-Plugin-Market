@@ -11,15 +11,22 @@ import (
 
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/rpcerr"
 	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/sshx"
+	"github.com/Syngnat/GoNavi-Plugin-Market/plugins/nginx-inspector/internal/store"
 )
 
-// accessLogLine matches the nginx "combined" format plus the optional
-// upstream timing fields many setups append. Custom log formats still
-// contribute the leading fields when they keep the same prefix.
+// accessLogLine matches the nginx "combined" format plus up to two optional
+// trailing fields. Two trailing fields are the common "$request_time
+// $upstream_response_time" pair; one trailing field is treated as
+// request_time because that is by far the most common single addition.
 var accessLogLine = regexp.MustCompile(
-	`^(\S+) \S+ (\S+) \[([^\]]+)\] "((?:[^"\\]|\\.)*)" (\d{3}) (\d+|-) "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)"(?: (\S+) (\S+))?`)
+	`^(\S+) \S+ (\S+) \[([^\]]+)\] "((?:[^"\\]|\\.)*)" (\d{3}) (\d+|-) "((?:[^"\\]|\\.)*)" "((?:[^"\\]|\\.)*)"(?: (\S+))?(?: (\S+))?`)
 
 const nginxTimeLayout = "02/Jan/2006:15:04:05 -0700"
+
+const (
+	defaultStatsWindow = 20 << 20
+	maxStatsWindow     = 100 << 20
+)
 
 // CountEntry is one aggregated bucket; AvgMs only appears for paths.
 type CountEntry struct {
@@ -28,23 +35,39 @@ type CountEntry struct {
 	AvgMs *float64 `json:"avgMs,omitempty"`
 }
 
-// AccessStats is the access.stats response.
+// TimingStats summarizes one timing column. Samples is always present so the
+// UI can distinguish "no timing data in this log format" from "zero".
+type TimingStats struct {
+	AvgMs   *float64 `json:"avgMs,omitempty"`
+	MaxMs   *float64 `json:"maxMs,omitempty"`
+	Samples int      `json:"samples"`
+}
+
+// AccessStats is the access.stats response. WindowBytes is the number of
+// bytes actually analyzed (not the requested window); RequestedBytes and
+// AnalyzedBytes make the transport cap visible instead of silently pretending
+// a 20 MiB window was read.
 type AccessStats struct {
-	Path          string       `json:"path"`
-	WindowBytes   int64        `json:"windowBytes"`
-	Total         int          `json:"total"`
-	Parsed        int          `json:"parsed"`
-	Unparsed      int          `json:"unparsed"`
-	Statuses      []CountEntry `json:"statuses"`
-	Classes       []CountEntry `json:"classes"`
-	Methods       []CountEntry `json:"methods"`
-	TopIPs        []CountEntry `json:"topIPs"`
-	TopPaths      []CountEntry `json:"topPaths"`
-	BytesTotal    int64        `json:"bytesTotal"`
-	TimeFrom      string       `json:"timeFrom,omitempty"`
-	TimeTo        string       `json:"timeTo,omitempty"`
-	AvgUpstreamMs *float64     `json:"avgUpstreamMs,omitempty"`
-	MaxUpstreamMs *float64     `json:"maxUpstreamMs,omitempty"`
+	Path            string       `json:"path"`
+	WindowBytes     int64        `json:"windowBytes"`
+	RequestedBytes  int64        `json:"requestedBytes"`
+	AnalyzedBytes   int64        `json:"analyzedBytes"`
+	Total           int          `json:"total"`
+	Parsed          int          `json:"parsed"`
+	Unparsed        int          `json:"unparsed"`
+	Statuses        []CountEntry `json:"statuses"`
+	Classes         []CountEntry `json:"classes"`
+	Methods         []CountEntry `json:"methods"`
+	TopIPs          []CountEntry `json:"topIPs"`
+	TopPaths        []CountEntry `json:"topPaths"`
+	BytesTotal      int64        `json:"bytesTotal"`
+	TimeFrom        string       `json:"timeFrom,omitempty"`
+	TimeTo          string       `json:"timeTo,omitempty"`
+	RequestTime     TimingStats  `json:"requestTime"`
+	UpstreamTime    TimingStats  `json:"upstreamTime"`
+	AvgUpstreamMs   *float64     `json:"avgUpstreamMs,omitempty"`
+	MaxUpstreamMs   *float64     `json:"maxUpstreamMs,omitempty"`
+	GzipUnsupported bool         `json:"gzipUnsupported,omitempty"`
 }
 
 func (r *Runtime) accessStats(ctx context.Context, args json.RawMessage) (any, error) {
@@ -64,18 +87,32 @@ func (r *Runtime) accessStats(ctx context.Context, args json.RawMessage) (any, e
 	if perr != nil {
 		return nil, perr
 	}
-	logPath, perr := resolveLogPath(info, "access", input.Path)
+	logPath, perr := r.logPath(ctx, input.ConnectionID, info, "access", input.Path)
 	if perr != nil {
 		return nil, perr
 	}
-	window := input.Bytes
-	if window <= 0 {
-		window = 20 << 20
+	requested := input.Bytes
+	if requested <= 0 {
+		requested = defaultStatsWindow
 	}
-	if window > 100<<20 {
-		window = 100 << 20
+	if requested > maxStatsWindow {
+		requested = maxStatsWindow
 	}
-	result, perr := r.pool.Run(ctx, profile, "tail -c "+strconv.FormatInt(window, 10)+" "+sshx.ShellQuote(logPath), 25*time.Second, window+(1<<20))
+	if compressed, ok := r.looksGzip(ctx, profile, logPath); ok && compressed {
+		return emptyAccessStats(logPath, requested, true), nil
+	}
+	analysisLimit := requested + (1 << 20)
+	if analysisLimit > sshx.MaxOutputBytes {
+		analysisLimit = sshx.MaxOutputBytes
+	}
+	// tail must not ask for more than the transport can deliver: with a
+	// 20 MiB request the old code read 20 MiB, kept the FIRST 2 MiB of it
+	// and silently analyzed the oldest part of the window. Reading exactly
+	// analysisLimit keeps the newest bytes, which is what a tail means.
+	readWindow := analysisLimit
+	result, perr := r.pool.Run(ctx, profile,
+		"tail -c "+strconv.FormatInt(readWindow, 10)+" "+sshx.ShellQuote(logPath),
+		25*time.Second, analysisLimit)
 	if perr != nil {
 		return nil, perr
 	}
@@ -83,11 +120,25 @@ func (r *Runtime) accessStats(ctx context.Context, args json.RawMessage) (any, e
 		return nil, rpcerr.E(rpcerr.CodeFileUnreadable, "access log is not readable: "+logPath,
 			map[string]string{"stderr": firstLine(result.Stderr)})
 	}
-	return analyzeAccessLog(logPath, window, result.Stdout), nil
+	return analyzeAccessLog(logPath, requested, result.Stdout), nil
 }
 
-func analyzeAccessLog(path string, window int64, content string) *AccessStats {
-	stats := &AccessStats{Path: path, WindowBytes: window}
+// looksGzip inspects the first two bytes; a gzip access log cannot be parsed
+// as text and must be reported as unsupported rather than as 100% unparsed.
+func (r *Runtime) looksGzip(ctx context.Context, profile store.Profile, logPath string) (bool, bool) {
+	out, perr := r.pool.Output(ctx, profile,
+		"head -c 2 "+sshx.ShellQuote(logPath)+" 2>/dev/null | od -An -tx1", 10*time.Second)
+	if perr != nil {
+		return false, false
+	}
+	return strings.Contains(strings.ToLower(out), "1f 8b"), true
+}
+
+func analyzeAccessLog(path string, requested int64, content string) *AccessStats {
+	stats := emptyAccessStats(path, requested, false)
+	stats.AnalyzedBytes = int64(len(content))
+	stats.WindowBytes = stats.AnalyzedBytes
+
 	statuses := map[string]int{}
 	classes := map[string]int{}
 	methods := map[string]int{}
@@ -95,9 +146,12 @@ func analyzeAccessLog(path string, window int64, content string) *AccessStats {
 	paths := map[string]int{}
 	pathTimeSum := map[string]float64{}
 	pathTimeCount := map[string]int{}
+	var requestSum float64
+	var requestCount int
+	var requestMax float64
 	var upstreamSum float64
 	var upstreamCount int
-	var maxUpstream float64
+	var upstreamMax float64
 	var firstTime, lastTime time.Time
 
 	for _, line := range splitLines(content) {
@@ -127,27 +181,41 @@ func analyzeAccessLog(path string, window int64, content string) *AccessStats {
 		if method != "" {
 			methods[method]++
 		}
+		requestTime, hasRequest := parseResponseTime(m[9])
+		upstreamTime, hasUpstream := parseResponseTime(m[10])
+		if hasRequest {
+			requestSum += requestTime
+			requestCount++
+			if requestTime > requestMax {
+				requestMax = requestTime
+			}
+		}
+		if hasUpstream {
+			upstreamSum += upstreamTime
+			upstreamCount++
+			if upstreamTime > upstreamMax {
+				upstreamMax = upstreamTime
+			}
+		}
 		if url != "" {
 			clean := url
 			if idx := strings.IndexAny(clean, "?#"); idx >= 0 {
 				clean = clean[:idx]
 			}
 			paths[clean]++
-			if rt, ok := parseResponseTime(m[10]); ok {
-				pathTimeSum[clean] += rt
+			// A per-path latency prefers the upstream duration and falls back
+			// to request_time when the log format has no upstream column.
+			if hasUpstream {
+				pathTimeSum[clean] += upstreamTime
+				pathTimeCount[clean]++
+			} else if hasRequest {
+				pathTimeSum[clean] += requestTime
 				pathTimeCount[clean]++
 			}
 		}
 		if m[6] != "-" {
 			if n, err := strconv.ParseInt(m[6], 10, 64); err == nil && n > 0 {
 				stats.BytesTotal += n
-			}
-		}
-		if rt, ok := parseResponseTime(m[10]); ok {
-			upstreamSum += rt
-			upstreamCount++
-			if rt > maxUpstream {
-				maxUpstream = rt
 			}
 		}
 		if ts, err := time.Parse(nginxTimeLayout, m[3]); err == nil {
@@ -168,13 +236,28 @@ func analyzeAccessLog(path string, window int64, content string) *AccessStats {
 		stats.TimeFrom = firstTime.UTC().Format(time.RFC3339)
 		stats.TimeTo = lastTime.UTC().Format(time.RFC3339)
 	}
-	if upstreamCount > 0 {
-		avg := upstreamSum / float64(upstreamCount) * 1000
-		stats.AvgUpstreamMs = &avg
-		maxMs := maxUpstream * 1000
-		stats.MaxUpstreamMs = &maxMs
-	}
+	stats.RequestTime = newTimingStats(requestSum, requestCount, requestMax)
+	stats.UpstreamTime = newTimingStats(upstreamSum, upstreamCount, upstreamMax)
+	stats.AvgUpstreamMs = stats.UpstreamTime.AvgMs
+	stats.MaxUpstreamMs = stats.UpstreamTime.MaxMs
 	return stats
+}
+
+func emptyAccessStats(path string, requested int64, gzip bool) *AccessStats {
+	return &AccessStats{
+		Path: path, RequestedBytes: requested, GzipUnsupported: gzip,
+		Statuses: []CountEntry{}, Classes: []CountEntry{}, Methods: []CountEntry{},
+		TopIPs: []CountEntry{}, TopPaths: []CountEntry{},
+	}
+}
+
+func newTimingStats(sum float64, count int, max float64) TimingStats {
+	if count == 0 {
+		return TimingStats{}
+	}
+	avg := sum / float64(count) * 1000
+	maxMs := max * 1000
+	return TimingStats{AvgMs: &avg, MaxMs: &maxMs, Samples: count}
 }
 
 func splitRequest(request string) (method, url string) {
@@ -230,6 +313,39 @@ func topCounts(counter map[string]int, limit int, timeSum map[string]float64, ti
 	return entries
 }
 
+// unescapeLog decodes nginx's default escape=default encoding, which writes
+// quotes, backslashes and control/high bytes as \xHH (for example \x22 for a
+// double quote). Only the request/referrer/user-agent strings need it.
 func unescapeLog(s string) string {
-	return strings.NewReplacer(`\"`, `"`, `\\`, `\`).Replace(s)
+	if !strings.Contains(s, "\\") {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\\' || i+1 >= len(s) {
+			b.WriteByte(s[i])
+			continue
+		}
+		switch s[i+1] {
+		case 'x':
+			if i+3 < len(s) {
+				if value, err := strconv.ParseUint(s[i+2:i+4], 16, 8); err == nil {
+					b.WriteByte(byte(value))
+					i += 3
+					continue
+				}
+			}
+			b.WriteByte(s[i])
+		case '\\':
+			b.WriteByte('\\')
+			i++
+		case '"':
+			b.WriteByte('"')
+			i++
+		default:
+			b.WriteByte(s[i])
+		}
+	}
+	return b.String()
 }
