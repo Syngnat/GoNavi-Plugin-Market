@@ -30,8 +30,8 @@ GoNavi → 标题栏插件按钮 → 插件市场/本地安装:选择发行 ZIP,
 或使用 CLI(先关闭桌面端插件运行时):
 
 ```sh
-gonavi plugin --root <data-root>/plugins inspect gonavi-plugin-nginx-inspector-1.0.1.zip
-gonavi plugin --root <data-root>/plugins install --digest <sha256> --trust gonavi-plugin-nginx-inspector-1.0.1.zip
+gonavi plugin --root <data-root>/plugins inspect gonavi-plugin-nginx-inspector-1.0.2.zip
+gonavi plugin --root <data-root>/plugins install --digest <sha256> --trust gonavi-plugin-nginx-inspector-1.0.2.zip
 gonavi plugin --root <data-root>/plugins enable com.gonavi.nginx-inspector
 ```
 
@@ -58,7 +58,7 @@ SDK 以伪版本引用 `github.com/Syngnat/GoNavi/sdk/go`,无其他第三方依�
 
 ```sh
 go test ./plugins/nginx-inspector/...
-go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.1.zip
+go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.2.zip
 ```
 
 `buildtool` 交叉编译 5 个平台(windows/amd64、linux/amd64、linux/arm64、

@@ -1,7 +1,8 @@
-# Nginx Inspector 1.0.1
+# Nginx Inspector 1.0.2
 
-1.0.1 是一次可用性修复版：1.0.0 在当前宿主上会被拒绝安装，而且配置树、证书巡检、日志路径与
-访问统计在标准 nginx 配置下会给出错误或空白结果。本版修复了这些问题，并补上了插件发布流程。
+1.0.2 是一次可用性与正确性修复版。1.0.1 只补了窗口权限声明，配置树、证书巡检、日志路径与访问统计
+在标准 nginx 配置下仍会给出错误或空白结果；1.0.0 则会被 v1.2.1+ 宿主直接拒装。本版修复这些缺陷，
+补齐路径白名单与帧预算，并把插件发布真正接上市场目录。
 
 ## 安装要求
 
@@ -12,7 +13,8 @@
 
 ### 发布链
 
-- 清单补上 `ui.html-panel`，修正 1.0.0 在 v1.2.1+ 宿主上“window requires the ui.html-panel permission”的拒装。
+- 清单保留 `ui.html-panel`，修正 1.0.0 在 v1.2.1+ 宿主上“window requires the ui.html-panel permission”的拒装；
+  1.0.1 虽有该权限，但从未写入市场目录，客户端仍只看到 1.0.0。
 - 新增 tag 触发的 Release 流水线：五平台构建、`SHA256SUMS.txt`、按 tag 生成 Release，并用构建产物的真实
   sha256/size 更新 `public/catalog.json`（版本、installSpec、artifact 一次写全）。
 - 新增插件 CI（gofmt/vet/test/build + catalog 一致性校验）与 `.gitattributes`（Go 文件 LF），消除 CRLF 噪声。
@@ -52,6 +54,8 @@
 - 日志路径优先取自合并后的配置（`access_log`/`error_log`，含 `http` 级），`off`/`syslog:`/`memory:`/`$变量`
   会给出 `source`+`note`；回退 `nginx -V`。
 - `logs.search` 增加 `windowLine` 与 `windowStartOffset`，明确行号是窗口内相对值（旧 `line` 字段保留一版）。
+- `logs.tail`/`logs.search` 输出限制在 512 KiB（宿主单帧 1 MiB），避免大日志行把整个调用打成帧错误；
+  尾部按字节窗口读取并在本地裁剪行数，截断如实置 `truncated`。
 - `service.reload` 在信号/systemd 返回后读取 `error_log` 尾部，只有未出现 `[emerg]`/`[alert]` 才报 `applied`，
   否则 `unknown`；自动识别 nginx/openresty/tengine unit，systemd 失败回退 `-s reload` 并置 `fallbackUsed`；
   非 root 导致的权限类 `-t` 失败单独返回 `RELOAD_BLOCKED reason=permission`。
