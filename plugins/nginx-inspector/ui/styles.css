@@ -338,6 +338,9 @@ input[aria-invalid="true"], select[aria-invalid="true"] {
 .field-note:empty { display: none; }
 
 .pills { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.path-field { display: flex; gap: 6px; min-width: 0; align-items: center; }
+form.conn .path-field input { width: auto; flex: 1 1 0; min-width: 0; }
+.path-field button { flex: 0 0 auto; white-space: nowrap; }
 .pills .pill { white-space: nowrap; }
 
 td .mono, td.mono { white-space: pre-wrap; }

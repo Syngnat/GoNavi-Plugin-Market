@@ -103,6 +103,10 @@ const STRINGS = {
     password: "密码",
     keyPath: "私钥路径",
     keyPassphrase: "私钥口令",
+    chooseFile: "选择…",
+    keyFilePickTitle: "选择本机 SSH 私钥文件",
+    keyFilePickUnavailable: "当前宿主不支持文件选择，请手动输入私钥路径。",
+    keyFilePickFailed: "打开文件选择器失败，请手动输入私钥路径。",
     save: "保存",
     cancel: "取消",
     edit: "编辑",
@@ -280,6 +284,10 @@ const STRINGS = {
     password: "Password",
     keyPath: "Private key path",
     keyPassphrase: "Key passphrase",
+    chooseFile: "Choose…",
+    keyFilePickTitle: "Select a local SSH private key",
+    keyFilePickUnavailable: "This host cannot open a file picker; enter the key path manually.",
+    keyFilePickFailed: "Could not open the file picker; enter the key path manually.",
     save: "Save",
     cancel: "Cancel",
     edit: "Edit",
@@ -1530,6 +1538,37 @@ function connForm(existing) {
     maxlength: "1024",
     spellcheck: "false",
   });
+  const keyPathPicker = el("button", {
+    type: "button",
+    text: t("chooseFile"),
+    title: t("keyFilePickTitle"),
+    "aria-label": t("keyFilePickTitle"),
+  });
+  const canPickKeyFile = window.gonaviPlugin && typeof window.gonaviPlugin.pickFile === "function";
+  if (!canPickKeyFile) {
+    keyPathPicker.disabled = true;
+    keyPathPicker.title = t("keyFilePickUnavailable");
+  }
+  keyPathPicker.addEventListener("click", async function () {
+    if (!canPickKeyFile) {
+      formError.textContent = t("keyFilePickUnavailable");
+      return;
+    }
+    keyPathPicker.disabled = true;
+    try {
+      const path = await window.gonaviPlugin.pickFile({ title: t("keyFilePickTitle") });
+      if (path) {
+        keyPathInput.value = path;
+        keyPathInput.focus();
+        keyPathInput.setSelectionRange(path.length, path.length);
+      }
+    } catch {
+      formError.textContent = t("keyFilePickFailed");
+    } finally {
+      keyPathPicker.disabled = false;
+    }
+  });
+  const keyPathField = el("div", { class: "path-field" }, [keyPathInput, keyPathPicker]);
   const keyPassInput = el("input", {
     type: "password",
     autocomplete: "new-password",
@@ -1547,7 +1586,7 @@ function connForm(existing) {
   const syncAuth = function () {
     const passwordMode = authSelect.value === "password";
     const passwordNodes = [passwordLabel, passwordInput, passwordHint];
-    const keyNodes = [keyPathLabel, keyPathInput, keyPassLabel, keyPassInput, passphraseHint];
+    const keyNodes = [keyPathLabel, keyPathField, keyPassLabel, keyPassInput, passphraseHint];
     for (const node of passwordNodes) {
       if (node) node.classList.toggle("hidden", !passwordMode);
     }
@@ -1567,7 +1606,7 @@ function connForm(existing) {
     el("label", { text: t("authType") }), authSelect,
     passwordLabel, passwordInput,
     passwordHint,
-    keyPathLabel, keyPathInput,
+    keyPathLabel, keyPathField,
     keyPassLabel, keyPassInput,
     passphraseHint,
   ]);
