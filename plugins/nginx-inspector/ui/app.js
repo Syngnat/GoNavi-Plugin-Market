@@ -16,6 +16,7 @@ const STRINGS = {
     conn: "连接",
     noConn: "未选择连接",
     addConn: "新建连接…",
+    selectConn: "选择连接…",
     manage: "连接管理",
     connections: "SSH 连接",
     overview: "概览",
@@ -227,6 +228,7 @@ const STRINGS = {
     conn: "Connection",
     noConn: "No connection",
     addConn: "New connection…",
+    selectConn: "Select a connection…",
     manage: "Connections",
     connections: "SSH connections",
     overview: "Overview",
@@ -766,7 +768,7 @@ function renderConnSelect() {
     return el("option", { value: c.id }, c.name);
   });
   select.replaceChildren(
-    el("option", { value: "" }, "— " + t("addConn") + " —"),
+    el("option", { value: "" }, "— " + t("selectConn") + " —"),
     ...options,
     el("option", { value: "__new__" }, "+ " + t("addConn"))
   );
