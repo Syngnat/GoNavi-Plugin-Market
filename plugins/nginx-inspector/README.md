@@ -25,13 +25,15 @@ GoNavi 插件:通过 SSH 对远程 nginx 做**以只读为主的诊断**——�
 ## 安装
 
 GoNavi → 标题栏插件按钮 → 插件市场/本地安装:选择发行 ZIP,核对清单与权限后信任安装,
-启用后在插件详情页点「打开窗口」。
+启用后在插件详情页点「打开窗口」。清单声明了顶栏入口(`contributes.navigation`,
+`location: tools`)后,标题栏工具条上也会出现「Nginx Inspector」按钮(与 GoNavi SSH 同一区域),
+点击直接打开该独立窗口。
 
 或使用 CLI(先关闭桌面端插件运行时):
 
 ```sh
-gonavi plugin --root <data-root>/plugins inspect gonavi-plugin-nginx-inspector-1.0.6.zip
-gonavi plugin --root <data-root>/plugins install --digest <sha256> --trust gonavi-plugin-nginx-inspector-1.0.6.zip
+gonavi plugin --root <data-root>/plugins inspect gonavi-plugin-nginx-inspector-1.0.7.zip
+gonavi plugin --root <data-root>/plugins install --digest <sha256> --trust gonavi-plugin-nginx-inspector-1.0.7.zip
 gonavi plugin --root <data-root>/plugins enable com.gonavi.nginx-inspector
 ```
 
@@ -58,7 +60,7 @@ SDK 以伪版本引用 `github.com/Syngnat/GoNavi/sdk/go`,无其他第三方依�
 
 ```sh
 go test ./plugins/nginx-inspector/...
-go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.6.zip
+go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.7.zip
 ```
 
 `buildtool` 交叉编译 5 个平台(windows/amd64、linux/amd64、linux/arm64、

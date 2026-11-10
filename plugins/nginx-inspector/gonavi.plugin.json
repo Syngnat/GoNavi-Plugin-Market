@@ -3,7 +3,7 @@
   "apiVersion": 1,
   "id": "com.gonavi.nginx-inspector",
   "name": "Nginx Inspector",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Read-only nginx diagnostics over SSH: config tree with include expansion, nginx -t validation, gated reload, error/access log tailing and search, access log statistics, TLS certificate expiry review and upstream health probes.",
   "author": "GoNavi",
   "license": "Apache-2.0",
@@ -28,6 +28,14 @@
     "height": 840
   },
   "contributes": {
+    "navigation": [
+      {
+        "id": "nginx.inspector",
+        "title": "Nginx Inspector",
+        "target": "window",
+        "location": "tools"
+      }
+    ],
     "commands": [
       {
         "id": "connections.list",
