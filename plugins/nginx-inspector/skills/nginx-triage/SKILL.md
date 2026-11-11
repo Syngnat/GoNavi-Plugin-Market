@@ -35,7 +35,11 @@ call `connections.list` first and ask which one to use when more than one exists
 3. **Understand the structure** — `config.tree` returns parsed files, server blocks
    (listen, names, ssl, locations with proxy_pass) and upstream blocks. Check
    `truncated` before treating the tree as complete; `files[]` already includes the
-   main config, so the file count is `files.length`.
+   main config, so the file count is `files.length`. Read `warnings` for degraded
+   results (unresolved globs, skipped/unreadable includes, truncated files) and
+   `error` when only a parsed prefix could be returned. An include outside the read
+   allowlist appears as `#disallowed-include` and its content is never read; that is
+   a plugin boundary, not necessarily a broken config.
 4. **Errors** — `logs.tail` with `kind:"error"`, default 200 lines. Look for
    `[emerg]`, `[crit]`, `[error]` and repeated patterns. Use `filter` with a RE2
    regex and `level` to select a configured error_log level. When `truncated` is true
@@ -43,10 +47,14 @@ call `connections.list` first and ask which one to use when more than one exists
    may be the binary default, `access_log off`, or syslog, and `totalLines` with
    `windowStartLine` locates the returned window.
 5. **Traffic** — `access.stats` over a 20–50 MB window answers status distribution,
-   5xx bursts, top IPs/paths, and latency. Prefer the structured `requestTime` and
+   5xx bursts, top IPs/paths, and latency. It analyzes the `access_log` from the
+   merged config (falling back to the `nginx -V` default); check `source` and `note`
+   — an empty `path` with a `note` means the log is off, syslog or variable-based.
+   Prefer the structured `requestTime` and
    `upstreamTime` objects (avg/max/samples); the legacy `avgUpstreamMs`/`maxUpstreamMs` only describe `$upstream_response_time`. Report
    `analyzedBytes` vs `requestedBytes` when you quote a window, and treat
-   `gzipUnsupported:true` as "no data" rather than "no traffic". Then `logs.search`
+   `truncated:true` as "the read stopped early" and `gzipUnsupported:true` as
+   "no data" rather than "no traffic". Then `logs.search`
    with a targeted ERE for evidence lines; each hit carries `windowLine`,
    `windowStartOffset` and the window/file sizes.
 6. **TLS** — `certs.list` flags expired and ≤30-day certificates, unreadable files,

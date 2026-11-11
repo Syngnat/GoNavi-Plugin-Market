@@ -13,11 +13,11 @@ GoNavi 插件:通过 SSH 对远程 nginx 做**以只读为主的诊断**——�
 |---|---|
 | 连接管理 | SSH 配置(密码/私钥)保存在本机插件数据目录,界面永不回显密码(仅 `hasPassword`/`hasKeyPassphrase`),私钥路径可直接调用宿主原生文件选择器选取本机文件,也可手动输入,保存时会自动去掉首尾引号(Windows“复制为路径”会带引号);编辑时留空即保留原凭据;首次连接记录服务器指纹(TOFU),指纹变化即拒绝,保存时省略 `fingerprint` 保持记录、显式传入才重新钉住。保存与删除属于写命令 |
 | 概览 | `nginx -V` 解析:版本、二进制、prefix、主配置、日志路径、systemd/容器环境;结果在插件进程内缓存,可显式刷新 |
-| 配置 | 主配置 + include 递归展开(环形检测、64 文件/8 层上限),server/upstream/location 摘要,按文件查看内容;文件数即 `files.length`,超限或超长时展示 `truncated` |
+| 配置 | 主配置 + include 递归展开(环形检测、64 文件/8 层上限、与 `config.get` 相同的路径白名单),server/upstream/location 摘要,按文件查看内容;文件数即 `files.length`,超限或超长时展示 `truncated`,并逐条展示 `warnings` / `error` |
 | 校验 | 远程执行 `nginx -t`,逐条解析报错的 file:line |
 | 服务 | 状态(systemd/pid/uptime);reload 带 `nginx -t` 门禁 + 显式确认,回执区分 `applied`(error_log 无 emerg/alert)与 `unknown` |
 | 日志 | error/access tail(≤1000 行,可按 error_log 级别)+ 本地正则过滤 + 远程 grep 搜索(≤50 MB 窗口);展示日志来源(`source`)、说明(`note`)、总行数与窗口起始行,命中行号、窗口字节偏移可追溯,截断有提示 |
-| 访问统计 | combined 格式聚合:状态码/分类、方法、Top IP、Top 路径(含平均耗时)、时间范围;区分"请求窗口"与"实际分析字节",gzip 日志标记为不支持解析 |
+| 访问统计 | 跟随配置中的 `access_log`(而非 `nginx -V` 的编译期默认),combined 格式聚合:状态码/分类、方法、Top IP、Top 路径(含平均耗时)、时间范围;窗口边读边聚合,20–100 MB 窗口不再受单次命令输出上限限制;区分"请求窗口"与"实际分析字节",`truncated` 如实上报,gzip 日志标记为不支持解析 |
 | 证书 | 解析配置引用的 `ssl_certificate`(X.509,相对路径按 prefix 解析,同时展示原始路径与解析后文件),标记 ≤30 天到期/已过期/不可读/解析失败(含原因)/跳过 |
 | 上游 | 从远程主机对每个 upstream server 做 TCP 探测(并发 ≤8,3 秒超时);unix socket、变量地址或配置中已 `down` 的成员标记为跳过,backup/disabled 单独展示 |
 | 界面 | 独立 HTML 窗口(无外部资源,仅加载本地静态资源);切页使用代际令牌防止旧响应覆盖新页面,切换页签不会触发 SSH 连接测试 |
@@ -32,8 +32,8 @@ GoNavi → 标题栏插件按钮 → 插件市场/本地安装:选择发行 ZIP,
 或使用 CLI(先关闭桌面端插件运行时):
 
 ```sh
-gonavi plugin --root <data-root>/plugins inspect gonavi-plugin-nginx-inspector-1.0.8.zip
-gonavi plugin --root <data-root>/plugins install --digest <sha256> --trust gonavi-plugin-nginx-inspector-1.0.8.zip
+gonavi plugin --root <data-root>/plugins inspect gonavi-plugin-nginx-inspector-1.0.9.zip
+gonavi plugin --root <data-root>/plugins install --digest <sha256> --trust gonavi-plugin-nginx-inspector-1.0.9.zip
 gonavi plugin --root <data-root>/plugins enable com.gonavi.nginx-inspector
 ```
 
@@ -60,7 +60,7 @@ SDK 以伪版本引用 `github.com/Syngnat/GoNavi/sdk/go`,无其他第三方依�
 
 ```sh
 go test ./plugins/nginx-inspector/...
-go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.8.zip
+go run ./cmd/buildtool -manifest plugins/nginx-inspector/gonavi.plugin.json -output plugin-dist/nginx-inspector -zip plugin-dist/gonavi-plugin-nginx-inspector-1.0.9.zip
 ```
 
 `buildtool` 交叉编译 5 个平台(windows/amd64、linux/amd64、linux/arm64、
@@ -85,6 +85,8 @@ skills/nginx-triage/     # Agent 技能文档
 
 - **不写配置文件**:GUI 配置生成/写回是另一个量级的工程与生产风险,本插件定位诊断。
 - **不读私钥内容回传**;密码仅在保存与拨号时存在于插件进程内存。
-- **路径白名单**:读取仅限 nginx prefix、日志与证书目录,越界返回 `PATH_NOT_ALLOWED`。
+- **路径白名单**:读取仅限 nginx prefix、日志与证书目录,越界返回 `PATH_NOT_ALLOWED`;
+  include 展开与 `config.get` 走同一套校验,越界 include 在树中以 `#disallowed-include` 标记,不读取内容。
 - 日志与配置读取全部有字节/行数上限(单文件 ≤512 KiB、tail ≤1000 行),响应中的
-  `truncated` 会如实回传并在界面上提示,避免静默截断。
+  `truncated` 会如实回传并在界面上提示,避免静默截断。访问统计的窗口边读边聚合,
+  不受单条命令 2 MiB 输出上限约束。

@@ -185,6 +185,36 @@ func TestExpandIncludesUnreadableFileBecomesPlaceholder(t *testing.T) {
 	}
 }
 
+// An include outside the read allowlist must not leak file content into the
+// tree: config.get refuses the same path, so the tree has to agree.
+func TestExpandIncludesRejectsDisallowedPath(t *testing.T) {
+	reader := &fakeConfigReader{files: map[string]string{
+		"/etc/shadow":                "root:$6$secret\n",
+		"/etc/nginx/snippets/x.conf": "worker_processes 1;\n",
+	}}
+	src := "include /etc/shadow;\ninclude snippets/x.conf;\n"
+	merged, loaded := expandTestIncludes(t, reader, src)
+
+	if len(merged) != 2 {
+		t.Fatalf("merged = %+v", merged)
+	}
+	if merged[0].Name != "#disallowed-include" {
+		t.Fatalf("first node = %q, want #disallowed-include", merged[0].Name)
+	}
+	if strings.Contains(strings.Join(merged[0].ArgValues(), " "), "root:") {
+		t.Fatal("content of a disallowed include must never reach the tree")
+	}
+	if merged[1].Name != "worker_processes" {
+		t.Fatalf("allowed include after a rejected one = %+v", merged[1])
+	}
+	if len(reader.commands) != 0 {
+		t.Fatalf("a rejected include must not run a remote command: %v", reader.commands)
+	}
+	if loaded.tree.IncludedCount != 1 {
+		t.Fatalf("includedCount = %d, want 1 (only the allowed snippet)", loaded.tree.IncludedCount)
+	}
+}
+
 func TestExpandIncludesCapsTotalFiles(t *testing.T) {
 	files := map[string]string{}
 	names := make([]string, 0, maxIncludeFiles)

@@ -376,6 +376,16 @@ func expandIncludes(ctx context.Context, reader configReader, profile store.Prof
 					out = append(out, includePlaceholder("#include-cycle", d, target, "include cycle broken"))
 					continue
 				}
+				// Includes are read by the same code path as config.get, so they
+				// must obey the same read allowlist: a config that includes a
+				// file outside it would otherwise leak that file's content into
+				// the tree while config.get refuses to show it.
+				allowed, perr := allowPath(info, target, false)
+				if perr != nil {
+					out = append(out, includePlaceholder("#disallowed-include", d, target, perr.Message))
+					continue
+				}
+				target = allowed
 				read, perr := reader.ReadFile(ctx, profile, target, maxConfigFileBytes)
 				if perr != nil {
 					out = append(out, includePlaceholder("#unreadable-include", d, target, perr.Message))

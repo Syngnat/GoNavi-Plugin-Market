@@ -23,9 +23,12 @@ const (
 // prefix). Readable reports whether the file could be read; ParseError is set
 // when the bytes were read but were not a usable PEM certificate.
 type CertificateInfo struct {
-	Path           string   `json:"path"`
-	File           string   `json:"file,omitempty"`
-	Readable       bool     `json:"readable"`
+	Path     string `json:"path"`
+	File     string `json:"file,omitempty"`
+	Readable bool   `json:"readable"`
+	// Skipped marks a path that was never read (variable, traversal attempt,
+	// outside the read allowlist); Reason explains why.
+	Skipped        bool     `json:"skipped,omitempty"`
 	Reason         string   `json:"reason,omitempty"`
 	ParseError     bool     `json:"parseError,omitempty"`
 	ParseErrorText string   `json:"parseErrorText,omitempty"`
@@ -122,6 +125,7 @@ func (r *Runtime) certsList(ctx context.Context, args json.RawMessage) (any, err
 		entry := CertificateInfo{Path: ref.Raw, File: ref.Resolved}
 		if ref.Reason != "" {
 			entry.Readable = false
+			entry.Skipped = true
 			entry.Reason = ref.Reason
 			report.Skipped++
 			report.Certificates = append(report.Certificates, entry)

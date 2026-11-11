@@ -9,6 +9,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -461,6 +462,129 @@ func awaitSession(done <-chan error) {
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
+	}
+}
+
+// StreamResult carries one streamed remote command outcome. BytesRead is what
+// the consumer actually received; Truncated means the maxBytes cap stopped the
+// read early, so the tail of the output was never delivered.
+type StreamResult struct {
+	BytesRead  int64 `json:"bytesRead"`
+	Truncated  bool  `json:"truncated"`
+	ExitCode   int   `json:"exitCode"`
+	DurationMs int64 `json:"durationMs"`
+}
+
+// streamOutcome is the stdout reader's final report.
+type streamOutcome struct {
+	err       error
+	bytes     int64
+	truncated bool
+}
+
+// awaitStream bounds the wait for the stdout reader to unwind after Close.
+func awaitStream(done <-chan streamOutcome) {
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+	}
+}
+
+// Stream executes one remote command and hands its stdout to consume as it
+// arrives, so output far larger than the frame budget can be aggregated
+// without ever being held in memory. consume must not retain the slice.
+//
+// There is deliberately no reconnect-and-retry here: replaying the command
+// would feed the same bytes to the consumer twice. Callers that want a retry
+// restart the whole aggregation.
+func (p *Pool) Stream(ctx context.Context, prof store.Profile, command string, timeout time.Duration, maxBytes int64, consume func([]byte)) (StreamResult, *plugin.Error) {
+	if timeout <= 0 {
+		timeout = DefaultExecTimeout
+	}
+	client, perr := p.Client(ctx, prof)
+	if perr != nil {
+		return StreamResult{}, perr
+	}
+	start := time.Now()
+	session, err := client.NewSession()
+	if err != nil {
+		return StreamResult{}, rpcerr.FromCode(err)
+	}
+	defer session.Close()
+	stdout, err := session.StdoutPipe()
+	if err != nil {
+		return StreamResult{}, rpcerr.FromCode(err)
+	}
+	stderr := &limitedBuffer{limit: 64 << 10}
+	session.Stderr = stderr
+	if err := session.Start(command); err != nil {
+		return StreamResult{}, rpcerr.FromCode(err)
+	}
+
+	done := make(chan streamOutcome, 1)
+	go func() {
+		buf := make([]byte, 32<<10)
+		var total int64
+		truncated := false
+		for {
+			n, readErr := stdout.Read(buf)
+			if n > 0 {
+				chunk := buf[:n]
+				if maxBytes > 0 && total+int64(n) > maxBytes {
+					chunk = chunk[:maxBytes-total]
+					truncated = true
+				}
+				if len(chunk) > 0 {
+					total += int64(len(chunk))
+					consume(chunk)
+				}
+				if truncated {
+					done <- streamOutcome{bytes: total, truncated: true}
+					return
+				}
+			}
+			if readErr != nil {
+				if readErr == io.EOF {
+					readErr = nil
+				}
+				done <- streamOutcome{err: readErr, bytes: total}
+				return
+			}
+		}
+	}()
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		_ = session.Close()
+		awaitStream(done)
+		return StreamResult{}, rpcerr.E(rpcerr.CodeSSHTimeout, "remote stream canceled")
+	case <-timer.C:
+		_ = session.Close()
+		awaitStream(done)
+		return StreamResult{}, rpcerr.E(rpcerr.CodeSSHTimeout, "remote command timed out after "+timeout.String())
+	case outcome := <-done:
+		if outcome.truncated {
+			// The cap was intentional; the command's exit status is no longer
+			// meaningful because its output was cut short.
+			_ = session.Close()
+			return StreamResult{BytesRead: outcome.bytes, Truncated: true, DurationMs: time.Since(start).Milliseconds()}, nil
+		}
+		if outcome.err != nil {
+			return StreamResult{}, rpcerr.FromCode(outcome.err)
+		}
+		result := StreamResult{BytesRead: outcome.bytes, DurationMs: time.Since(start).Milliseconds()}
+		waitErr := session.Wait()
+		if waitErr == nil {
+			return result, nil
+		}
+		var exitErr *ssh.ExitError
+		if errors.As(waitErr, &exitErr) {
+			result.ExitCode = exitErr.ExitStatus()
+			return result, nil
+		}
+		return StreamResult{}, rpcerr.FromCode(waitErr)
 	}
 }
 

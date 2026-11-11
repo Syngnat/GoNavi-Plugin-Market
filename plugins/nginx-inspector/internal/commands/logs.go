@@ -273,6 +273,13 @@ func (r *Runtime) logsSearch(ctx context.Context, args json.RawMessage) (any, er
 	if strings.TrimSpace(input.Pattern) == "" || len(input.Pattern) > 256 {
 		return nil, rpcerr.E(rpcerr.CodeInvalidArgs, "pattern must be 1-256 characters (POSIX extended regex)")
 	}
+	if input.Level != "" {
+		level := strings.ToLower(input.Level)
+		if _, ok := errorLogLevels[level]; !ok {
+			return nil, rpcerr.E(rpcerr.CodeInvalidArgs, "level must be one of debug, info, notice, warn, error, crit, alert, emerg")
+		}
+		input.Level = level
+	}
 	kind := normalizeLogKind(input.Kind)
 	info, perr := r.ensureInfo(ctx, input.ConnectionID)
 	if perr != nil {
@@ -340,11 +347,19 @@ func (r *Runtime) logsSearch(ctx context.Context, args json.RawMessage) (any, er
 		if err != nil {
 			continue
 		}
+		text := line[idx+1:]
+		// The remote grep can only match text, so a level filter is applied
+		// here; otherwise grep -m would spend the match budget on lines the
+		// caller asked to exclude.
+		if input.Level != "" && kind == "error" {
+			if _, rank, ok := errorLineLevel(text); !ok || rank < errorLogLevels[input.Level] {
+				continue
+			}
+		}
 		if len(matches) >= maxMatches {
 			more = true
 			break
 		}
-		text := line[idx+1:]
 		if len(text) > maxMatchTextBytes {
 			// Cut on a byte boundary, then drop a torn UTF-8 tail.
 			text = strings.ToValidUTF8(text[:maxMatchTextBytes], "") + "…"
@@ -370,6 +385,7 @@ func (r *Runtime) logsSearch(ctx context.Context, args json.RawMessage) (any, er
 		"kind": kind, "path": target.Path, "source": target.Source, "note": target.Note,
 		"matches": matches, "more": more, "scannedBytes": scanned, "windowBytes": scanned,
 		"fileSizeBytes": fileSize, "windowStartOffset": windowStart, "exitCode": result.ExitCode,
+		"level": input.Level,
 	}, nil
 }
 

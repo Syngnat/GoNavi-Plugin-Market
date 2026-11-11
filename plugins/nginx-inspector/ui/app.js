@@ -170,6 +170,7 @@ const STRINGS = {
     unit: "systemd 单元",
     totalLines: "总行数",
     level: "日志级别",
+    levelAll: "全部级别",
     state: "状态",
     pid: "PID",
     uptime: "运行时长",
@@ -207,6 +208,7 @@ const STRINGS = {
     fileIncludedTimes: "被 include {count} 次",
     includeUnresolved: "include 未匹配到任何文件,配置可能遗漏",
     includeUnreadable: "include 文件不可读",
+    includeDisallowed: "include 路径不在允许读取范围内,已跳过",
     tailTruncated: "tail 输出超过远端命令输出上限,显示的是前缀而不是完整尾部。",
     searchTruncated: "搜索命中数达到上限,仅显示前若干条。",
     statsTruncated: "日志窗口被输出上限截断:统计只覆盖窗口内更新的那部分字节,不代表整个时间窗。",
@@ -382,6 +384,7 @@ const STRINGS = {
     unit: "systemd unit",
     totalLines: "Total lines",
     level: "Log level",
+    levelAll: "All levels",
     state: "State",
     pid: "PID",
     uptime: "Uptime",
@@ -419,6 +422,7 @@ const STRINGS = {
     fileIncludedTimes: "included {count} times",
     includeUnresolved: "include matched no files; the configuration may be incomplete",
     includeUnreadable: "included file is unreadable",
+    includeDisallowed: "included path is outside the allowed read roots; skipped",
     tailTruncated: "The tail output hit the remote command limit; this is the prefix, not the newest lines.",
     searchTruncated: "Match limit reached; only the first matches are shown.",
     statsTruncated: "The log window was cut by the output limit: statistics cover only the newest bytes of the window, not the whole time range.",
@@ -536,7 +540,9 @@ function errorDetail(err) {
 
 function errorText(err) {
   const detail = errorDetail(err);
-  if (err.code === "EXEC_FAILED" && detail && detail.kind === "permission") {
+  // The backend reports permission failures under details.reason; the older
+  // details.kind spelling is kept so a stale backend still localizes.
+  if (err.code === "EXEC_FAILED" && detail && (detail.reason === "permission" || detail.kind === "permission")) {
     return ERROR_TEXT[LOCALE]["EXEC_PERMISSION"] || err.message;
   }
   if (err.code === "RELOAD_BLOCKED" && detail && detail.reason === "permission") {
@@ -1016,6 +1022,7 @@ function nodeLine(node) {
     line.classList.add("dir-err");
     if (name === "#unresolved-include") line.append(el("span", { class: "ln", text: "  " + t("includeUnresolved") }));
     else if (name === "#unreadable-include") line.append(el("span", { class: "ln", text: "  " + t("includeUnreadable") }));
+    else if (name === "#disallowed-include") line.append(el("span", { class: "ln", text: "  " + t("includeDisallowed") }));
   }
   return line;
 }
@@ -1123,6 +1130,15 @@ function renderConfigBody(tree, generation) {
   ]));
   if (tree.truncated) {
     parts.push(el("div", { class: "alert bad", text: t("configTruncated") }));
+  }
+  // The backend reports non-fatal degradations (unresolved globs, skipped
+  // includes, parse fallbacks) and a hard error it could still partly parse;
+  // neither is visible in the directive tree itself, so surface both.
+  if (tree.error) {
+    parts.push(el("div", { class: "alert bad", text: tree.error }));
+  }
+  for (const warning of tree.warnings || []) {
+    parts.push(el("div", { class: "alert", text: warning }));
   }
 
   const serverRows = (tree.servers || []).map(function (s) {
@@ -1362,6 +1378,15 @@ async function renderLogs(main, generation) {
   linesInput.setAttribute("aria-label", t("lines"));
   const filterInput = el("input", { type: "text", class: "wide", placeholder: t("filter") });
   const searchInput = el("input", { type: "text", class: "wide", placeholder: t("searchPattern") });
+  // Level filtering only means anything for error logs; the select stays
+  // enabled so switching kind back restores the current choice.
+  const levelSelect = el("select", {}, [
+    el("option", { value: "" }, t("levelAll")),
+  ].concat(["emerg", "alert", "crit", "error", "warn", "notice", "info", "debug"].map(function (level) {
+    return el("option", { value: level }, level);
+  })));
+  levelSelect.setAttribute("aria-label", t("level"));
+  const levelLabel = el("label", { text: t("level") });
   const refreshButton = el("button", { class: "primary", text: t("refresh") });
   const searchButton = el("button", { text: t("search") });
   const meta = el("div", { class: "sub" });
@@ -1387,12 +1412,14 @@ async function renderLogs(main, generation) {
     tailNotice.replaceChildren();
     out.textContent = t("loading");
     try {
-      const res = await call("logs.tail", {
+      const args = {
         connectionId: state.connectionId,
         kind: kindSelect.value,
         lines: clampLines(linesInput.value),
         filter: filterInput.value,
-      });
+      };
+      if (levelSelect.value && kindSelect.value === "error") args.level = levelSelect.value;
+      const res = await call("logs.tail", args);
       if (!current(gen)) return;
       sourceHead.textContent = connName() + " · " + (kindSelect.value === "access" ? t("accessLog") : t("errorLog"));
       sourcePath.textContent = res.path || "";
@@ -1422,12 +1449,14 @@ async function renderLogs(main, generation) {
     const gen = state.generation;
     searchOut.replaceChildren(el("div", { class: "skel", text: t("loading") }));
     try {
-      const res = await call("logs.search", {
+      const searchArgs = {
         connectionId: state.connectionId,
         kind: kindSelect.value,
         pattern: searchInput.value,
         maxMatches: 100,
-      });
+      };
+      if (levelSelect.value && kindSelect.value === "error") searchArgs.level = levelSelect.value;
+      const res = await call("logs.search", searchArgs);
       if (!current(gen)) return;
       const rows = (res.matches || []).map(function (m) {
         return [m.windowLine != null ? m.windowLine : m.line, m.text];
@@ -1453,16 +1482,29 @@ async function renderLogs(main, generation) {
     }
   }
 
+  function syncLevelVisibility() {
+    const errorMode = kindSelect.value !== "access";
+    levelLabel.classList.toggle("hidden", !errorMode);
+    levelSelect.classList.toggle("hidden", !errorMode);
+  }
+
   refreshButton.onclick = doTail;
   searchButton.onclick = doSearch;
-  kindSelect.addEventListener("change", doTail);
+  kindSelect.addEventListener("change", function () {
+    syncLevelVisibility();
+    doTail();
+  });
+  levelSelect.addEventListener("change", doTail);
   searchInput.addEventListener("keydown", function (e) { if (e.key === "Enter") doSearch(); });
   filterInput.addEventListener("keydown", function (e) { if (e.key === "Enter") doTail(); });
+  syncLevelVisibility();
 
   parts.push(
     sourceBox,
     el("div", { class: "row" }, [
       kindSelect,
+      levelLabel,
+      levelSelect,
       el("label", { text: t("lines") }),
       linesInput,
       filterInput,
@@ -1549,6 +1591,9 @@ async function renderStats(main, generation) {
       if (!current(gen)) return;
       const analyzed = analyzedBytes(s);
       const requested = numOrNull(s.requestedBytes) != null ? s.requestedBytes : requestedArg;
+      // Windows are aggregated while streaming, so the whole requested range
+      // is analyzed; the notice below only fires when the remote read stopped
+      // early or the transport cap cut it.
       const total = numOrNull(s.total);
       const parsed = numOrNull(s.parsed);
       const unparsed = numOrNull(s.unparsed) != null
@@ -1569,6 +1614,7 @@ async function renderStats(main, generation) {
 
       const metaBits = [];
       if (s.path) metaBits.push(s.path);
+      if (s.source) metaBits.push(t("source") + ": " + sourceLabel(s.source));
       metaBits.push(t("timeRange") + ": " + fmtTime(s.timeFrom) + " → " + fmtTime(s.timeTo));
       if (total != null) metaBits.push(t("scanned") + ": " + (parsed != null ? parsed : 0) + "/" + total);
       if (unparsed != null) metaBits.push(t("unparsed") + ": " + unparsed);
@@ -1591,6 +1637,7 @@ async function renderStats(main, generation) {
       }
 
       const nodes = [kpiGrid(kpis), el("p", { class: "sub stat-meta", text: metaBits.join(" · ") })];
+      if (s.note) nodes.push(el("p", { class: "sub", text: t("note") + ": " + s.note }));
       if (s.gzipUnsupported) nodes.push(el("div", { class: "alert bad", text: t("gzipUnsupported") }));
       if (s.truncated === true) nodes.push(el("div", { class: "alert bad", text: t("statsTruncated") }));
       nodes.push(grid);

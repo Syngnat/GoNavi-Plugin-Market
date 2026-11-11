@@ -344,7 +344,9 @@ func TestCertsPathAllowlistIntegration(t *testing.T) {
 	}
 }
 
-func TestAccessStatsTruncationIntegration(t *testing.T) {
+// A window larger than the file must analyze the whole file: the streaming
+// path is not limited by the per-command output cap any more.
+func TestAccessStatsAnalyzesWholeWindowBeyondFrameCap(t *testing.T) {
 	nl := string(rune(10))
 	line := `203.0.113.7 - - [24/Oct/2026:10:00:01 +0800] "GET /api/users HTTP/1.1" 200 1534 "-" "Mozilla/5.0" 0.045 0.044`
 	content := strings.Repeat(line+nl, (3<<20)/len(line))
@@ -364,8 +366,11 @@ func TestAccessStatsTruncationIntegration(t *testing.T) {
 	if stats.RequestedBytes != requested {
 		t.Fatalf("requestedBytes = %d", stats.RequestedBytes)
 	}
-	if stats.WindowBytes != int64(sshx.MaxOutputBytes) || stats.AnalyzedBytes != stats.WindowBytes {
-		t.Fatalf("window = %d analyzed = %d, want %d", stats.WindowBytes, stats.AnalyzedBytes, sshx.MaxOutputBytes)
+	if stats.AnalyzedBytes != int64(len(content)) || stats.WindowBytes != stats.AnalyzedBytes {
+		t.Fatalf("analyzed = %d window = %d, want the whole %d-byte file", stats.AnalyzedBytes, stats.WindowBytes, len(content))
+	}
+	if stats.Truncated {
+		t.Fatal("a window larger than the file must not be reported as truncated")
 	}
 	if stats.Total == 0 || stats.Parsed == 0 {
 		t.Fatalf("expected parsed lines, got total=%d parsed=%d", stats.Total, stats.Parsed)
@@ -375,6 +380,148 @@ func TestAccessStatsTruncationIntegration(t *testing.T) {
 	}
 	if stats.GzipUnsupported {
 		t.Fatalf("text log must not be reported as gzip")
+	}
+}
+
+// A window smaller than the file analyzes exactly that many newest bytes.
+func TestAccessStatsHonorsSmallWindow(t *testing.T) {
+	nl := string(rune(10))
+	line := `203.0.113.7 - - [24/Oct/2026:10:00:01 +0800] "GET /api/users HTTP/1.1" 200 1534 "-" "Mozilla/5.0" 0.045 0.044`
+	content := strings.Repeat(line+nl, 5000)
+	host, port := startFakeSSH(t, fileCommands(map[string][]byte{
+		"/var/log/nginx/access.log": []byte(content),
+	}))
+	runtime, connectionID := newFakeRuntime(t, host, port)
+	const requested = int64(64 << 10)
+	result, err := runtime.accessStats(context.Background(), connectionArgs(t, connectionID, "bytes", requested))
+	if err != nil {
+		t.Fatalf("access.stats: %v", err)
+	}
+	stats := result.(*AccessStats)
+	if stats.AnalyzedBytes != requested {
+		t.Fatalf("analyzed = %d, want the requested %d", stats.AnalyzedBytes, requested)
+	}
+	if stats.Total == 0 || stats.Total >= 5000 {
+		t.Fatalf("total = %d, want a bounded subset of 5000 lines", stats.Total)
+	}
+}
+
+// Statistics must follow the access_log directive of the merged config, not the
+// compile-time default from nginx -V: sites that write their own log file would
+// otherwise get statistics from an unrelated (usually empty) default path.
+func TestAccessStatsUsesConfiguredAccessLog(t *testing.T) {
+	nl := string(rune(10))
+	line := `203.0.113.7 - - [24/Oct/2026:10:00:01 +0800] "GET /api/users HTTP/1.1" 200 1534 "-" "Mozilla/5.0" 0.045 0.044`
+	config := "http {\n    access_log /var/log/nginx/site.access.log;\n}\n"
+	host, port := startFakeSSH(t, fileCommands(map[string][]byte{
+		"/etc/nginx/nginx.conf":          []byte(config),
+		"/var/log/nginx/site.access.log": []byte(line + nl),
+		"/var/log/nginx/access.log":      []byte("this default file must not be analyzed" + nl),
+	}))
+	runtime, connectionID := newFakeRuntime(t, host, port)
+	result, err := runtime.accessStats(context.Background(), connectionArgs(t, connectionID))
+	if err != nil {
+		t.Fatalf("access.stats: %v", err)
+	}
+	stats := result.(*AccessStats)
+	if stats.Path != "/var/log/nginx/site.access.log" {
+		t.Fatalf("path = %q, want the configured access_log", stats.Path)
+	}
+	if stats.Source != "config" {
+		t.Fatalf("source = %q, want config", stats.Source)
+	}
+	if stats.Total != 1 || stats.Parsed != 1 {
+		t.Fatalf("total/parsed = %d/%d, want the configured file's single line", stats.Total, stats.Parsed)
+	}
+}
+
+// A log target that cannot be read (off/syslog) must report its note instead of
+// silently analyzing the binary default.
+func TestAccessStatsReportsUnreadableTarget(t *testing.T) {
+	config := "http {\n    access_log off;\n}\n"
+	host, port := startFakeSSH(t, fileCommands(map[string][]byte{
+		"/etc/nginx/nginx.conf": []byte(config),
+	}))
+	runtime, connectionID := newFakeRuntime(t, host, port)
+	result, err := runtime.accessStats(context.Background(), connectionArgs(t, connectionID))
+	if err != nil {
+		t.Fatalf("access.stats: %v", err)
+	}
+	stats := result.(*AccessStats)
+	if stats.Path != "" {
+		t.Fatalf("path = %q, want empty for an unreadable target", stats.Path)
+	}
+	if !strings.Contains(stats.Note, "off") {
+		t.Fatalf("note = %q, want the access_log off explanation", stats.Note)
+	}
+	if stats.Total != 0 {
+		t.Fatalf("total = %d, want 0 analyzed lines", stats.Total)
+	}
+}
+
+// logs.search must honor the level filter locally: the remote grep matches
+// text only, so without this the match budget is spent on excluded lines.
+func TestLogsSearchLevelFilter(t *testing.T) {
+	nl := string(rune(10))
+	lines := []string{
+		"2026/10/24 10:00:00 [notice] 1#0: signal 17",
+		"2026/10/24 10:00:01 [warn] 1#0: upstream slow",
+		"2026/10/24 10:00:02 [error] 1#0: connect() failed",
+		"2026/10/24 10:00:03 [emerg] 1#0: no memory",
+	}
+	content := strings.Join(lines, nl) + nl
+	base := fileCommands(map[string][]byte{
+		"/var/log/nginx/error.log": []byte(content),
+	})
+	// Emulate "tail ... | grep -n": every line matches, numbered from 1.
+	handler := func(command string) (string, string, int) {
+		if strings.Contains(command, "| grep ") {
+			var out strings.Builder
+			for i, line := range lines {
+				out.WriteString(strconv.Itoa(i+1) + ":" + line + nl)
+			}
+			return out.String(), "", 0
+		}
+		return base(command)
+	}
+	host, port := startFakeSSH(t, handler)
+	runtime, connectionID := newFakeRuntime(t, host, port)
+
+	result, err := runtime.logsSearch(context.Background(),
+		connectionArgs(t, connectionID, "kind", "error", "pattern", "1#0", "level", "error"))
+	if err != nil {
+		t.Fatalf("logs.search: %v", err)
+	}
+	payload, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	raw, err := json.Marshal(payload["matches"])
+	if err != nil {
+		t.Fatalf("marshal matches: %v", err)
+	}
+	var matches []struct {
+		WindowLine int    `json:"windowLine"`
+		Text       string `json:"text"`
+	}
+	if err := json.Unmarshal(raw, &matches); err != nil {
+		t.Fatalf("unmarshal matches: %v", err)
+	}
+	if len(matches) != 2 {
+		t.Fatalf("matches = %d, want the error and emerg lines only: %s", len(matches), raw)
+	}
+	for _, m := range matches {
+		if strings.Contains(m.Text, "[notice]") || strings.Contains(m.Text, "[warn]") {
+			t.Fatalf("level filter let a lower level through: %q", m.Text)
+		}
+	}
+	if payload["level"] != "error" {
+		t.Fatalf("level echo = %v", payload["level"])
+	}
+
+	if _, err := runtime.logsSearch(context.Background(),
+		connectionArgs(t, connectionID, "kind", "error", "pattern", "x", "level", "bogus")); err == nil {
+		t.Fatal("an unknown level must be rejected")
 	}
 }
 
