@@ -162,7 +162,17 @@ Let's Encrypt ECDSA，cert-name `plugin.gonavi.org`，webroot 续期（certbot �
 
 ### 官方插件上架
 
-服务端目录是主路径：`gonavi-market-server -publish-official <zip>` 走同一条静态校验/发布流水线（官方徽标由运营授予）。`public/catalog.json` 作为服务不可用时的静态兜底，仍可用 `python deploy/update-catalog.py` 更新。
+服务端目录是主路径：`gonavi-market-server -publish-official <zip>` 走同一条静态校验/发布流水线（官方徽标由运营授予）。`public/catalog.json` 作为服务不可用时的静态兜底，由 `python3 deploy/update-catalog.py` 推送。
+
+**静态兜底为什么不能只靠 `deploy.yml`**：`plugin-release.yml` 用 `GITHUB_TOKEN` 推送 `chore(market)` 提交，而 GitHub 不会为 `GITHUB_TOKEN` 触发的 push 启动工作流，所以 `deploy.yml` 从不因这次提交重建站点，线上 `current/catalog.json` 会一直停留在上一个版本（1.0.9 发布时线上仍是 1.0.6）。因此 `plugin-release.yml` 的 `release` job 在推完 catalog 提交后直接调用本脚本把文件送到站点；脚本会校验远端摘要、原子替换并回读公网摘要确认。
+
+手动修复或本地演练：
+
+```bash
+python3 deploy/update-catalog.py --dry-run          # 只打印目标，不写入
+python3 deploy/update-catalog.py                     # 推送并校验 https://plugin.gonavi.org/catalog.json
+python3 deploy/update-catalog.py --host user@host --port 2222   # CI 用法
+```
 
 ## Host checker
 

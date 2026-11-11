@@ -33,6 +33,16 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
+      - name: Configure ssh
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+
       - name: Build five-platform package
         run: |
           set -eu
@@ -68,6 +78,11 @@ jobs:
           node scripts/update-plugin-catalog.mjs \
             --manifest plugins/nginx-inspector/gonavi.plugin.json \
             --zip "/tmp/gonavi-plugin-nginx-inspector-${version}.zip"
+          # The commit below is pushed with GITHUB_TOKEN, and GitHub never starts
+          # a workflow for a GITHUB_TOKEN event, so deploy.yml does not rebuild
+          # the site. That would leave the static fallback catalog.json (served
+          # when /api/v1 is down) advertising the previous version forever, so
+          # this job publishes it directly below.
           if git diff --quiet -- public/catalog.json; then
             echo "catalog already current"
             exit 0
@@ -75,6 +90,24 @@ jobs:
           git add public/catalog.json
           git commit -m "chore(market): publish nginx-inspector ${version}"
           git push origin main
+
+      - name: Publish static catalog fallback
+        # Runs on every successful release, including the one where the catalog
+        # commit was already current: the site copy may still be stale because
+        # an earlier run failed after pushing the commit.
+        env:
+          SSH_KEY: /home/runner/.ssh/deploy_key
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          set -eu
+          version="${RELEASE_TAG#nginx-inspector-v}"
+          python3 deploy/update-catalog.py \
+            --host "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            ${DEPLOY_PORT:+--port "${DEPLOY_PORT}"} \
+            --remote-root /srv/gonavi-plugin-market
+          echo "static catalog now serves nginx-inspector ${version}"
 
       - name: Publish GitHub release
         env:
