@@ -17,7 +17,7 @@
 | `host.query.read` | 通过插件页面桥用已保存连接执行单条只读查询 | 仍受只读连接、SQL 审计、30s 超时、扫描层行预算与 256 KiB 结果上限约束；不能写入或开事务。**只读 ≠ 无副作用**：锁子句与常见危险函数被拒绝，其余副作用未穷举 |
 | `host.schema.write` | 通过 `schema.preview` / `schema.apply` 对已保存连接执行受控 DDL | 仅 CREATE/ALTER/DROP TABLE\|INDEX\|VIEW；拒绝只读/结构保护连接、TRUNCATE、数据库/schema 级 DDL、DML 与多语句；apply 必须经宿主原生确认，计划一次性且 5 分钟过期 |
 | `host.ai.providers.read` | 通过 `ai.providers.read` 读取已配置 AI 供应商的元数据：ID、类型、名称、认证方式、端点（已去凭据与 fragment）、模型与协议、是否有密钥 | 不返回密钥、自定义请求头或 CLI 环境；不写任何对象；不改动供应商列表。判断「是否已存在同一条」够用，读不到也不影响插件其余功能 |
-| `host.ai.providers.write` | 通过 `ai.providers.import` 把**已经解析好的**供应商条目（名称、端点、协议、模型、凭据、请求头）写入宿主 AI 供应商列表；同名同地址视为重复，只有显式 `overwrite` 才复用原 ID 就地更新 | 不回读既有密钥或凭据（逐条结果只带条目名与宿主生成的 providerId）；不删除、不停用既有供应商；不做宿主原生确认——是否覆盖由用户在插件页上显式勾选；只接受 http(s) 端点且不落 URL 里的凭据；自定义请求头超过 16 组时该条直接失败（reason `too_many_headers`），不静默截断 |
+| `host.ai.providers.write` | 通过 `ai.providers.import` 把**已经解析好的**供应商条目（名称、端点、协议、模型、凭据、请求头）写入宿主 AI 供应商列表；同名同地址视为重复（主机名大小写不敏感、路径与查询大小写敏感），只有显式 `overwrite` 才复用原 ID 就地更新 | 不回读既有密钥或凭据（逐条结果只带条目名与宿主生成的 providerId，且名称有界截断）；不删除、不停用既有供应商；不做宿主原生确认——是否覆盖由用户在插件页上显式勾选；只接受 http(s) 端点且不落 URL 里的凭据；请求头超过 16 组（`too_many_headers`）或单条无法在边界内落库（`invalid_headers`）时该条失败，不静默丢弃；取消后立即停写，并逐条回报已落地结果（顶层 `cancelled: true`） |
 | `host.files` | 通过 `files.pick` / `files.save` 弹出宿主原生文件或目录选择器，并把用户选中的路径回给插件 | 宿主不代插件读写文件——文件 I/O 由插件自己做；不返回目录树、不返回未选中的路径；用户取消即返回空 |
 | `host.events` | 通过 `events.subscribe` / `events.poll` / `events.publish` / `events.unsubscribe` 在有界话题上收发宿主事件（偏好、生命周期、连接）与插件自定义事件 | 不是通用消息总线：话题数每插件 ≤8、订阅每插件 ≤4，事件随进程换代失效；只送同一插件自己的页面与窗口，不跨插件转发 |
 | `host.clipboard` | 通过 `clipboard.read` / `clipboard.write` 读写系统剪贴板的纯文本（读 ≤64 KiB、写 ≤256 KiB） | 不读剪贴板里的图片、文件列表或 HTML 片段；不监听剪贴板变化；不投递到其它应用之外 |
