@@ -13,11 +13,19 @@
 | `host.describe` | 读取**当前进程**的身份 | 不能用参数指定别的插件，也不返回宿主状态 |
 | `host.connections.read` | 通过插件页面桥读取脱敏后的已保存连接列表 | 不返回凭据、DSN、SSH／代理密码；不代替连接授权 |
 | `host.connections.credentials` | 在**插件动作**启动的独立窗口中读取所选连接的完整配置与凭据 | 仅随 `connectionActions` 的 launch context 下发，窗口不暴露给插件页面；不代替连接授权，仍受只读/生产保护 |
-| `host.metadata.read` | 通过插件页面桥读取已保存连接的库／表／列元数据 | 不执行查询、不读数据行、不写任何对象 |
+| `host.metadata.read` | 通过插件页面桥读取已保存连接的库／表／列元数据；同时仍是旧只读能力 `ai.providers`（AI 供应商元数据）的准入权限 | 不执行查询、不读数据行、不写任何对象；想读 AI 供应商元数据的**新**插件请改用 `host.ai.providers.read`，不要为此申请数据库元数据权限 |
 | `host.query.read` | 通过插件页面桥用已保存连接执行单条只读查询 | 仍受只读连接、SQL 审计、30s 超时、扫描层行预算与 256 KiB 结果上限约束；不能写入或开事务。**只读 ≠ 无副作用**：锁子句与常见危险函数被拒绝，其余副作用未穷举 |
 | `host.schema.write` | 通过 `schema.preview` / `schema.apply` 对已保存连接执行受控 DDL | 仅 CREATE/ALTER/DROP TABLE\|INDEX\|VIEW；拒绝只读/结构保护连接、TRUNCATE、数据库/schema 级 DDL、DML 与多语句；apply 必须经宿主原生确认，计划一次性且 5 分钟过期 |
+| `host.ai.providers.read` | 通过 `ai.providers.read` 读取已配置 AI 供应商的元数据：ID、类型、名称、认证方式、端点（已去凭据与 fragment）、模型与协议、是否有密钥 | 不返回密钥、自定义请求头或 CLI 环境；不写任何对象；不改动供应商列表。判断「是否已存在同一条」够用，读不到也不影响插件其余功能 |
+| `host.ai.providers.write` | 通过 `ai.providers.import` 把**已经解析好的**供应商条目（名称、端点、协议、模型、凭据、请求头）写入宿主 AI 供应商列表；同名同地址视为重复（主机名大小写不敏感、路径与查询大小写敏感），只有显式 `overwrite` 才复用原 ID 就地更新 | 不回读既有密钥或凭据（逐条结果只带条目名与宿主生成的 providerId，且名称有界截断）；不删除、不停用既有供应商；不做宿主原生确认——是否覆盖由用户在插件页上显式勾选；只接受 http(s) 端点且不落 URL 里的凭据；请求头超过 16 组（`too_many_headers`）或单条无法在边界内落库（`invalid_headers`）时该条失败，不静默丢弃；取消后立即停写，并逐条回报已落地结果（顶层 `cancelled: true`） |
+| `host.files` | 通过 `files.pick` / `files.save` 弹出宿主原生文件或目录选择器，并把用户选中的路径回给插件 | 宿主不代插件读写文件——文件 I/O 由插件自己做；不返回目录树、不返回未选中的路径；用户取消即返回空 |
+| `host.events` | 通过 `events.subscribe` / `events.poll` / `events.publish` / `events.unsubscribe` 在有界话题上收发宿主事件（偏好、生命周期、连接）与插件自定义事件 | 不是通用消息总线：话题数每插件 ≤8、订阅每插件 ≤4，事件随进程换代失效；只送同一插件自己的页面与窗口，不跨插件转发 |
+| `host.clipboard` | 通过 `clipboard.read` / `clipboard.write` 读写系统剪贴板的纯文本（读 ≤64 KiB、写 ≤256 KiB） | 不读剪贴板里的图片、文件列表或 HTML 片段；不监听剪贴板变化；不投递到其它应用之外 |
 | `host.appearance.read` | 通过页面桥读取宿主背景状态：背景来源（自定义图片／内置图库）、透明度、位置、启用开关，以及内置图库目录与缩略图 | 不授予写入；自定义背景图片以 JPEG data URL 返回，图库缩略图以 data URL 返回，不暴露本地路径或其他插件数据 |
 | `host.appearance.write` | 通过页面桥更换／清除背景、调节透明度与位置、启用开关，并下载／切换／删除内置图库条目 | 不授予读取图库目录以外的权限；删除正在使用的背景会被拒绝；不直接访问宿主存储或文件系统 |
+| `ui.dialog` | 通过 `dialog.confirm` 弹一次宿主原生确认框并把用户的选择回给插件 | 只回布尔值；不收集文本输入、不弹自定义 UI、不代插件执行副作用 |
+| `ui.progress` | 通过 `progress.report` 上报一条有界的任务进度（开始/更新/结束），以宿主通知形式呈现 | 不是任务调度：不执行、不取消、不排队插件的工作；无跨重启状态 |
+| `ui.sidebar` | 声明 `contributes.sidebar`，在宿主左侧连接树挂可展开的分组，节点数据由声明的命令产出、宿主按文本渲染 | 不授予任何 `host.*` 能力；不能改写连接树其它部分或其它插件的分组；分组数每插件 ≤4，节点由宿主校验后才进树 |
 | `ui.pages` | 渲染 `pages`、把页面导航挂到主窗口（标题栏「插件」菜单），并在设置中心声明的 `settingsSections` 位置渲染页面；`target: "window"` 的导航只打开插件自己的窗口，不需要本权限 | 不授予任何 `host.*` 能力，也不授权其他插件页面 |
 | `ui.html-panel` | 在主窗口内以不透明源沙箱 iframe 渲染有界自定义 HTML；面板没有桥，`pages` 里的 HTML 页面自 v1 起可通过页面桥调用**已单独授权**的 `host.*` 能力 | 不提供存储、Cookie、凭据、同源访问、表单或嵌套 frame；CSP 拦截页面 fetch／XHR／WebSocket 与外部资源，但这不是 OS 或网络栈沙箱，也**不阻止页面自我导航**（导航后宿主撤销桥，见页面契约） |
 | `system.open-external` | 通过 `system.open-external` 能力把**一个** http(s) 链接交给系统默认浏览器打开；插件页面与插件窗口均可调用 | 不接受 `file:`／`javascript:`／`data:`／`mailto:`／自定义 scheme、带用户名密码的 URL 或超长目标；不导航宿主 WebView，插件无法把主窗口、页面 frame 或插件窗口变成地址栏；Web／headless 运行时不执行 |
